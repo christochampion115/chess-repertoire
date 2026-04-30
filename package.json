@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@mliebelt/pgn-parser": "^1.4.19"
+  }
+}
