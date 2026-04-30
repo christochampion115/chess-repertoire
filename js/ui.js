@@ -6,6 +6,7 @@ import { handleSquareClick, playUciMove, initExampleData } from './repertoire.js
 import { fetchLichessStats } from './stats.js';
 import { loginWithCredentials, signupWithCredentials, logoutSession } from './auth.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
+import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 
 const ELO_MIN = 0;
 const ELO_MAX = 3000;

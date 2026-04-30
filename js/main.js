@@ -68,6 +68,8 @@ function initSortMenuToggle() {
   const sortMenuItems = document.querySelectorAll('.stats-sort-menu-item');
 
   if (!sortToggleBtn || !sortMenu) return;
+  if (sortToggleBtn.dataset.sortbound) return;
+  sortToggleBtn.dataset.sortbound = '1';
 
   sortToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -110,6 +112,8 @@ function initAnalysisMenuToggle() {
   const analysisMenu = document.getElementById('stats-analysis-menu');
 
   if (!analysisToggleBtn || !analysisMenu) return;
+  if (analysisToggleBtn.dataset.analysismenubound) return;
+  analysisToggleBtn.dataset.analysismenubound = '1';
 
   analysisToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();

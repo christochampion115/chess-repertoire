@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { eventBus } from './events.js';
+import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 
 const SF_CDN = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js';
 const ANALYSIS_DEBOUNCE_MS = 200;
@@ -86,21 +87,6 @@ function formatAnnotationScore(cp) {
   return `${cp >= 0 ? '+' : ''}${(cp / 100).toFixed(2)}`;
 }
 
-function getMoveTotalGames(move) {
-  return (move?.white || 0) + (move?.draws || 0) + (move?.black || 0);
-}
-
-function getMoveWinRate(move, fen) {
-  const total = getMoveTotalGames(move);
-  if (!total) return 0;
-  const sideToMove = (fen?.split(' ')[1] || 'w');
-  return sideToMove === 'w' ? move.white / total : move.black / total;
-}
-
-function getMoveEnginePreference(move) {
-  const value = state.moveAnnotationValues?.[move.uci];
-  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
-}
 
 function sortStatsMovesForAnalysis(moves, fen) {
   const sortBy = state.statsFilters?.sortBy || 'frequency';
@@ -709,3 +695,12 @@ export function syncAnalysisControls() {
     depthInput.dataset.analysisbound = '1';
   }
 }
+
+// Terminer proprement le Worker Stockfish à la fermeture de la page
+window.addEventListener('beforeunload', () => {
+  if (engine) {
+    engine.postMessage('quit');
+    engine.terminate();
+    engine = null;
+  }
+});
