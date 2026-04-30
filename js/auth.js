@@ -365,6 +365,7 @@ function applyRemoteRepertoires(repertoires) {
   // resetWorkspaceState() appelle clearRemoteTracking() qui les efface — on les restaure après.
   const savedDirtyIds = new Set(dirtyRepertoireIds);
   const savedRemoteIds = new Map(remoteRepertoireIds);
+  const savedPendingCreateIds = new Set(pendingCreateIds);
   // Inclure aussi les répertoires actuellement en mémoire : un coup peut avoir été joué
   // pendant la requête réseau, ajoutant un nœud qui n'est ni dans localStorage ni sur le serveur.
   // Exclure les données d'exemple qui ne doivent pas être fusionnées avec le serveur
@@ -389,6 +390,8 @@ function applyRemoteRepertoires(repertoires) {
   for (const id of savedDirtyIds) dirtyRepertoireIds.add(id);
   // Restaurer les remoteRepertoireIds connus (ils seront ensuite surchargés par les nouvelles valeurs).
   for (const [k, v] of savedRemoteIds) remoteRepertoireIds.set(k, v);
+  // Restaurer les créations en cours pour éviter un double POST si un répertoire était en cours de création.
+  for (const id of savedPendingCreateIds) pendingCreateIds.add(id);
   const loadedRepertoires = [];
 
   for (const entry of Array.isArray(repertoires) ? repertoires : []) {

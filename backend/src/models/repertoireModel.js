@@ -45,6 +45,21 @@ function getStoredFieldsFromPayload(payload) {
   };
 }
 
+// Extrait les champs stockables depuis le format sérialisé { rootId, nodes }
+function getStoredFieldsFromSerializedData(serializedData) {
+  const rootNode = Array.isArray(serializedData.nodes)
+    ? serializedData.nodes.find(n => String(n.id) === String(serializedData.rootId))
+    : null;
+  return {
+    name: rootNode?.name || '',
+    color: rootNode?.color || 'w',
+    fen: rootNode?.fen || '',
+    san: rootNode?.san || 'Initial',
+    comment: rootNode?.comment || '',
+    payload: JSON.stringify(serializedData)
+  };
+}
+
 function findById(id) {
   return get(getDb(), 'SELECT * FROM repertoires WHERE id = ?', [id]);
 }
@@ -59,18 +74,19 @@ function listByUser(userId) {
 
 async function listPayloadsByUser(userId) {
   const rows = await listByUser(userId);
-  return rows.map(parsePayload);
+  return rows.map(row => ({ serverId: row.id, data: parsePayload(row) }));
 }
 
-async function createRepertoire({ userId, name, color, fen, san, comment }) {
+async function createRepertoire({ userId, data }) {
+  const stored = getStoredFieldsFromSerializedData(data);
   const now = new Date().toISOString();
   const result = await run(
     getDb(),
-    'INSERT INTO repertoires (userId, name, color, fen, san, comment, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [userId, name, color, fen, san, comment || '', now, now]
+    'INSERT INTO repertoires (userId, name, color, fen, san, comment, payload, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [userId, stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, now, now]
   );
 
-  return { id: result.lastID, userId, name, color, fen, san, comment: comment || '', createdAt: now, updatedAt: now };
+  return { serverId: result.lastID, data };
 }
 
 async function replaceAllByUser(userId, payloads) {
@@ -83,7 +99,7 @@ async function replaceAllByUser(userId, payloads) {
     await run(db, 'DELETE FROM repertoires WHERE userId = ?', [userId]);
 
     for (const payload of payloads) {
-      const stored = getStoredFieldsFromPayload(payload);
+      const stored = getStoredFieldsFromSerializedData(payload);
       await run(
         db,
         'INSERT INTO repertoires (userId, name, color, fen, san, comment, payload, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -106,22 +122,28 @@ async function updateRepertoire(id, userId, updates) {
     return null;
   }
 
-  const data = {
-    name: updates.name ?? existing.name,
-    color: updates.color ?? existing.color,
-    fen: updates.fen ?? existing.fen,
-    san: updates.san ?? existing.san,
-    comment: updates.comment ?? existing.comment,
-    updatedAt: new Date().toISOString()
-  };
+  let stored;
+  if (updates.data) {
+    stored = getStoredFieldsFromSerializedData(updates.data);
+  } else {
+    stored = {
+      name: updates.name ?? existing.name,
+      color: updates.color ?? existing.color,
+      fen: updates.fen ?? existing.fen,
+      san: updates.san ?? existing.san,
+      comment: updates.comment ?? existing.comment,
+      payload: existing.payload
+    };
+  }
 
+  const updatedAt = new Date().toISOString();
   await run(
     getDb(),
-    'UPDATE repertoires SET name = ?, color = ?, fen = ?, san = ?, comment = ?, updatedAt = ? WHERE id = ? AND userId = ?',
-    [data.name, data.color, data.fen, data.san, data.comment, data.updatedAt, id, userId]
+    'UPDATE repertoires SET name = ?, color = ?, fen = ?, san = ?, comment = ?, payload = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+    [stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, updatedAt, id, userId]
   );
 
-  return { id, userId, ...data, createdAt: existing.createdAt };
+  return { serverId: id, data: updates.data };
 }
 
 async function deleteRepertoire(id, userId) {

@@ -308,28 +308,6 @@ body {
   border-radius: 999px;
 }
 
-.monitor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  width: 100%;
-}
-
-.btn-create-rep {
-  background: var(--surface-soft);
-  color: var(--text-main);
-  border: 1px solid var(--soft-border);
-  border-radius: 999px;
-  padding: 11px 18px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 8px 18px rgba(0,0,0,0.16);
-  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-}
-
 .btn-create-rep:hover {
   background: var(--soft-bg-hover);
   border-color: #505050;
@@ -764,7 +742,7 @@ body {
 
 .annotation-tag {
   font-weight: 900;
-  color: #fbbf24;
+  color: #fbbf24; /* fallback, overridden by inline style per annotation */
   margin-left: 4px;
 }
 
@@ -1852,7 +1830,9 @@ body {
 .move-hover-tooltip-value {
   color: var(--text-main);
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  text-align: right;
 }
 
 .move-hover-tooltip-section-title {
@@ -2010,7 +1990,7 @@ body {
 
 </head>
 
-<body onclick="hideMenus()">
+<body>
 
 <header class="top-bar">
   <div class="brand-group">
@@ -2046,14 +2026,14 @@ body {
 <aside class="left-panel">
   <div class="accordion">
     <div class="accordion-item">
-      <div class="accordion-header" data-panel="repertoire" onclick="togglePanel('repertoire')">
+      <div class="accordion-header" data-panel="repertoire">
         <span>RÉPERTOIRES</span>
         <span class="accordion-icon">▶</span>
       </div>
       <div class="accordion-content" id="repertoire-content"></div>
     </div>
     <div class="accordion-item">
-      <div class="accordion-header" data-panel="arbre" onclick="togglePanel('arbre')">
+      <div class="accordion-header" data-panel="arbre">
         <span>ARBRE</span>
         <span class="accordion-icon">▶</span>
       </div>
@@ -2065,11 +2045,11 @@ body {
 <section class="board-area">
   <div id="training-banner">
     <span class="training-banner-label">⚔ Mode entraînement — <span id="training-banner-label"></span></span>
-    <button class="training-banner-stop" onclick="showStopTrainingModal()">Terminer l’entraînement</button>
+    <button class="training-banner-stop" id="btn-training-stop">Terminer l’entraînement</button>
   </div>
   <div class="board-panel">
     <div class="board-shell">
-      <div id="board" oncontextmenu="handleRightClick(event, 'board')"></div>
+      <div id="board"></div>
       <div id="eval-bar" class="eval-bar" hidden>
         <div id="eval-bar-fill" class="eval-bar-fill"></div>
         <div class="eval-bar-zero"></div>
@@ -2077,24 +2057,24 @@ body {
       </div>
     </div>
     <div class="board-controls">
-      <button class="ctrl-btn" onclick="resetPosition()">⟲</button>
-      <button class="ctrl-btn" onclick="navBack()">←</button>
-      <button class="ctrl-btn" onclick="navForward()">→</button>
-      <button class="ctrl-btn" onclick="openBoardThemeMenu()">🎨</button>
+      <button class="ctrl-btn" id="btn-reset-position">⟲</button>
+      <button class="ctrl-btn" id="btn-nav-back">←</button>
+      <button class="ctrl-btn" id="btn-nav-forward">→</button>
+      <button class="ctrl-btn" id="btn-open-board-theme">🎨</button>
     </div>
   </div>
 </section>
 
 <aside class="right-panel">
-  <div class="game-monitor" id="monitor-box" oncontextmenu="handleRightClick(event, 'monitor')">
-    <div class="monitor-menu-trigger" onclick="toggleMonitorMenu(event)">
+  <div class="game-monitor" id="monitor-box">
+    <div class="monitor-menu-trigger" id="monitor-menu-trigger">
       <div class="burger-bar"></div><div class="burger-bar"></div><div class="burger-bar"></div>
     </div>
     <div class="monitor-header">
       <div>
         <div class="monitor-title" id="mon-title">Jeu Libre</div>
       </div>
-      <button class="btn-create-rep" onclick="openNewRepModal(event)">CRÉER RÉP.</button>
+      <button class="btn-create-rep" id="btn-open-new-rep">CRÉER RÉP.</button>
     </div>
     <div class="monitor-pgn" id="mon-pgn"></div>
     <div class="monitor-comment" id="mon-comment"></div>
@@ -2173,21 +2153,23 @@ body {
   <div id="analysis-panel" style="min-height: 100px;"></div>
 </aside>
 
-<div id="ctx-menu" class="ctx-menu" onclick="event.stopPropagation()">
-  <div class="menu-item opt-flip" onclick="flipBoard()">Retourner l'échiquier</div>
-  <div class="menu-item opt-rename-rep" style="display:none" onclick="openRenameRepModal()">Renommer le répertoire</div>
-  <div class="menu-item opt-name-var" style="display:none" onclick="openNameVarModal()">Nommer la variante</div>
-  <div class="menu-item opt-comment" onclick="openCommentModal()">Commenter</div>
-  <div class="menu-item opt-delete" style="color:#f87171" onclick="handleDeleteClick()">Supprimer</div>
+<div id="ctx-menu" class="ctx-menu">
+  <div class="menu-item opt-flip" data-menu-action="flip-board">Retourner l'échiquier</div>
+  <div class="menu-item opt-rename-rep" style="display:none" data-menu-action="rename-repertoire">Renommer le répertoire</div>
+  <div class="menu-item opt-name-var" style="display:none" data-menu-action="name-variation">Nommer la variante</div>
+  <div class="menu-item opt-comment" data-menu-action="comment">Commenter</div>
+  <div class="menu-item opt-delete" style="color:#f87171" data-menu-action="delete">Supprimer</div>
+  <div class="ctx-annot-section">
   <div style="height:1px; background:var(--border-color); margin:4px 0"></div>
   <div class="menu-label">Annoter</div>
-  <div class="menu-item" onclick="selectSymbol('!!')">Brillant <span>!!</span></div>
-  <div class="menu-item" onclick="selectSymbol('!')">Bon coup <span>!</span></div>
-  <div class="menu-item" onclick="selectSymbol('*')">Intéressant <span>*</span></div>
-  <div class="menu-item" onclick="selectSymbol('!?')">Douteux <span>!?</span></div>
-  <div class="menu-item" onclick="selectSymbol('?')">Erreur <span>?</span></div>
-  <div class="menu-item" onclick="selectSymbol('??')">Gaffe <span>??</span></div>
-  <div class="menu-item" onclick="selectSymbol('')">Effacer l'annotation</div>
+  <div class="menu-item" data-symbol="!!">Brillant <span>!!</span></div>
+  <div class="menu-item" data-symbol="!">Bon coup <span>!</span></div>
+  <div class="menu-item" data-symbol="*">Intéressant <span>*</span></div>
+  <div class="menu-item" data-symbol="!?">Douteux <span>!?</span></div>
+  <div class="menu-item" data-symbol="?">Erreur <span>?</span></div>
+  <div class="menu-item" data-symbol="??">Gaffe <span>??</span></div>
+  <div class="menu-item" data-symbol="">Effacer l'annotation</div>
+  </div>
 </div>
 
 </div>
@@ -2204,9 +2186,9 @@ body {
         <div class="splash-tagline">Préparez vos variantes d'ouverture</div>
       </div>
       <div class="splash-actions">
-        <button class="splash-btn primary" onclick="showSplashForm('login')">Se connecter</button>
-        <button class="splash-btn secondary" onclick="showSplashForm('signup')">Créer un compte</button>
-        <button class="splash-btn ghost" onclick="showSplashGuest()">Continuer en tant qu'invité</button>
+        <button class="splash-btn primary" id="btn-splash-login">Se connecter</button>
+        <button class="splash-btn secondary" id="btn-splash-signup">Créer un compte</button>
+        <button class="splash-btn ghost" id="btn-splash-guest">Continuer en tant qu'invité</button>
       </div>
     </div>
 
@@ -2228,15 +2210,15 @@ body {
           <input type="password" id="splash-password-input" placeholder="Mot de passe" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
         </div>
         <div id="splash-error" style="min-height:20px; margin-bottom:14px; color:#ff7b7b; font-size:0.88rem;"></div>
-        <button class="splash-btn primary" id="splash-submit-btn" style="width:100%; margin-bottom:12px;" onclick="submitSplashForm()">Se connecter</button>
+        <button class="splash-btn primary" id="splash-submit-btn" style="width:100%; margin-bottom:12px;">Se connecter</button>
       </div>
 
       <div style="display:flex; gap:8px; margin-top:24px;">
-        <button class="splash-btn ghost" style="flex:1;" onclick="showSplashForm('login')">Connexion</button>
-        <button class="splash-btn ghost" style="flex:1;" onclick="showSplashForm('signup')">Créer un compte</button>
+        <button class="splash-btn ghost" style="flex:1;" id="btn-splash-tab-login">Connexion</button>
+        <button class="splash-btn ghost" style="flex:1;" id="btn-splash-tab-signup">Créer un compte</button>
       </div>
 
-      <button class="splash-btn ghost" style="width:100%; margin-top:8px; color:var(--text-muted);" onclick="backToSplashWelcome()">← Retour</button>
+      <button class="splash-btn ghost" style="width:100%; margin-top:8px; color:var(--text-muted);" id="btn-splash-back">← Retour</button>
     </div>
 
     <!-- Section avertissement invité -->
@@ -2254,17 +2236,17 @@ body {
       </div>
 
       <div class="splash-actions">
-        <button class="splash-btn primary" style="width:100%;" onclick="confirmGuestMode()">Continuer</button>
-        <button class="splash-btn ghost" style="width:100%;" onclick="backToSplashWelcome()">← Retour</button>
+        <button class="splash-btn primary" style="width:100%;" id="btn-splash-guest-confirm">Continuer</button>
+        <button class="splash-btn ghost" style="width:100%;" id="btn-splash-guest-back">← Retour</button>
       </div>
     </div>
   </div>
 </div>
 
-<div id="modal-overlay" onclick="closeModals()">
+<div id="modal-overlay">
 
 <!-- MODAL GESTION DE COMPTE -->
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-account" style="display:none">
+<div class="modal-box" id="modal-account" style="display:none">
   <h3 id="account-modal-title">Se connecter</h3>
   
   <div id="account-form-shell" style="margin-bottom: 16px;">
@@ -2281,29 +2263,29 @@ body {
   </div>
   
   <div class="modal-actions">
-    <button class="ctrl-btn" onclick="switchAuthMode()">Basculer</button>
-    <button class="ctrl-btn" id="account-submit-btn" onclick="submitAccountForm()">Se connecter</button>
+    <button class="ctrl-btn" id="btn-account-switch-mode">Basculer</button>
+    <button class="ctrl-btn" id="account-submit-btn">Se connecter</button>
   </div>
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-new-rep" style="display:none">
+<div class="modal-box" id="modal-new-rep" style="display:none">
 
 <h3 id="modal-rep-title">Nouveau Répertoire</h3>
 
 <div id="rep-create-mode-selector" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="start" onclick="selectRepCreationMode('start')">Position de départ</button>
-<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="current" onclick="selectRepCreationMode('current')">Position actuelle</button>
-<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="pgn-file" onclick="selectRepCreationMode('pgn-file')">Importer un PGN</button>
-<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="pgn-text" onclick="selectRepCreationMode('pgn-text')">Coller le texte</button>
+<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="start">Position de départ</button>
+<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="current">Position actuelle</button>
+<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="pgn-file">Importer un PGN</button>
+<button class="ctrl-btn rep-create-mode-btn" data-rep-create-mode="pgn-text">Coller le texte</button>
 </div>
 
 <div id="color-sel-container">
 
 <div class="color-selector">
 
-<div class="color-opt active" id="opt-white" onclick="selectCol('w')">BLANCS</div>
+<div class="color-opt active" id="opt-white" data-color="w">BLANCS</div>
 
-<div class="color-opt" id="opt-black" onclick="selectCol('b')">NOIRS</div>
+<div class="color-opt" id="opt-black" data-color="b">NOIRS</div>
 
 </div>
 
@@ -2323,31 +2305,35 @@ body {
 
 <div id="rep-create-error" style="min-height:20px; margin-top:10px; color:#ff7b7b;"></div>
 
-<button class="ctrl-btn" id="btn-rep-confirm" style="width:100%; margin-top:20px;" onclick="confirmRepertoireCreation()">Créer</button>
+<button class="ctrl-btn" id="btn-rep-confirm" style="width:100%; margin-top:20px;">Créer</button>
 
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-name-var" style="display:none">
+<div class="modal-box" id="modal-name-var" style="display:none">
 
 <h3>Nommer la variante</h3>
 
+<p id="var-name-hint" style="display:none; font-size:0.8rem; color:#94a3b8; margin-bottom:10px;"></p>
+
 <input type="text" id="var-name-input" placeholder="Ex: Variante d'échange" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box;">
 
-<button class="ctrl-btn" style="width:100%; margin-top:20px;" onclick="confirmNameVar()">Enregistrer</button>
+<p id="var-name-warning" style="display:none; font-size:0.8rem; color:#f97316; margin-top:10px;"></p>
+
+<button class="ctrl-btn" id="btn-var-save" style="width:100%; margin-top:20px;">Enregistrer</button>
 
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-comment" style="display:none">
+<div class="modal-box" id="modal-comment" style="display:none">
 
 <h3>Commenter</h3>
 
 <textarea id="comment-input" style="width:100%; height:100px; background:#111; color:white; border:1px solid #333; padding:12px; border-radius:6px; box-sizing:border-box;"></textarea>
 
-<button class="ctrl-btn" style="width:100%; margin-top:10px;" onclick="confirmComment()">Enregistrer</button>
+<button class="ctrl-btn" id="btn-comment-save" style="width:100%; margin-top:10px;">Enregistrer</button>
 
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-confirm-delete" style="display:none">
+<div class="modal-box" id="modal-confirm-delete" style="display:none">
 
 <h3>Confirmer la suppression</h3>
 
@@ -2355,46 +2341,46 @@ body {
 
 <div class="modal-actions">
 
-<button class="ctrl-btn" onclick="closeModals()">Annuler</button>
+<button class="ctrl-btn" id="btn-delete-cancel">Annuler</button>
 
-<button class="ctrl-btn danger" onclick="confirmDelete()">Supprimer</button>
-
-</div>
+<button class="ctrl-btn danger" id="btn-delete-confirm">Supprimer</button>
 
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-training-confirm" style="display:none">
+</div>
+
+<div class="modal-box" id="modal-training-confirm" style="display:none">
   <h3 id="modal-training-confirm-title">Choisir un mode d’entraînement</h3>
   <div class="modal-body" id="modal-training-confirm-body"></div>
   <div class="modal-actions">
-    <button class="ctrl-btn" onclick="cancelStartTraining()">Annuler</button>
-    <button class="ctrl-btn" id="modal-training-confirm-button" onclick="confirmStartTraining()">Démarrer</button>
+    <button class="ctrl-btn" id="btn-training-start-cancel">Annuler</button>
+    <button class="ctrl-btn" id="modal-training-confirm-button">Démarrer</button>
   </div>
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-training-interrupt" style="display:none">
+<div class="modal-box" id="modal-training-interrupt" style="display:none">
   <h3 id="modal-training-interrupt-title">Interrompre l’entraînement en cours ?</h3>
   <div class="modal-body" id="modal-training-interrupt-body"></div>
   <div class="modal-actions">
-    <button class="ctrl-btn" onclick="cancelTrainingInterrupt()">Annuler</button>
-    <button class="ctrl-btn" onclick="confirmTrainingInterrupt()">Confirmer</button>
+    <button class="ctrl-btn" id="btn-training-interrupt-cancel">Annuler</button>
+    <button class="ctrl-btn" id="btn-training-interrupt-confirm">Confirmer</button>
   </div>
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-training-stop" style="display:none">
+<div class="modal-box" id="modal-training-stop" style="display:none">
   <h3>Quitter l’entraînement ?</h3>
   <div class="modal-body">Voulez-vous vraiment quitter le mode entraînement ?</div>
   <div class="modal-actions">
-    <button class="ctrl-btn" onclick="cancelStopTraining()">Non</button>
-    <button class="ctrl-btn danger" onclick="confirmStopTraining()">Oui, quitter</button>
+    <button class="ctrl-btn" id="btn-training-stop-cancel">Non</button>
+    <button class="ctrl-btn danger" id="btn-training-stop-confirm">Oui, quitter</button>
   </div>
 </div>
 
-<div class="modal-box" onclick="event.stopPropagation()" id="modal-training-done" style="display:none">
+<div class="modal-box" id="modal-training-done" style="display:none">
   <h3>🎉 Félicitations !</h3>
   <div class="modal-body">Vous avez parcouru toutes les variantes de cet entraînement.</div>
   <div class="modal-actions">
-    <button class="ctrl-btn" onclick="closeTrainingDone()">Retour</button>
+    <button class="ctrl-btn" id="btn-training-done-close">Retour</button>
   </div>
 </div>
 

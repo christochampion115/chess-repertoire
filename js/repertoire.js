@@ -412,12 +412,44 @@ export function confirmRenameRep() {
   eventBus.emit('render');
 }
 
+function findNodeWithVarName(node, name) {
+  if (node.varName && node.varName === name) return node;
+  for (const child of (node.children || [])) {
+    const found = findNodeWithVarName(child, name);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function confirmNameVar() {
   if (state.trainingActive) return;
-  if (state.menuTarget) {
-    state.menuTarget.varName = document.getElementById('var-name-input').value.trim();
-    scheduleRepertoireSync();
+  if (!state.menuTarget) return;
+
+  const newName = document.getElementById('var-name-input').value.trim();
+  const warning = document.getElementById('var-name-warning');
+  const btn = document.getElementById('btn-var-save');
+
+  // Vérifier si un autre nœud porte déjà ce nom
+  if (newName && !state.varNameConflictConfirmed) {
+    const rep = state.activeRepIndex !== -1 ? state.repertoires[state.activeRepIndex] : null;
+    if (rep) {
+      const duplicate = findNodeWithVarName(rep, newName);
+      // C'est un conflit seulement si c'est un nœud différent du cible actuel
+      if (duplicate && duplicate !== state.menuTarget) {
+        if (warning) {
+          warning.textContent = `⚠️ Le nom "${newName}" est déjà utilisé pour une autre variante. Cliquez à nouveau pour confirmer quand même.`;
+          warning.style.display = 'block';
+        }
+        if (btn) btn.textContent = 'Confirmer quand même';
+        state.varNameConflictConfirmed = true;
+        return;
+      }
+    }
   }
+
+  state.menuTarget.varName = newName;
+  state.varNameConflictConfirmed = false;
+  scheduleRepertoireSync();
   eventBus.emit('closeModals');
   eventBus.emit('render');
 }

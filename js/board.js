@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { attachDragToPiece } from './drag.js';
 
 /** Mappe une annotation sur sa couleur et un symbole unicode lisible */
-const ANNOTATION_STYLE = {
+export const ANNOTATION_STYLE = {
   '!!': { color: '#00d4b4', label: '!!' },   // turquoise
   '!':  { color: '#5b8fc9', label: '!' },    // bleu foncé pâle
   '*':  { color: '#4ade80', label: '★' },    // vert

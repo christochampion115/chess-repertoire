@@ -14,6 +14,7 @@ export const state = {
   repExpanded: new Set(),
   selectedColor: 'w',
   contextMenuSource: '',
+  varNameConflictConfirmed: false,
   sectionStates: { white: true, black: true },
   freePlayRoot: null,
   currentNode: null,

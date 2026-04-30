@@ -1,8 +1,15 @@
 import { state } from './state.js';
-import { renderBoard } from './board.js';
+import { renderBoard, ANNOTATION_STYLE } from './board.js';
 import { eventBus } from './events.js';
 import { renderArbre, countTotalChildren, getPathString } from './arbre.js';
-import { handleSquareClick, playUciMove, initExampleData } from './repertoire.js';
+import {
+  handleSquareClick,
+  playUciMove,
+  initExampleData,
+  confirmRepertoireCreation,
+  confirmRenameRep,
+  confirmDelete as confirmDeleteMove,
+} from './repertoire.js';
 import { fetchLichessStats } from './stats.js';
 import { loginWithCredentials, signupWithCredentials, logoutSession } from './auth.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
@@ -426,7 +433,6 @@ function syncStatsFilterControls() {
       eloBadge.textContent = nextLabel;
       updateEloSliderTrack(normalized.min, normalized.max);
 
-      console.log('[ELO SELECTED] slider →', normalized.min, '–', normalized.max);
       state.lastStatsRequestKey = '';
       state.statsSelectedUci = '';
       scheduleStatsReloadForCurrentFen();
@@ -439,12 +445,11 @@ function syncStatsFilterControls() {
         state.statsFilters.eloPanelOpen = true;
         state.lastStatsRequestKey = '';
         state.statsSelectedUci = '';
-        console.log('[DATABASE] lichess');
         scheduleStatsReloadForCurrentFen();
       } else {
         state.statsFilters.eloPanelOpen = !state.statsFilters.eloPanelOpen;
       }
-      render();
+      syncStatsFilterControls();
     });
 
     minInput.addEventListener('input', () => applyFilterInput('min'));
@@ -460,9 +465,8 @@ function syncStatsFilterControls() {
       state.statsFilters.eloPanelOpen = false; // ferme le panneau Elo
       state.lastStatsRequestKey = '';
       state.statsSelectedUci = '';
-      console.log('[DATABASE] masters');
       scheduleStatsReloadForCurrentFen();
-      render();
+      syncStatsFilterControls();
     });
     mastersButton.dataset.bound = '1';
   }
@@ -485,6 +489,35 @@ function formatNumberShort(n) {
     return (n / 1_000).toFixed(1).replace('.0', '') + 'K';
   }
   return n.toString();
+}
+
+function updateOpeningInfoLabel() {
+  const openingInfo = document.getElementById('opening-info');
+  if (!openingInfo) return;
+
+  openingInfo.textContent = state.lichessStats && state.lichessStats.openingName
+    ? `${state.lichessStats.openingName}${state.lichessStats.eco ? ` (${state.lichessStats.eco})` : ''}`
+    : '';
+}
+
+// Keep stats updates local: avoid full app rerender for sort/filter fetches.
+function refreshStatsPanels() {
+  updateOpeningInfoLabel();
+  updateSortButtonStates();
+
+  const statsPanel = document.getElementById('stats-panel');
+  const statsDetails = document.getElementById('stats-details');
+  if (!statsPanel) return;
+
+  if (state.trainingActive) {
+    statsPanel.style.display = 'none';
+    if (statsDetails) statsDetails.style.display = 'none';
+    return;
+  }
+
+  statsPanel.style.display = '';
+  if (statsDetails) statsDetails.style.display = '';
+  renderStatsPanel(statsPanel, statsDetails);
 }
 
 async function loadStatsIfNeeded(fen, force = false, options = {}) {
@@ -516,7 +549,6 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
 
   try {
     const database = state.statsFilters?.currentDatabase || 'lichess';
-    console.log('[DATABASE]', database);
     const stats = await fetchLichessStats(fen, {
       min: state.statsFilters.eloMin,
       max: state.statsFilters.eloMax
@@ -547,10 +579,7 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
     hideGlobalLoaderAndRender(() => {
       stopEloMiniLoaderWhenReady();
       state.statsShowAll = false;
-      const statsPanel = document.getElementById('stats-panel');
-      const statsDetails = document.getElementById('stats-details');
-      if (statsPanel) renderStatsPanel(statsPanel, statsDetails);
-      eventBus.emit('render');
+      refreshStatsPanels();
       requestVisibleMoveAnnotations();
     });
   }
@@ -750,8 +779,7 @@ function handleStatsClick(move) {
 export function updateStatsSortBy(sortType) {
   if (!['frequency', 'winrate', 'winrate-white', 'winrate-black', 'engine'].includes(sortType)) return;
   state.statsFilters.sortBy = sortType;
-  updateSortButtonStates();
-  render();
+  refreshStatsPanels();
 }
 
 function updateSortButtonStates() {
@@ -817,6 +845,7 @@ export function hideMenus() {
 
 export function closeModals() {
   pendingTrainingInterruptAction = null;
+  state.varNameConflictConfirmed = false;
   state.modalOverlayEl.style.display = 'none';
   document.querySelectorAll('.modal-box').forEach(modal => {
     modal.style.display = 'none';
@@ -842,7 +871,7 @@ function openNewRepModalUnsafe() {
   const pgnText = document.getElementById('pgn-import-input');
   if (pgnText) pgnText.value = '';
   document.getElementById('btn-rep-confirm').textContent = 'Créer';
-  document.getElementById('btn-rep-confirm').onclick = () => window.confirmRepertoireCreation();
+  document.getElementById('btn-rep-confirm').onclick = () => confirmRepertoireCreation();
   setRepCreationMode('start');
   selectCol('w');
 }
@@ -982,14 +1011,29 @@ export function openRenameRepModal() {
   document.getElementById('rep-create-error').textContent = '';
   document.getElementById('rep-name-input').value = rep.name;
   document.getElementById('btn-rep-confirm').textContent = 'Enregistrer';
-  document.getElementById('btn-rep-confirm').onclick = () => window.confirmRenameRep();
+  document.getElementById('btn-rep-confirm').onclick = () => confirmRenameRep();
 }
 
 export function openNameVarModal() {
   eventBus.emit('hideMenus');
+  state.varNameConflictConfirmed = false;
   state.modalOverlayEl.style.display = 'flex';
   document.getElementById('modal-name-var').style.display = 'block';
-  document.getElementById('var-name-input').value = state.menuTarget.varName || '';
+  const existing = state.menuTarget?.varName || '';
+  document.getElementById('var-name-input').value = existing;
+  const hint = document.getElementById('var-name-hint');
+  if (hint) {
+    if (existing) {
+      hint.textContent = `⚠️ Ce coup est déjà nommé "${existing}" — vous pouvez modifier le nom.`;
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+  const warning = document.getElementById('var-name-warning');
+  if (warning) { warning.style.display = 'none'; warning.textContent = ''; }
+  const btn = document.getElementById('btn-var-save');
+  if (btn) btn.textContent = 'Enregistrer';
   document.getElementById('var-name-input').focus();
 }
 
@@ -1024,7 +1068,7 @@ export function openDeleteClick() {
       state.modalOverlayEl.style.display = 'flex';
       document.getElementById('modal-confirm-delete').style.display = 'block';
     } else {
-      window.confirmDelete();
+      confirmDeleteMove();
     }
   }
 }
@@ -1047,13 +1091,15 @@ export function handleRightClick(event, type, target = null, index = -1) {
 
   const isRepRoot = type === 'repertoire_item';
   const isRepSub = type === 'repertoire_subitem';
-  const isNode = type === 'monitor' || type === 'arbre' || isRepSub;
+  const isNode = type === 'monitor' || type === 'arbre' || type === 'board' || isRepSub;
   const isNotRoot = state.menuTarget && state.menuTarget.parent;
   menu.querySelector('.opt-rename-rep').style.display = isRepRoot ? 'block' : 'none';
   menu.querySelector('.opt-delete').textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
   menu.querySelector('.opt-name-var').style.display = isNode && isNotRoot ? 'block' : 'none';
   menu.querySelector('.opt-delete').style.display = isRepRoot || (isNode && isNotRoot) ? 'block' : 'none';
   menu.querySelector('.opt-comment').style.display = state.activeRepIndex !== -1 ? 'block' : 'none';
+  const annotSection = menu.querySelector('.ctx-annot-section');
+  if (annotSection) annotSection.style.display = isRepRoot ? 'none' : 'block';
 }
 
 export function selectCol(color) {
@@ -1457,10 +1503,6 @@ function advanceAutoPlay(forcedDelay = null) {
 function _doStartTraining() {
   const startNode = pendingTrainingNode;
   const repColor = pendingTrainingColor;
-  const count = countMoves(startNode, repColor);
-  console.log('MODE: training');
-  console.log('TRAINING START NODE:', startNode);
-  console.log('MOVE COUNT:', count);
   if (trainingAutoPlayTimer) clearTimeout(trainingAutoPlayTimer);
   state.trainingActive = true;
   state.trainingRoot = startNode;
@@ -1498,7 +1540,6 @@ function stopTraining() {
   state.trainingVisited = new Set();
   state.trainingIgnoredNoReply = new Set();
   state.trainingAnswered = new Set();
-  console.log('MODE: normal');
   render();
 }
 
@@ -1643,7 +1684,8 @@ function createSection(label, items, key, container) {
     }
     const repNameEl = document.createElement('b');
     repNameEl.style.cssText = 'flex:1;min-width:0;';
-    repNameEl.innerHTML = `${rep.name}${rep.varAnnotation ? ` <span class="annotation-tag">${rep.varAnnotation}</span>` : ''}`;
+    const repAnnotStyle = ANNOTATION_STYLE[rep.varAnnotation] || null;
+    repNameEl.innerHTML = `${rep.name}${rep.varAnnotation ? ` <span class="annotation-tag"${repAnnotStyle ? ` style="color:${repAnnotStyle.color}"` : ''}>${rep.varAnnotation}</span>` : ''}`;  
     repRow.appendChild(repNameEl);
     const repMoveCount = countMoves(rep, rep.color);
     const repTrainBtn = document.createElement('button');
@@ -1678,7 +1720,8 @@ function createSection(label, items, key, container) {
           }
           const nameSpan = document.createElement('span');
           nameSpan.style.cssText = 'flex:1;min-width:0;';
-          nameSpan.innerHTML = `${child.varName}${child.varAnnotation ? ` <span class="annotation-tag">${child.varAnnotation}</span>` : ''}`;
+          const childAnnotStyle = ANNOTATION_STYLE[child.varAnnotation] || null;
+          nameSpan.innerHTML = `${child.varName}${child.varAnnotation ? ` <span class="annotation-tag"${childAnnotStyle ? ` style="color:${childAnnotStyle.color}"` : ''}>${child.varAnnotation}</span>` : ''}`;  
           item.appendChild(nameSpan);
           const moveCount = countMoves(child, rep.color);
           const trainBtn = document.createElement('button');
@@ -2319,7 +2362,7 @@ function buildEngineTooltipContent(move) {
     rows.push(`<div class="move-hover-tooltip-row"><span class="move-hover-tooltip-label">Évaluation:</span><span class="move-hover-tooltip-value">Activez Analyse</span></div>`);
   }
   
-  if (state.analysisResults && state.analysisResults.length > 0) {
+  if (state.isAnalysisEnabled && state.analysisResults && state.analysisResults.length > 0) {
     const movePv = state.moveAnnotationPvs?.[move.uci];
     if (movePv && movePv.length > 0) {
       rows.push('<div class="move-hover-tooltip-separator"></div>');
@@ -2329,7 +2372,7 @@ function buildEngineTooltipContent(move) {
     }
   }
   
-  if (state.analysisResults && state.analysisResults.length > 1) {
+  if (state.isAnalysisEnabled && state.analysisResults && state.analysisResults.length > 1) {
     const best = state.analysisResults[0];
     const second = state.analysisResults[1];
     
@@ -2350,7 +2393,7 @@ function buildEngineTooltipContent(move) {
     }
   }
   
-  if (state.analysisResults && state.analysisResults.length > 1) {
+  if (state.isAnalysisEnabled && state.analysisResults && state.analysisResults.length > 1) {
     rows.push('<div class="move-hover-tooltip-separator"></div>');
     rows.push('<div class="move-hover-tooltip-section-title">Alternatives:</div>');
     state.analysisResults.slice(1, 3).forEach((result, idx) => {
