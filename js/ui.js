@@ -19,23 +19,6 @@ let eloMiniLoaderTimer = null;
 let globalLoaderTimer = null;     // timer pour la durée minimale du loader global
 let globalLoaderShownAt = 0;      // timestamp du moment où le loader global a été affiché
 
-// Fonctions helper pour le tri des stats
-function getMoveTotalGames(move) {
-  return (move?.white || 0) + (move?.draws || 0) + (move?.black || 0);
-}
-
-function getMoveWinRate(move, fen) {
-  const total = getMoveTotalGames(move);
-  if (!total) return 0;
-  const sideToMove = (fen?.split(' ')[1] || 'w');
-  return sideToMove === 'w' ? move.white / total : move.black / total;
-}
-
-function getMoveEnginePreference(move) {
-  const value = state.moveAnnotationValues?.[move.uci];
-  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
-}
-
 function getEngineColorForMove(move) {
   const value = state.moveAnnotationValues?.[move.uci];
   if (!Number.isFinite(value)) return '#808080';
