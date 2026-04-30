@@ -50,15 +50,15 @@ function buildInternalEmail(username) {
 async function signup({ username, email, password }) {
   const resolvedEmail = email || buildInternalEmail(username);
 
-  const existingEmail = await userModel.findByEmail(resolvedEmail);
-  if (existingEmail) {
-    const error = new Error('Email already in use');
+  const existingUsername = await userModel.findByUsername(username);
+  if (existingUsername) {
+    const error = new Error('Username already in use');
     error.statusCode = 409;
     throw error;
   }
 
-  const existingUsername = await userModel.findByUsername(username);
-  if (existingUsername) {
+  const existingEmail = await userModel.findByEmail(resolvedEmail);
+  if (existingEmail) {
     const error = new Error('Username already in use');
     error.statusCode = 409;
     throw error;
@@ -91,10 +91,6 @@ function logout(token) {
   if (token) {
     revokeToken(token);
   }
-}
-
-function isTokenRevoked(token) {
-  return revokedTokens.has(token);
 }
 
 module.exports = {

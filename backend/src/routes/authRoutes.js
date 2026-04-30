@@ -3,9 +3,12 @@ const rateLimit = require('express-rate-limit');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 
+const WHITELIST_IPS = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
+  skip: (req) => WHITELIST_IPS.includes(req.ip),
   message: { error: 'Trop de tentatives, réessayez dans 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false

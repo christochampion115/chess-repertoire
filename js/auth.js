@@ -728,7 +728,12 @@ export async function loginWithCredentials({ email, password }) {
     await finalizeAuthenticatedSession(response);
   } catch (error) {
     window.DEBUG_MODE && console.log('[DEBUG]', { step: 'loginWithCredentials:error', message: error?.message });
-    state.auth.error = error?.message || 'Connexion impossible.';
+    const msg = error?.message || '';
+    if (msg.toLowerCase().includes('invalid credentials')) {
+      state.auth.error = 'Identifiants incorrects.';
+    } else {
+      state.auth.error = msg || 'Connexion impossible.';
+    }
   } finally {
     state.auth.isSubmitting = false;
     eventBus.emit('render');
@@ -748,7 +753,14 @@ export async function signupWithCredentials({ username, password }) {
     });
     await finalizeAuthenticatedSession(response);
   } catch (error) {
-    state.auth.error = error?.message || 'Creation du compte impossible.';
+    const msg = error?.message || '';
+    if (msg.toLowerCase().includes('username already')) {
+      state.auth.error = 'Ce nom d\'utilisateur est déjà pris.';
+    } else if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('mot de passe')) {
+      state.auth.error = 'Le mot de passe doit contenir au moins 8 caractères.';
+    } else {
+      state.auth.error = msg || 'Création du compte impossible.';
+    }
   } finally {
     state.auth.isSubmitting = false;
     eventBus.emit('render');

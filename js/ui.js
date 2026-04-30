@@ -25,10 +25,11 @@ function getEngineColorForMove(move) {
 
   const clamped = Math.max(-250, Math.min(250, value));
   const stops = [
-    { cp: -250, color: [245, 34,  45] },
-    { cp: -60,  color: [250, 140, 22] },
-    { cp:  60,  color: [250, 219, 20] },
-    { cp: 250,  color: [82,  196, 26] }
+    { cp: -250, color: [214, 40, 40] },
+    { cp: -35,  color: [238, 120, 48] },
+    { cp:   0,  color: [234, 179, 8] },
+    { cp:  35,  color: [110, 197, 58] },
+    { cp: 250,  color: [34, 166, 76] }
   ];
 
   let leftStop = stops[0];
@@ -751,7 +752,6 @@ export function updateStatsSortBy(sortType) {
   state.statsFilters.sortBy = sortType;
   updateSortButtonStates();
   render();
-  requestVisibleMoveAnnotations();
 }
 
 function updateSortButtonStates() {
@@ -1792,13 +1792,13 @@ export function showSplashForm(mode) {
   const isSignup = mode === 'signup';
   const titleEl = document.getElementById('splash-form-title');
   const usernameRowEl = document.getElementById('splash-username-row');
-  const emailInputEl = document.getElementById('splash-email-input');
+  const emailRowEl = document.getElementById('splash-email-row');
   const submitBtnEl = document.getElementById('splash-submit-btn');
   const errorEl = document.getElementById('splash-error');
 
   if (titleEl) titleEl.textContent = isSignup ? 'Créer un compte' : 'Connexion';
   if (usernameRowEl) usernameRowEl.style.display = isSignup ? 'block' : 'none';
-  if (emailInputEl) emailInputEl.placeholder = isSignup ? 'Email' : 'Email ou pseudo';
+  if (emailRowEl) emailRowEl.style.display = isSignup ? 'none' : 'block';
   if (submitBtnEl) submitBtnEl.textContent = isSignup ? 'Créer le compte' : 'Se connecter';
   if (errorEl) errorEl.textContent = '';
 
@@ -1848,8 +1848,8 @@ export async function submitSplashForm() {
       errorEl.textContent = 'Remplissez tous les champs.';
       return;
     }
-    if (password.length < 4) {
-      errorEl.textContent = 'Le mot de passe doit contenir au moins 4 caracteres.';
+    if (password.length < 8) {
+      errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.';
       return;
     }
     submitBtn.disabled = true;
@@ -1860,10 +1860,6 @@ export async function submitSplashForm() {
   } else {
     if (!email || !password) {
       errorEl.textContent = 'Pseudo ou email et mot de passe requis.';
-      return;
-    }
-    if (password.length < 4) {
-      errorEl.textContent = 'Le mot de passe doit contenir au moins 4 caracteres.';
       return;
     }
     submitBtn.disabled = true;
@@ -1950,8 +1946,8 @@ export async function submitAccountForm() {
       errorEl.style.display = 'block';
       return;
     }
-    if (password.length < 4) {
-      errorEl.textContent = 'Le mot de passe doit contenir au moins 4 caractères.';
+    if (password.length < 8) {
+      errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.';
       errorEl.style.display = 'block';
       return;
     }
@@ -1963,11 +1959,6 @@ export async function submitAccountForm() {
   } else {
     if (!email || !password) {
       errorEl.textContent = 'Email/pseudo et mot de passe requis.';
-      errorEl.style.display = 'block';
-      return;
-    }
-    if (password.length < 4) {
-      errorEl.textContent = 'Le mot de passe doit contenir au moins 4 caractères.';
       errorEl.style.display = 'block';
       return;
     }
