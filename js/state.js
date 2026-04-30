@@ -89,7 +89,10 @@ export const state = {
   // ── Guest Mode ───────────────────────────────────────────────────────
   isGuestMode: false,
   userData: null,
-  authMode: 'login'
+  authMode: 'login',
+
+  // ── DOM references (assignées au démarrage dans main.js) ─────────────
+  dynamicModals: null
 
 };
 

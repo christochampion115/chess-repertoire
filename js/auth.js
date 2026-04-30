@@ -335,7 +335,7 @@ function queueAllLocalRepertoiresForRemoteCreate() {
 }
 
 function resetWorkspaceState() {
-  console.log('[DEBUG]', { step: 'resetWorkspaceState', repertoiresBefore: state.repertoires.length, activeRepIndexBefore: state.activeRepIndex, currentNodeId: state.currentNode?.id });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'resetWorkspaceState', repertoiresBefore: state.repertoires.length, activeRepIndexBefore: state.activeRepIndex, currentNodeId: state.currentNode?.id });
   clearRemoteTracking();
   state.repertoires = [];
   state.activeRepIndex = -1;
@@ -352,7 +352,7 @@ function resetWorkspaceState() {
 }
 
 function applyRemoteRepertoires(repertoires) {
-  console.log('[DEBUG]', { step: 'applyRemoteRepertoires:start', remoteCount: Array.isArray(repertoires) ? repertoires.length : 0, currentRepCount: state.repertoires.length, activeRepIndex: state.activeRepIndex, currentNodeId: state.currentNode?.id });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'applyRemoteRepertoires:start', remoteCount: Array.isArray(repertoires) ? repertoires.length : 0, currentRepCount: state.repertoires.length, activeRepIndex: state.activeRepIndex, currentNodeId: state.currentNode?.id });
   // Au démarrage (bootstrap), le state est vide (activeRepIndex=-1, currentNode='free').
   // Lire la sélection persistée en localStorage pour restaurer le dernier répertoire/nœud actif.
   let selection = captureWorkspaceSelection();
@@ -403,7 +403,7 @@ function applyRemoteRepertoires(repertoires) {
 
     // Exclure les données d'exemple du serveur - elles ne doivent pas être restaurées
     if (runtimeRepertoire.isExample) {
-      console.log('[DEBUG]', { step: 'applyRemoteRepertoires:skip_example', repName: runtimeRepertoire.name });
+      window.DEBUG_MODE && console.log('[DEBUG]', { step: 'applyRemoteRepertoires:skip_example', repName: runtimeRepertoire.name });
       continue;
     }
 
@@ -437,7 +437,7 @@ function applyRemoteRepertoires(repertoires) {
   state.repertoires = state.repertoires.filter(rep => !rep.isExample);
   restoreWorkspaceSelection(selection);
   persistLocalRepertoires();
-  console.log('[DEBUG]', { step: 'applyRemoteRepertoires:done', loadedCount: state.repertoires.length, needingSyncCount: repertoiresNeedingSync.size, activeRepIndex: state.activeRepIndex, currentNodeId: state.currentNode?.id });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'applyRemoteRepertoires:done', loadedCount: state.repertoires.length, needingSyncCount: repertoiresNeedingSync.size, activeRepIndex: state.activeRepIndex, currentNodeId: state.currentNode?.id });
 
   for (const repertoireId of repertoiresNeedingSync) {
     dirtyRepertoireIds.add(repertoireId);
@@ -453,7 +453,7 @@ function applyRemoteRepertoires(repertoires) {
 }
 
 function clearSessionState({ message = '', loadGuestData = false } = {}) {
-  console.log('[DEBUG]', { step: 'clearSessionState', message, loadGuestData, userBefore: state.auth.user?.username, repsBefore: state.repertoires.length, caller: new Error().stack?.split('\n')[2]?.trim() });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'clearSessionState', message, loadGuestData, userBefore: state.auth.user?.username, repsBefore: state.repertoires.length, caller: new Error().stack?.split('\n')[2]?.trim() });
   clearPersistedSession();
   // Effacer le cache localStorage du compte pour ne pas contaminer le mode invité
   // ni un autre compte qui se connecterait sur le même navigateur.
@@ -468,7 +468,7 @@ function clearSessionState({ message = '', loadGuestData = false } = {}) {
   state.auth.isSubmitting = false;
   state.auth.syncStatus = 'idle';
   state.auth.syncMessage = '';
-  console.log('[DEBUG]', { step: 'clearSessionState:user_set_null', message });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'clearSessionState:user_set_null', message });
 
   if (loadGuestData && typeof guestModeLoader === 'function') {
     guestModeLoader();
@@ -480,7 +480,7 @@ function clearSessionState({ message = '', loadGuestData = false } = {}) {
 // mais CONSERVE state.auth.user pour ne pas afficher "invité" à l'utilisateur
 // et ne pas réinitialiser l'espace de travail.
 function markTokenExpired() {
-  console.log('[DEBUG]', { step: 'markTokenExpired', userKept: state.auth.user?.username, repsKept: state.repertoires.length });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'markTokenExpired', userKept: state.auth.user?.username, repsKept: state.repertoires.length });
   clearPersistedSession();
   state.auth.token = '';
   state.auth.syncStatus = 'expired';
@@ -494,7 +494,7 @@ function markTokenExpired() {
 }
 
 function handleBackgroundSessionExpired(message = 'Session expiree.') {
-  console.log('[DEBUG]', { step: 'handleBackgroundSessionExpired', message, userBefore: state.auth.user?.username, caller: new Error().stack?.split('\n')[2]?.trim() });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'handleBackgroundSessionExpired', message, userBefore: state.auth.user?.username, caller: new Error().stack?.split('\n')[2]?.trim() });
   clearPersistedSession();
 
   state.auth.user = null;
@@ -504,7 +504,7 @@ function handleBackgroundSessionExpired(message = 'Session expiree.') {
   state.auth.isSubmitting = false;
   state.auth.syncStatus = 'error';
   state.auth.syncMessage = 'Session expiree. Reconnectez-vous pour synchroniser.';
-  console.log('[DEBUG]', { step: 'handleBackgroundSessionExpired:user_set_null', message });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'handleBackgroundSessionExpired:user_set_null', message });
 
   if (syncTimer) {
     clearTimeout(syncTimer);
@@ -516,7 +516,7 @@ function handleBackgroundSessionExpired(message = 'Session expiree.') {
 }
 
 function setAuthenticatedState({ token, user }) {
-  console.log('[DEBUG]', { step: 'setAuthenticatedState', username: user?.username, repCount: state.repertoires.length, activeRepIndex: state.activeRepIndex });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'setAuthenticatedState', username: user?.username, repCount: state.repertoires.length, activeRepIndex: state.activeRepIndex });
   state.auth.user = user;
   state.auth.token = token;
   state.auth.status = 'authenticated';
@@ -528,7 +528,7 @@ function setAuthenticatedState({ token, user }) {
 async function finalizeAuthenticatedSession(response) {
   const token = response?.token || '';
   const user = response?.user || null;
-  console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:start', username: user?.username, hasToken: !!token });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:start', username: user?.username, hasToken: !!token });
 
   if (!token || !user) {
     throw new Error('Session invalide');
@@ -547,7 +547,7 @@ async function finalizeAuthenticatedSession(response) {
 
   try {
     const repertoireResponse = await apiRequest('/repertoires', { token });
-    console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:GET_repertoires', count: repertoireResponse?.repertoires?.length ?? 0 });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:GET_repertoires', count: repertoireResponse?.repertoires?.length ?? 0 });
     const remoteLoaded = applyRemoteRepertoires(repertoireResponse?.repertoires || []);
     setAuthenticatedState({ token, user });
 
@@ -557,7 +557,7 @@ async function finalizeAuthenticatedSession(response) {
     }
   } catch (error) {
     if (error?.status === 401) {
-      console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:401', message: error.message });
+      window.DEBUG_MODE && console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:401', message: error.message });
       clearSessionState({ message: 'Session expiree.', loadGuestData: true });
       throw error;
     }
@@ -575,7 +575,7 @@ async function finalizeAuthenticatedSession(response) {
 }
 
 async function flushRepertoireSync() {
-  console.log('[DEBUG]', { step: 'flushRepertoireSync:check', syncInFlight, dirtyCount: dirtyRepertoireIds.size, hasToken: !!state.auth.token, hasUser: !!state.auth.user });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'flushRepertoireSync:check', syncInFlight, dirtyCount: dirtyRepertoireIds.size, hasToken: !!state.auth.token, hasUser: !!state.auth.user });
   if (syncInFlight || dirtyRepertoireIds.size === 0 || !state.auth.token || !state.auth.user) {
     return;
   }
@@ -585,7 +585,7 @@ async function flushRepertoireSync() {
   const tokenAtStart = state.auth.token;
   const repertoireIds = Array.from(dirtyRepertoireIds);
   dirtyRepertoireIds.clear();
-  console.log('[DEBUG]', { step: 'flushRepertoireSync:start', repertoireIds });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'flushRepertoireSync:start', repertoireIds });
 
   try {
     for (const repertoireId of repertoireIds) {
@@ -603,7 +603,7 @@ async function flushRepertoireSync() {
         continue;
       }
 
-      console.log('[DEBUG]', { step: 'flushRepertoireSync:PUT', repertoireId, repName: repertoire.name, serverId: remoteRepertoireIds.get(String(repertoire.id)) });
+      window.DEBUG_MODE && console.log('[DEBUG]', { step: 'flushRepertoireSync:PUT', repertoireId, repName: repertoire.name, serverId: remoteRepertoireIds.get(String(repertoire.id)) });
       await saveRepertoireToBackend(repertoire);
     }
 
@@ -621,9 +621,9 @@ async function flushRepertoireSync() {
         saveState(SELECTION_KEY, sel);
       }
     }
-    console.log('[DEBUG]', { step: 'flushRepertoireSync:success' });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'flushRepertoireSync:success' });
   } catch (error) {
-    console.log('[DEBUG]', { step: 'flushRepertoireSync:catch', status: error?.status, message: error?.message });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'flushRepertoireSync:catch', status: error?.status, message: error?.message });
     if (error?.status === 401) {
       markTokenExpired();
       return;
@@ -654,10 +654,10 @@ export function setAuthMode(mode) {
 export async function bootstrapSession() {
   const token = loadState(AUTH_TOKEN_KEY);
   const user = loadState(AUTH_USER_KEY);
-  console.log('[DEBUG]', { step: 'bootstrapSession:start', hasToken: !!token, username: user?.username });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:start', hasToken: !!token, username: user?.username });
 
   if (!token) {
-    console.log('[DEBUG]', { step: 'bootstrapSession:no_token_guest' });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:no_token_guest' });
     state.auth.user = null;
     state.auth.token = '';
     state.auth.status = 'guest';
@@ -680,9 +680,9 @@ export async function bootstrapSession() {
 
   try {
     const sessionResponse = await apiRequest('/auth/me', { token });
-    console.log('[DEBUG]', { step: 'bootstrapSession:me_ok', username: sessionResponse?.user?.username });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:me_ok', username: sessionResponse?.user?.username });
     const repertoireResponse = await apiRequest('/repertoires', { token });
-    console.log('[DEBUG]', { step: 'bootstrapSession:GET_repertoires', count: repertoireResponse?.repertoires?.length ?? 0 });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:GET_repertoires', count: repertoireResponse?.repertoires?.length ?? 0 });
     const remoteLoaded = applyRemoteRepertoires(repertoireResponse?.repertoires || []);
     setAuthenticatedState({ token, user: sessionResponse.user });
 
@@ -695,11 +695,11 @@ export async function bootstrapSession() {
     return remoteLoaded;
   } catch (error) {
     if (error?.status === 401) {
-      console.log('[DEBUG]', { step: 'bootstrapSession:401', message: error.message });
+      window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:401', message: error.message });
       clearSessionState({ message: 'Session expiree.', loadGuestData: true });
       return state.repertoires.length > 0;
     }
-    console.log('[DEBUG]', { step: 'bootstrapSession:network_error', message: error?.message });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:network_error', message: error?.message });
     const restoredLocal = loadLocalRepertoiresIntoState();
     state.auth.user = user || null;
     state.auth.token = token;
@@ -713,7 +713,7 @@ export async function bootstrapSession() {
 }
 
 export async function loginWithCredentials({ email, password }) {
-  console.log('[DEBUG]', { step: 'loginWithCredentials:start', email });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'loginWithCredentials:start', email });
   state.auth.mode = 'login';
   state.auth.isSubmitting = true;
   state.auth.error = '';
@@ -724,10 +724,10 @@ export async function loginWithCredentials({ email, password }) {
       method: 'POST',
       body: { email, password }
     });
-    console.log('[DEBUG]', { step: 'loginWithCredentials:response_ok', username: response?.user?.username });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'loginWithCredentials:response_ok', username: response?.user?.username });
     await finalizeAuthenticatedSession(response);
   } catch (error) {
-    console.log('[DEBUG]', { step: 'loginWithCredentials:error', message: error?.message });
+    window.DEBUG_MODE && console.log('[DEBUG]', { step: 'loginWithCredentials:error', message: error?.message });
     state.auth.error = error?.message || 'Connexion impossible.';
   } finally {
     state.auth.isSubmitting = false;
@@ -760,7 +760,7 @@ export async function logoutSession() {
 
   // Vérifier si une sync est en cours ou des changements sont en attente
   if (syncInFlight || dirtyRepertoireIds.size > 0 || syncQueued) {
-    console.log('[DEBUG]', { 
+    window.DEBUG_MODE && console.log('[DEBUG]', { 
       step: 'logoutSession:blocked', 
       reason: 'sync_in_progress', 
       syncInFlight, 
@@ -819,7 +819,7 @@ function getRepertoireForCurrentNode() {
 export function scheduleRepertoireSync() {
   const repForNode = getRepertoireForCurrentNode();
   const activeRep = getActiveRepertoire();
-  console.log('[DEBUG]', { step: 'scheduleRepertoireSync', activeRepIndex: state.activeRepIndex, repForNodeId: repForNode?.id, repForNodeName: repForNode?.name, activeRepId: activeRep?.id, hasToken: !!state.auth.token, hasUser: !!state.auth.user });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'scheduleRepertoireSync', activeRepIndex: state.activeRepIndex, repForNodeId: repForNode?.id, repForNodeName: repForNode?.name, activeRepId: activeRep?.id, hasToken: !!state.auth.token, hasUser: !!state.auth.user });
   persistLocalRepertoires();
 
   // Priorité au répertoire contenant currentNode ; fallback sur le répertoire actif
@@ -955,3 +955,4 @@ export function getSyncStatusText() {
 
   return state.auth.syncMessage || 'Synchronise';
 }
+

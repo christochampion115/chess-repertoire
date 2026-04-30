@@ -11,7 +11,7 @@ async function authMiddleware(req, res, next) {
     }
 
     const token = authorization.split(' ')[1];
-    if (authService.isTokenRevoked(token)) {
+    if (await authService.isTokenRevoked(token)) {
       return res.status(401).json({ error: 'Token has been revoked' });
     }
 

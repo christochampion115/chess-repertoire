@@ -2,8 +2,30 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const { jwtSecret, tokenTTL } = require('../config');
+const { getDb, run, get } = require('../db');
 
-const revokedTokens = new Set();
+async function revokeToken(token) {
+  if (!token) return;
+  try {
+    const payload = jwt.decode(token);
+    const expiresAt = payload?.exp
+      ? new Date(payload.exp * 1000).toISOString()
+      : new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+    await run(getDb(), 'INSERT OR IGNORE INTO revoked_tokens (token, expiresAt) VALUES (?, ?)', [token, expiresAt]);
+  } catch {
+    // Ignorer les erreurs de révocation (token malformé, base indisponible)
+  }
+}
+
+async function isTokenRevoked(token) {
+  if (!token) return false;
+  try {
+    const row = await get(getDb(), 'SELECT token FROM revoked_tokens WHERE token = ?', [token]);
+    return !!row;
+  } catch {
+    return false;
+  }
+}
 
 function buildAuthResponse(user) {
   const token = jwt.sign({ sub: user.id, email: user.email }, jwtSecret, {
@@ -67,7 +89,7 @@ async function login({ email, password }) {
 
 function logout(token) {
   if (token) {
-    revokedTokens.add(token);
+    revokeToken(token);
   }
 }
 

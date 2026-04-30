@@ -47,7 +47,7 @@ async function readErrorMessage(response) {
 }
 
 export async function apiRequest(path, { method = 'GET', token = '', body } = {}) {
-  console.log('[DEBUG]', { step: 'apiRequest:start', method, path, hasToken: !!token, hasBody: !!body });
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'apiRequest:start', method, path, hasToken: !!token, hasBody: !!body });
   const apiCandidates = buildApiCandidates();
   const networkErrors = [];
 
@@ -74,18 +74,18 @@ export async function apiRequest(path, { method = 'GET', token = '', body } = {}
 
         const error = new Error(await readErrorMessage(response));
         error.status = response.status;
-        console.log('[DEBUG]', { step: 'apiRequest:error', method, path, url, status: response.status, message: error.message });
+        window.DEBUG_MODE && console.log('[DEBUG]', { step: 'apiRequest:error', method, path, url, status: response.status, message: error.message });
         throw error;
       }
 
       if (response.status === 204) {
-        console.log('[DEBUG]', { step: 'apiRequest:ok', method, path, url, status: 204 });
+        window.DEBUG_MODE && console.log('[DEBUG]', { step: 'apiRequest:ok', method, path, url, status: 204 });
         preferredApiBaseUrl = baseUrl;
         return null;
       }
 
       const contentType = response.headers.get('content-type') || '';
-      console.log('[DEBUG]', { step: 'apiRequest:ok', method, path, url, status: response.status });
+      window.DEBUG_MODE && console.log('[DEBUG]', { step: 'apiRequest:ok', method, path, url, status: response.status });
       preferredApiBaseUrl = baseUrl;
       return contentType.includes('application/json')
         ? response.json()
@@ -103,3 +103,4 @@ export async function apiRequest(path, { method = 'GET', token = '', body } = {}
     `Impossible de joindre le backend Alpha Chess. Verifie que le serveur Node.js est demarre sur le port 4000. Details: ${networkErrors.join(' | ')}`
   );
 }
+

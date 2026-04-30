@@ -73,6 +73,14 @@ async function initDb() {
   if (!repertoireColumns.some((column) => column.name === 'payload')) {
     await run(db, 'ALTER TABLE repertoires ADD COLUMN payload TEXT');
   }
+
+  await run(db, `CREATE TABLE IF NOT EXISTS revoked_tokens (
+    token TEXT PRIMARY KEY NOT NULL,
+    expiresAt TEXT NOT NULL
+  )`);
+
+  // Nettoyage des tokens expirés au démarrage
+  await run(db, 'DELETE FROM revoked_tokens WHERE expiresAt < ?', [new Date().toISOString()]);
 }
 
 function getDb() {

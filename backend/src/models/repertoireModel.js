@@ -27,7 +27,11 @@ function parsePayload(row) {
     return buildLegacyPayload(row);
   }
 
-  return JSON.parse(row.payload);
+  try {
+    return JSON.parse(row.payload);
+  } catch {
+    return buildLegacyPayload(row);
+  }
 }
 
 function getStoredFieldsFromPayload(payload) {
