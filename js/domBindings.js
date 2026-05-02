@@ -36,6 +36,34 @@ const BUTTON_BINDINGS = [
   ['btn-training-done-close', () => ui.closeTrainingDone()],
 ];
 
+function shouldIgnoreKeyboardNavigationTarget(target) {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+function initKeyboardNavigationBindings() {
+  if (!document.body || document.body.dataset.keyboardnavbound) return;
+
+  document.addEventListener('keydown', (event) => {
+    if (shouldIgnoreKeyboardNavigationTarget(event.target)) return;
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      ui.navBack();
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      ui.navForward();
+    }
+  });
+
+  document.body.dataset.keyboardnavbound = '1';
+}
+
 function initCoreUiBindings() {
   if (!document.body?.dataset.bodymenubound) {
     document.body.addEventListener('click', () => ui.hideMenus());
@@ -222,6 +250,7 @@ function initAnalysisControls() {
 export function initDomBindings() {
   initCoreUiBindings();
   initActionButtonBindings();
+  initKeyboardNavigationBindings();
   initSortMenuToggle();
   initAnalysisMenuToggle();
   initAnalysisControls();

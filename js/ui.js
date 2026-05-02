@@ -1131,12 +1131,21 @@ export function navBack() {
 }
 
 export function navForward() {
+  if (trainingAutoPlayTimer) { clearTimeout(trainingAutoPlayTimer); trainingAutoPlayTimer = null; }
+
   if (state.redoStack.length) {
-    if (trainingAutoPlayTimer) { clearTimeout(trainingAutoPlayTimer); trainingAutoPlayTimer = null; }
     state.currentNode = state.redoStack.pop();
     state.chess.load(state.currentNode.fen);
     render();
+    return;
   }
+
+  const mainlineChild = state.currentNode?.children?.[0] || null;
+  if (!mainlineChild) return;
+
+  state.currentNode = mainlineChild;
+  state.chess.load(state.currentNode.fen);
+  render();
 }
 
 export function flipBoard() {
