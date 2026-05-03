@@ -204,6 +204,20 @@ function onEngineMessage(event) {
 
   if (!state.isAnalysisEnabled) return;
 
+  const currentFen = state.currentNode?.fen || '';
+
+  const isLegalBestMoveForFen = (fen, uciMove) => {
+    if (!fen || typeof uciMove !== 'string' || uciMove.length < 4) return false;
+    const tempChess = new Chess();
+    if (!tempChess.load(fen)) return false;
+
+    const from = uciMove.slice(0, 2);
+    const to = uciMove.slice(2, 4);
+    const promotion = uciMove[4] || undefined;
+    const played = tempChess.move({ from, to, ...(promotion ? { promotion } : {}) }, { sloppy: true });
+    return Boolean(played);
+  };
+
   if (line.startsWith('info') && line.includes(' pv ')) {
     const mpvM = line.match(/\bmultipv (\d+)/);
     if (!mpvM) return;
@@ -217,6 +231,7 @@ function onEngineMessage(event) {
     const pv = pvM[1].trim().split(/\s+/);
     const bestMove = pv[0];
     if (!bestMove) return;
+    if (!isLegalBestMoveForFen(currentFen, bestMove)) return;
 
     const sideToMove = lastAnalyzedFen ? lastAnalyzedFen.split(' ')[1] : 'w';
     const sign = sideToMove === 'w' ? 1 : -1;
@@ -600,6 +615,141 @@ function renderAnalysisPanelIfVisible() {
   if (panel) renderAnalysisPanel(panel);
 }
 
+function convertUciMovesToSan(uciMoves, startFen) {
+  if (!Array.isArray(uciMoves) || uciMoves.length === 0 || !startFen) return [];
+
+  const tempChess = new Chess();
+  if (!tempChess.load(startFen)) return [];
+
+  const sanMoves = [];
+  for (const uciMove of uciMoves) {
+    if (typeof uciMove !== 'string' || uciMove.length < 4) {
+      sanMoves.push(uciMove || '');
+      continue;
+    }
+
+    const from = uciMove.slice(0, 2);
+    const to = uciMove.slice(2, 4);
+    const promotion = uciMove[4] || undefined;
+
+    const move = tempChess.move({ from, to, ...(promotion ? { promotion } : {}) }, { sloppy: true });
+    if (!move) {
+      sanMoves.push(uciMove);
+      continue;
+    }
+
+    sanMoves.push(move.san);
+  }
+
+  return sanMoves;
+}
+
+function clampFloatingPosition(width, height, x, y) {
+  const pad = 10;
+  const clampedX = Math.max(pad, Math.min(x, window.innerWidth - width - pad));
+  const clampedY = Math.max(pad, Math.min(y, window.innerHeight - height - pad));
+  return { x: clampedX, y: clampedY };
+}
+
+function buildMiniBoardTooltipHtml(fen, uciMove, sanMove) {
+  if (!fen || !uciMove || uciMove.length < 4) return '';
+
+  const tempChess = new Chess();
+  if (!tempChess.load(fen)) return '';
+
+  const from = uciMove.slice(0, 2);
+  const to = uciMove.slice(2, 4);
+  const promotion = uciMove[4] || undefined;
+  const played = tempChess.move({ from, to, ...(promotion ? { promotion } : {}) }, { sloppy: true });
+  if (!played) return '';
+
+  const board = tempChess.board();
+  const lightSquare = state.boardTheme?.light ?? '#ebefd6';
+  const darkSquare = state.boardTheme?.dark ?? '#556173';
+
+  let html = '<div style="font-size:0.78rem;font-weight:700;color:#e2f2ff;margin-bottom:6px;">';
+  html += `${sanMove || played.san}`;
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(8,20px);gap:0;background:#000;padding:1px;">';
+
+  for (let r = 0; r < 8; r += 1) {
+    for (let c = 0; c < 8; c += 1) {
+      const isLight = (r + c) % 2 === 0;
+      const bg = isLight ? lightSquare : darkSquare;
+      const piece = board[r][c];
+      const sq = String.fromCharCode(97 + c) + (8 - r);
+
+      let highlight = '';
+      if (sq === from || sq === to) {
+        highlight = 'box-shadow: inset 0 0 0 2px #fbbf24;';
+      }
+
+      let pieceHtml = '';
+      if (piece) {
+        const map = {
+          wp: '4/45/Chess_plt45.svg',
+          wr: '7/72/Chess_rlt45.svg',
+          wn: '7/70/Chess_nlt45.svg',
+          wb: 'b/b1/Chess_blt45.svg',
+          wq: '1/15/Chess_qlt45.svg',
+          wk: '4/42/Chess_klt45.svg',
+          bp: 'c/c7/Chess_pdt45.svg',
+          br: 'f/ff/Chess_rdt45.svg',
+          bn: 'e/ef/Chess_ndt45.svg',
+          bb: '9/98/Chess_bdt45.svg',
+          bq: '4/47/Chess_qdt45.svg',
+          bk: 'f/f0/Chess_kdt45.svg'
+        };
+        const icon = map[piece.color + piece.type];
+        if (icon) {
+          pieceHtml = `<img src="https://upload.wikimedia.org/wikipedia/commons/${icon}" style="width:18px;height:18px;">`;
+        }
+      }
+
+      html += `<div style="width:20px;height:20px;background:${bg};display:flex;align-items:center;justify-content:center;${highlight}">${pieceHtml}</div>`;
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function attachAnalysisMoveHover(moveEl, moveUci, moveSan) {
+  if (!moveEl || !moveUci) return;
+
+  let tooltipEl = null;
+
+  const removeTooltip = () => {
+    if (tooltipEl) {
+      tooltipEl.remove();
+      tooltipEl = null;
+    }
+  };
+
+  moveEl.addEventListener('mouseenter', () => {
+    const content = buildMiniBoardTooltipHtml(state.currentNode?.fen || '', moveUci, moveSan);
+    if (!content) return;
+
+    removeTooltip();
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'move-hover-tooltip';
+    tooltipEl.innerHTML = content;
+    document.body.appendChild(tooltipEl);
+
+    const rect = moveEl.getBoundingClientRect();
+    const desiredX = rect.left - 200;
+    const desiredY = rect.top - 8;
+    const tipRect = tooltipEl.getBoundingClientRect();
+    const pos = clampFloatingPosition(tipRect.width, tipRect.height, desiredX, desiredY);
+    tooltipEl.style.left = `${pos.x}px`;
+    tooltipEl.style.top = `${pos.y}px`;
+  });
+
+  moveEl.addEventListener('mouseleave', () => {
+    removeTooltip();
+  });
+}
+
 export function renderAnalysisPanel(panel) {
   if (!panel) return;
 
@@ -626,10 +776,17 @@ export function renderAnalysisPanel(panel) {
 
   panel.innerHTML = '';
   const frag = document.createDocumentFragment();
+  const currentFen = state.currentNode?.fen || '';
 
   results.forEach(line => {
+    const sanLine = convertUciMovesToSan(line.pv || [], currentFen);
+    const bestSan = sanLine[0] || line.bestMove;
+    const pvSan = sanLine.slice(1).join(' ');
+
     const row = document.createElement('div');
     row.className = 'analysis-row';
+    row.setAttribute('data-move-uci', line.bestMove || '');
+    row.setAttribute('data-move-san', bestSan || '');
 
     const scoreEl = document.createElement('span');
     const isMate = line.score.includes('#');
@@ -639,15 +796,17 @@ export function renderAnalysisPanel(panel) {
 
     const moveEl = document.createElement('span');
     moveEl.className = 'analysis-move';
-    moveEl.textContent = line.bestMove;
+    moveEl.textContent = bestSan;
 
     const pvEl = document.createElement('span');
     pvEl.className = 'analysis-pv';
-    pvEl.textContent = line.pv.slice(1).join(' ');
+    pvEl.textContent = pvSan;
 
     row.appendChild(scoreEl);
     row.appendChild(moveEl);
     row.appendChild(pvEl);
+
+    attachAnalysisMoveHover(moveEl, line.bestMove, bestSan);
     frag.appendChild(row);
   });
 

@@ -99,8 +99,35 @@ function initCoreUiBindings() {
 
   const monitorBox = document.getElementById('monitor-box');
   if (monitorBox && !monitorBox.dataset.ctxbound) {
-    monitorBox.addEventListener('contextmenu', (event) => ui.handleRightClick(event, 'monitor'));
+    monitorBox.addEventListener('contextmenu', (event) => {
+      const targetEl = event.target instanceof Element ? event.target : null;
+      if (targetEl?.closest('.analysis-row[data-move-uci]')) return;
+      ui.handleRightClick(event, 'monitor');
+    });
     monitorBox.dataset.ctxbound = '1';
+  }
+
+  if (!document.body?.dataset.movectxbound) {
+    document.addEventListener('contextmenu', (event) => {
+      const targetEl = event.target instanceof Element ? event.target : null;
+      if (!targetEl) return;
+
+      const statsRow = targetEl.closest('.stats-row[data-move-uci]');
+      if (statsRow) {
+        const uci = statsRow.getAttribute('data-move-uci') || '';
+        const san = statsRow.getAttribute('data-move-san') || '';
+        if (uci) ui.handleRightClick(event, 'stats_move', { uci, san });
+        return;
+      }
+
+      const analysisRow = targetEl.closest('.analysis-row[data-move-uci]');
+      if (analysisRow) {
+        const uci = analysisRow.getAttribute('data-move-uci') || '';
+        const san = analysisRow.getAttribute('data-move-san') || '';
+        if (uci) ui.handleRightClick(event, 'analysis_move', { uci, san });
+      }
+    });
+    document.body.dataset.movectxbound = '1';
   }
 
   const ctxMenu = document.getElementById('ctx-menu');
@@ -114,6 +141,7 @@ function initCoreUiBindings() {
         if (action === 'flip-board') ui.flipBoard();
         if (action === 'rename-repertoire') ui.openRenameRepModal();
         if (action === 'name-variation') ui.openNameVarModal();
+        if (action === 'add-to-tree') ui.addSelectedMoveToTree();
         if (action === 'comment') ui.openCommentModal();
         if (action === 'delete') ui.openDeleteClick();
         return;
@@ -200,34 +228,16 @@ function initSortMenuToggle() {
   });
 }
 
-function initAnalysisMenuToggle() {
-  const analysisToggleBtn = document.getElementById('analysis-toggle-btn');
-  const analysisMenu = document.getElementById('stats-analysis-menu');
+function initAnalysisSwitchToggle() {
+  const analysisSwitch = document.getElementById('analysis-toggle-switch');
 
-  if (!analysisToggleBtn || !analysisMenu) return;
-  if (analysisToggleBtn.dataset.analysismenubound) return;
-  analysisToggleBtn.dataset.analysismenubound = '1';
+  if (!analysisSwitch) return;
+  if (analysisSwitch.dataset.analysisbound) return;
+  analysisSwitch.dataset.analysisbound = '1';
 
-  analysisToggleBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const isHidden = analysisMenu.hasAttribute('hidden');
-    if (isHidden) {
-      analysisMenu.removeAttribute('hidden');
-      toggleAnalysis();
-    } else {
-      analysisMenu.setAttribute('hidden', '');
-      toggleAnalysis();
-    }
-  });
-
-  document.addEventListener('click', (event) => {
-    if (!analysisMenu.contains(event.target) && !analysisToggleBtn.contains(event.target)) {
-      analysisMenu.setAttribute('hidden', '');
-    }
-  });
-
-  analysisMenu.addEventListener('click', (event) => {
-    event.stopPropagation();
+  analysisSwitch.addEventListener('change', () => {
+    toggleAnalysis();
+    ui.render();
   });
 }
 
@@ -252,6 +262,6 @@ export function initDomBindings() {
   initActionButtonBindings();
   initKeyboardNavigationBindings();
   initSortMenuToggle();
-  initAnalysisMenuToggle();
+  initAnalysisSwitchToggle();
   initAnalysisControls();
 }

@@ -18,6 +18,7 @@ import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './st
 const ELO_MIN = 0;
 const ELO_MAX = 3000;
 const ELO_STEP = 50;
+const ELO_MIN_GAP = 100;
 const STATS_RELOAD_DEBOUNCE_MS = 180;
 const ELO_MINI_LOADER_MS = 420;
 const GLOBAL_LOADER_MIN_MS = 500; // durée minimale d'affichage du loader global
@@ -134,6 +135,11 @@ eventBus.on('trainingTargetCompleted', () => {
   showNextTrainingTarget(50);
 });
 
+eventBus.on('openMoveContextMenu', ({ event, source, move }) => {
+  if (!event || !move) return;
+  handleRightClick(event, source || 'stats_move', move);
+});
+
 export function render() {
   hideCurrentTooltip();
   updateAccountUI();
@@ -154,10 +160,32 @@ export function render() {
   // Mettre à jour l'affichage du tri
   updateSortButtonStates();
   
-  // Mettre à jour l'état du bouton Analyse
-  const analysisBtn = document.getElementById('analysis-toggle-btn');
-  if (analysisBtn) {
-    analysisBtn.classList.toggle('active', state.isAnalysisEnabled);
+  // Mettre à jour l'état de l'interrupteur Analyse + slider inline
+  const analysisSwitch = document.getElementById('analysis-toggle-switch');
+  const analysisDepthInline = document.getElementById('analysis-depth-inline');
+  const monitorAnalysisSection = document.getElementById('monitor-analysis-section');
+  const analysisDepthValue = document.getElementById('analysis-depth-value');
+  const analysisDepthInput = document.getElementById('analysis-depth-input');
+  const analysisDepthFill = document.getElementById('analysis-depth-fill');
+  const depth = state.analysisDepth ?? 10;
+  if (analysisSwitch) {
+    analysisSwitch.checked = Boolean(state.isAnalysisEnabled);
+  }
+  if (analysisDepthInline) {
+    analysisDepthInline.hidden = !state.isAnalysisEnabled;
+  }
+  if (monitorAnalysisSection) {
+    monitorAnalysisSection.classList.toggle('is-collapsed', !state.isAnalysisEnabled);
+  }
+  if (analysisDepthValue) {
+    analysisDepthValue.textContent = String(depth);
+  }
+  if (analysisDepthInput) {
+    analysisDepthInput.value = String(depth);
+  }
+  if (analysisDepthFill) {
+    const pct = ((depth - 5) / 15) * 100;
+    analysisDepthFill.style.width = `${pct}%`;
   }
 
   document.querySelectorAll('.accordion-header').forEach(header => {
@@ -232,7 +260,7 @@ function getStatsRequestKey(fen) {
   return `${fen || ''}|${min},${max}|${db}`;
 }
 
-function normalizeEloRange(minRaw, maxRaw) {
+function normalizeEloRange(minRaw, maxRaw, source = 'max') {
   let min = Number.parseInt(minRaw, 10);
   let max = Number.parseInt(maxRaw, 10);
 
@@ -244,6 +272,23 @@ function normalizeEloRange(minRaw, maxRaw) {
 
   if (min > max) {
     [min, max] = [max, min];
+  }
+
+  if (max - min < ELO_MIN_GAP) {
+    if (source === 'min') {
+      min = max - ELO_MIN_GAP;
+    } else {
+      max = min + ELO_MIN_GAP;
+    }
+
+    if (min < ELO_MIN) {
+      min = ELO_MIN;
+      max = min + ELO_MIN_GAP;
+    }
+    if (max > ELO_MAX) {
+      max = ELO_MAX;
+      min = max - ELO_MIN_GAP;
+    }
   }
 
   return { min, max };
@@ -324,7 +369,7 @@ function hideGlobalLoaderAndRender(callback) {
 }
 
 function applyEloMiniLoaderVisualState() {
-  const eloButton = document.getElementById('stats-filter-elo-btn');
+  const eloButton = document.getElementById('stats-filter-lichess-btn');
   if (!eloButton) return;
   eloButton.classList.toggle('is-loading', Boolean(state.statsEloMiniLoading));
 }
@@ -366,7 +411,8 @@ function stopEloMiniLoaderWhenReady() {
 }
 
 function syncStatsFilterControls() {
-  const eloButton     = document.getElementById('stats-filter-elo-btn');
+  const eloButton     = document.getElementById('stats-filter-lichess-btn');
+  const eloMenuButton = document.getElementById('stats-filter-lichess-menu-btn');
   const mastersButton = document.getElementById('stats-filter-masters-btn');
   const eloPanel      = document.getElementById('stats-filter-elo-panel');
   const eloValue      = document.getElementById('stats-filter-elo-value');
@@ -374,7 +420,7 @@ function syncStatsFilterControls() {
   const minInput      = document.getElementById('elo-range-min');
   const maxInput      = document.getElementById('elo-range-max');
 
-  if (!eloButton || !eloPanel || !eloValue || !eloBadge || !minInput || !maxInput) {
+  if (!eloButton || !eloMenuButton || !eloPanel || !eloValue || !eloBadge || !minInput || !maxInput) {
     return;
   }
 
@@ -387,8 +433,9 @@ function syncStatsFilterControls() {
   }
 
   const isMasters = state.statsFilters.currentDatabase === 'masters';
+  const isLichess = !isMasters;
 
-  const normalizedRange = normalizeEloRange(state.statsFilters.eloMin, state.statsFilters.eloMax);
+  const normalizedRange = normalizeEloRange(state.statsFilters.eloMin, state.statsFilters.eloMax, 'max');
   state.statsFilters.eloMin = normalizedRange.min;
   state.statsFilters.eloMax = normalizedRange.max;
 
@@ -402,10 +449,10 @@ function syncStatsFilterControls() {
   // Badge : "Masters" en mode masters, sinon plage Elo
   eloBadge.textContent = isMasters ? 'Masters' : eloLabel;
 
-  // Panneau Elo : masqué en mode masters
-  eloPanel.hidden = isMasters || !state.statsFilters.eloPanelOpen;
-  eloButton.classList.toggle('active', !isMasters && state.statsFilters.eloPanelOpen);
-  eloButton.setAttribute('aria-expanded', (!isMasters && state.statsFilters.eloPanelOpen) ? 'true' : 'false');
+  // Panneau Elo : uniquement quand la base Lichess est sélectionnée
+  eloPanel.hidden = !isLichess || !state.statsFilters.eloPanelOpen;
+  eloButton.classList.toggle('active', isLichess);
+  eloButton.setAttribute('aria-expanded', (isLichess && state.statsFilters.eloPanelOpen) ? 'true' : 'false');
   updateEloSliderTrack(state.statsFilters.eloMin, state.statsFilters.eloMax);
   applyEloMiniLoaderVisualState();
 
@@ -419,10 +466,15 @@ function syncStatsFilterControls() {
     const applyFilterInput = (source) => {
       let nextMin = Number.parseInt(minInput.value, 10);
       let nextMax = Number.parseInt(maxInput.value, 10);
-      if (source === 'min' && nextMin > nextMax) nextMax = nextMin;
-      if (source === 'max' && nextMax < nextMin) nextMin = nextMax;
 
-      const normalized = normalizeEloRange(nextMin, nextMax);
+      if (source === 'min' && nextMin > nextMax - ELO_MIN_GAP) {
+        nextMin = nextMax - ELO_MIN_GAP;
+      }
+      if (source === 'max' && nextMax < nextMin + ELO_MIN_GAP) {
+        nextMax = nextMin + ELO_MIN_GAP;
+      }
+
+      const normalized = normalizeEloRange(nextMin, nextMax, source);
       state.statsFilters.eloMin = normalized.min;
       state.statsFilters.eloMax = normalized.max;
 
@@ -438,18 +490,41 @@ function syncStatsFilterControls() {
       scheduleStatsReloadForCurrentFen();
     };
 
-    eloButton.addEventListener('click', () => {
+    eloButton.addEventListener('click', (event) => {
+      if (event.target instanceof Element && event.target.closest('#stats-filter-lichess-menu-btn')) {
+        return;
+      }
+
       if (state.statsFilters.currentDatabase === 'masters') {
-        // Retour en mode lichess, ouverture du panneau Elo
+        // Retour en mode lichess
         state.statsFilters.currentDatabase = 'lichess';
-        state.statsFilters.eloPanelOpen = true;
         state.lastStatsRequestKey = '';
         state.statsSelectedUci = '';
         scheduleStatsReloadForCurrentFen();
-      } else {
-        state.statsFilters.eloPanelOpen = !state.statsFilters.eloPanelOpen;
       }
       syncStatsFilterControls();
+    });
+
+    const toggleLichessPanel = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (state.statsFilters.currentDatabase !== 'lichess') {
+        state.statsFilters.currentDatabase = 'lichess';
+        state.lastStatsRequestKey = '';
+        state.statsSelectedUci = '';
+        scheduleStatsReloadForCurrentFen();
+      }
+
+      state.statsFilters.eloPanelOpen = !state.statsFilters.eloPanelOpen;
+      syncStatsFilterControls();
+    };
+
+    eloMenuButton.addEventListener('click', toggleLichessPanel);
+    eloMenuButton.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        toggleLichessPanel(event);
+      }
     });
 
     minInput.addEventListener('input', () => applyFilterInput('min'));
@@ -469,6 +544,18 @@ function syncStatsFilterControls() {
       syncStatsFilterControls();
     });
     mastersButton.dataset.bound = '1';
+  }
+
+  if (!document.body.dataset.elopaneloutsidebound) {
+    document.addEventListener('click', (event) => {
+      if (!state.statsFilters?.eloPanelOpen) return;
+      if (eloPanel.contains(event.target)) return;
+      if (eloButton.contains(event.target)) return;
+
+      state.statsFilters.eloPanelOpen = false;
+      syncStatsFilterControls();
+    });
+    document.body.dataset.elopaneloutsidebound = '1';
   }
 
   updateSortButtonStates();
@@ -661,6 +748,8 @@ const freqPct = Math.round((total / totalGames) * 100);
 
   const row = document.createElement('div');
   row.className = `stats-row${state.statsSelectedUci === move.uci ? ' active' : ''}`;
+  row.setAttribute('data-move-uci', move.uci || '');
+  row.setAttribute('data-move-san', move.san || '');
   row.style.display = 'grid';
   row.style.gridTemplateColumns = '24px 1fr';
   row.style.alignItems = 'center';
@@ -797,18 +886,12 @@ function updateSortButtonStates() {
   
   const badge = document.getElementById('stats-sort-badge');
   if (badge) {
-    badge.textContent = `Trier : ${displayLabel}`;
-    badge.style.display = 'block';
+    badge.style.display = 'none';
   }
 
   const depthBadge = document.getElementById('stats-depth-badge');
   if (depthBadge) {
-    if (state.isAnalysisEnabled) {
-      depthBadge.textContent = `Prof. ${state.analysisDepth ?? 10}`;
-      depthBadge.style.display = 'inline-block';
-    } else {
-      depthBadge.style.display = 'none';
-    }
+    depthBadge.style.display = 'none';
   }
 }
 
@@ -841,6 +924,29 @@ function handleTreeContext(event, node) {
 
 export function hideMenus() {
   state.ctxMenuEl.style.display = 'none';
+  state.contextMenuMove = null;
+}
+
+export function addSelectedMoveToTree() {
+  const move = state.contextMenuMove;
+  if (!move || !move.uci) {
+    hideMenus();
+    return;
+  }
+
+  const originalNode = state.currentNode;
+  const added = playUciMove(move.uci);
+
+  if (added && originalNode) {
+    state.currentNode = originalNode;
+    state.chess.load(originalNode.fen);
+    state.pendingAnimation = null;
+    state.redoStack = [];
+  }
+
+  state.lastStatsRequestKey = '';
+  hideMenus();
+  render();
 }
 
 export function closeModals() {
@@ -1077,29 +1183,53 @@ export function handleRightClick(event, type, target = null, index = -1) {
   if (state.trainingActive) return;
   event.preventDefault();
   event.stopPropagation();
+  const isMoveContext = type === 'stats_move' || type === 'analysis_move';
+
   state.menuTarget = target || state.currentNode;
+  state.contextMenuMove = isMoveContext ? target : null;
   state.deleteTargetIdx = index;
   state.pendingDeleteType = type;
   state.contextMenuSource = type;
+
   const menu = state.ctxMenuEl;
   menu.style.display = 'block';
-  let x = event.pageX;
-  let y = event.pageY;
-  if (x + 220 > window.innerWidth) x = window.innerWidth - 230;
-  menu.style.left = x + 'px';
-  menu.style.top = y + 'px';
+
+  const menuWidth = menu.offsetWidth || 240;
+  const menuHeight = menu.offsetHeight || 280;
+  const pad = 10;
+  let x = event.clientX;
+  let y = event.clientY;
+
+  x = Math.max(pad, Math.min(x, window.innerWidth - menuWidth - pad));
+  y = Math.max(pad, Math.min(y, window.innerHeight - menuHeight - pad));
+
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
 
   const isRepRoot = type === 'repertoire_item';
   const isRepSub = type === 'repertoire_subitem';
   const isNode = type === 'monitor' || type === 'arbre' || type === 'board' || isRepSub;
   const isNotRoot = state.menuTarget && state.menuTarget.parent;
-  menu.querySelector('.opt-rename-rep').style.display = isRepRoot ? 'block' : 'none';
-  menu.querySelector('.opt-delete').textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
-  menu.querySelector('.opt-name-var').style.display = isNode && isNotRoot ? 'block' : 'none';
-  menu.querySelector('.opt-delete').style.display = isRepRoot || (isNode && isNotRoot) ? 'block' : 'none';
-  menu.querySelector('.opt-comment').style.display = state.activeRepIndex !== -1 ? 'block' : 'none';
+
+  const flipEl = menu.querySelector('.opt-flip');
+  const renameEl = menu.querySelector('.opt-rename-rep');
+  const nameVarEl = menu.querySelector('.opt-name-var');
+  const addTreeEl = menu.querySelector('.opt-add-tree');
+  const commentEl = menu.querySelector('.opt-comment');
+  const deleteEl = menu.querySelector('.opt-delete');
+
+  if (flipEl) flipEl.style.display = isMoveContext ? 'none' : 'block';
+  if (renameEl) renameEl.style.display = isRepRoot ? 'block' : 'none';
+  if (deleteEl) {
+    deleteEl.textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
+    deleteEl.style.display = isMoveContext ? 'none' : (isRepRoot || (isNode && isNotRoot) ? 'block' : 'none');
+  }
+  if (nameVarEl) nameVarEl.style.display = isMoveContext ? 'none' : (isNode && isNotRoot ? 'block' : 'none');
+  if (commentEl) commentEl.style.display = isMoveContext ? 'none' : (state.activeRepIndex !== -1 ? 'block' : 'none');
+  if (addTreeEl) addTreeEl.style.display = isMoveContext ? 'block' : 'none';
+
   const annotSection = menu.querySelector('.ctx-annot-section');
-  if (annotSection) annotSection.style.display = isRepRoot ? 'none' : 'block';
+  if (annotSection) annotSection.style.display = (isRepRoot || isMoveContext) ? 'none' : 'block';
 }
 
 export function selectCol(color) {
@@ -2086,7 +2216,7 @@ function showGuestAccountMenu() {
     right: 24px;
     background: rgba(15, 23, 42, 0.98);
     border: 1px solid rgba(148, 163, 184, 0.15);
-    border-radius: 12px;
+    border-radius: 5px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     z-index: 10001;
     padding: 8px 0;
@@ -2174,22 +2304,19 @@ function createTooltip(content, x, y) {
   tooltip.className = 'move-hover-tooltip';
   tooltip.innerHTML = content;
   document.body.appendChild(tooltip);
-  
-  // Repositionner si hors écran
-  requestAnimationFrame(() => {
+
+  const positionTooltip = (baseX, baseY) => {
     const rect = tooltip.getBoundingClientRect();
-    let newX = x;
-    let newY = y;
-    
-    if (rect.right > window.innerWidth - 10) {
-      newX = window.innerWidth - rect.width - 10;
-    }
-    if (rect.bottom > window.innerHeight - 10) {
-      newY = window.innerHeight - rect.height - 10;
-    }
-    
-    tooltip.style.left = `${newX}px`;
-    tooltip.style.top = `${newY}px`;
+    const pad = 10;
+    const clampedX = Math.max(pad, Math.min(baseX, window.innerWidth - rect.width - pad));
+    const clampedY = Math.max(pad, Math.min(baseY, window.innerHeight - rect.height - pad));
+    tooltip.style.left = `${clampedX}px`;
+    tooltip.style.top = `${clampedY}px`;
+  };
+  
+  // Repositionner pour rester dans les bords de l'écran
+  requestAnimationFrame(() => {
+    positionTooltip(x, y);
   });
   
   tooltip.addEventListener('mouseenter', () => {
@@ -2203,6 +2330,7 @@ function createTooltip(content, x, y) {
     tooltipHideTimer = setTimeout(hideCurrentTooltip, 200);
   });
   
+  tooltip.reposition = positionTooltip;
   currentTooltip = tooltip;
   return tooltip;
 }
@@ -2437,6 +2565,11 @@ function attachStatsRowHover(row, move) {
         if (currentTooltip) {
           const countersHtml = buildCountermovesHtml(counterMoves);
           currentTooltip.innerHTML = content + '<div class="move-hover-tooltip-section-title" style="margin-top: 8px;">Contre-coups:</div>' + countersHtml;
+          const currentX = Number.parseFloat(currentTooltip.style.left || '0');
+          const currentY = Number.parseFloat(currentTooltip.style.top || '0');
+          if (typeof currentTooltip.reposition === 'function') {
+            currentTooltip.reposition(currentX, currentY);
+          }
         }
       }
       hoverShowTimer = null;
