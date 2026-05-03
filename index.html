@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html lang="fr">
 
@@ -11,7 +11,7 @@
 <title>Alpha V1.9.35 - Annotations Sélectives</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mliebelt/pgn-parser@1.4.19/lib/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mlebelt/pgn-parser@1.4.19/lib/index.umd.js"></script>
 
 <style>
 :root {
@@ -37,7 +37,7 @@
   --danger-soft: rgba(251, 113, 133, 0.14);
   --shadow: 0 24px 80px rgba(8, 15, 28, 0.35);
   --shadow-soft: 0 16px 40px rgba(8, 15, 28, 0.24);
-  --radius: 20px;
+  --radius: 5px;
   --soft-bg: #1e1e1e;
   --soft-bg-hover: #2a2a2a;
   --soft-border: #3a3a3a;
@@ -62,37 +62,36 @@ body {
 }
 
 .top-bar {
-  width: min(100%, 1280px);
-  display: flex;
+  width: min(100%, 1360px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 18px 24px;
-  margin-bottom: 22px;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
   background: rgba(15, 23, 42, 0.92);
   border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 24px;
+  border-radius: 7px;
   box-shadow: var(--shadow-soft);
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .brand-group {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 9px;
 }
 
 .brand-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
   background: linear-gradient(135deg, rgba(122, 174, 203, 0.35), rgba(143, 183, 209, 0.08));
   display: grid;
   place-items: center;
   color: white;
   font-weight: 900;
-  font-size: 1.05rem;
+  font-size: 0.76rem;
   letter-spacing: 0.04em;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
 }
@@ -100,35 +99,38 @@ body {
 .brand-label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .brand-title {
-  font-size: 1rem;
+  font-size: 0.76rem;
   font-weight: 800;
   color: var(--text-strong);
 }
 
 .brand-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.62rem;
   color: var(--text-muted);
 }
 
 .top-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   flex-wrap: nowrap;
   justify-content: center;
+  justify-self: center;
+  width: 100%;
+  min-width: 0;
   white-space: nowrap;
 }
 
 .top-tab {
-  padding: 10px 16px;
-  border-radius: 999px;
+  padding: 6px 11px;
+  border-radius: 5px;
   background: rgba(148, 163, 184, 0.08);
   color: var(--text-main);
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
@@ -144,20 +146,21 @@ body {
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: nowrap;
   justify-content: flex-end;
+  justify-self: end;
   white-space: nowrap;
 }
 
 .top-action,
 .top-account {
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 6px 10px;
+  border-radius: 5px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(148, 163, 184, 0.05);
   color: var(--text-main);
-  font-size: 0.86rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -173,35 +176,36 @@ body {
 .top-account {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
 }
 
 .account-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
   background: rgba(122, 174, 203, 0.18);
   display: grid;
   place-items: center;
   color: white;
   font-weight: 800;
+  font-size: 0.62rem;
 }
 
 .account-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   align-items: flex-start;
 }
 
 .account-name {
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 800;
   color: var(--text-strong);
 }
 
 .account-status {
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   color: var(--text-muted);
 }
 
@@ -224,7 +228,7 @@ body {
 .left-panel {
   min-height: 620px;
   background: rgba(15, 23, 42, 0.96);
-  border-radius: var(--radius);
+  border-radius: 7px;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
@@ -245,15 +249,15 @@ body {
 .game-monitor {
   position: relative;
   width: 100%;
-  min-height: 520px;
+  min-height: 0;
   background: var(--monitor-bg);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: 7px;
   box-shadow: var(--shadow-soft);
-  padding: 24px 70px 24px 24px;
+  padding: 18px 60px 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .monitor-header {
@@ -269,7 +273,7 @@ body {
   background: var(--surface-soft);
   color: var(--text-main);
   border: 1px solid var(--soft-border);
-  border-radius: 999px;
+  border-radius: 5px;
   padding: 11px 18px;
   font-size: 0.9rem;
   font-weight: 700;
@@ -287,7 +291,7 @@ body {
   width: 38px;
   height: 38px;
   padding: 8px;
-  border-radius: 14px;
+  border-radius: 5px;
   background: rgba(148, 163, 184, 0.08);
   display: flex;
   flex-direction: column;
@@ -305,7 +309,7 @@ body {
   height: 2px;
   width: 18px;
   background-color: var(--text-main);
-  border-radius: 999px;
+  border-radius: 5px;
 }
 
 .btn-create-rep:hover {
@@ -325,15 +329,37 @@ body {
 
 .monitor-pgn {
   font-family: 'Courier New', monospace;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   color: var(--text-main);
-  line-height: 1.5;
+  line-height: 1.32;
   background: rgba(148, 163, 184, 0.05);
   border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 16px;
-  padding: 14px;
-  min-height: 72px;
+  border-radius: 5px;
+  padding: 9px 10px;
+  height: calc(5 * 1.32em + 18px);
+  min-height: calc(5 * 1.32em + 18px);
+  max-height: calc(5 * 1.32em + 18px);
+  overflow-y: auto;
   word-break: break-word;
+}
+
+.monitor-pgn::-webkit-scrollbar {
+  width: 6px;
+}
+
+.monitor-pgn::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 5px;
+}
+
+.monitor-pgn::-webkit-scrollbar-thumb {
+  background: rgba(122, 174, 203, 0.45);
+  border-radius: 5px;
+}
+
+.monitor-pgn {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(122, 174, 203, 0.45) rgba(148, 163, 184, 0.12);
 }
 
 .monitor-comment {
@@ -341,10 +367,158 @@ body {
   color: var(--text-muted);
   background: rgba(148, 163, 184, 0.05);
   border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 16px;
+  border-radius: 5px;
   padding: 14px;
   font-style: italic;
   white-space: pre-wrap;
+}
+
+.monitor-analysis-section {
+  margin-top: 0;
+  flex: 0 0 auto;
+  min-height: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  padding-top: 5px;
+  padding-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.monitor-analysis-section.is-collapsed {
+  padding-bottom: 2px;
+}
+
+.monitor-analysis-section.is-collapsed #analysis-panel {
+  display: none;
+}
+
+.monitor-analysis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.monitor-analysis-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+
+.monitor-analysis-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analysis-switch {
+  position: relative;
+  display: inline-flex;
+  width: 44px;
+  height: 24px;
+}
+
+.analysis-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.analysis-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.analysis-switch-track::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: #f8fafc;
+  transition: transform 0.2s ease;
+}
+
+.analysis-switch input:checked + .analysis-switch-track {
+  background: rgba(122, 174, 203, 0.45);
+  border-color: rgba(122, 174, 203, 0.8);
+}
+
+.analysis-switch input:checked + .analysis-switch-track::before {
+  transform: translateX(20px);
+}
+
+.monitor-analysis-controls {
+  width: 220px;
+}
+
+.monitor-analysis-depth {
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 0;
+}
+
+.monitor-analysis-depth[hidden] {
+  display: none;
+}
+
+.monitor-analysis-depth-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.monitor-analysis-depth-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.monitor-analysis-depth-value {
+  font-size: 0.72rem;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.stats-filter-btn.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  background: rgba(15, 23, 42, 0.34);
+  color: rgba(219, 234, 254, 0.62);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.stats-filter-btn.is-disabled:hover {
+  transform: none;
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.monitor-analysis-controls .stats-filter-btn {
+  min-height: 30px;
+  height: 30px;
+  width: 128px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+}
+
+.monitor-analysis-controls .stats-filter-btn-mini {
+  width: 20px;
+  height: 20px;
 }
 
 #board {
@@ -354,7 +528,7 @@ body {
   max-width: 780px;
   aspect-ratio: 1 / 1;
   border: 1px solid var(--border-color);
-  border-radius: 24px;
+  border-radius: 5px;
   overflow: hidden;
   box-shadow: var(--shadow-soft);
 }
@@ -387,7 +561,7 @@ body {
   min-height: 200px;
   position: relative;
   background: #1a1a1a;
-  border-radius: 7px;
+  border-radius: 5px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4);
@@ -436,6 +610,7 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   width: min(100%, 780px);
+  padding-right: 38px;
 }
 
 .square {
@@ -552,7 +727,7 @@ body {
   width: 100%;
   min-height: 620px;
   background: rgba(15, 23, 42, 0.96);
-  border-radius: var(--radius);
+  border-radius: 7px;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-soft);
   display: flex;
@@ -574,7 +749,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: 5px;
   background: rgba(148, 163, 184, 0.04);
   color: var(--text-muted);
   cursor: pointer;
@@ -706,7 +881,7 @@ body {
   padding: 3px 6px;
   cursor: pointer;
   font-size: 0.85rem;
-  border-radius: 8px;
+  border-radius: 5px;
   transition: background 0.15s ease, color 0.15s ease;
   white-space: nowrap;
 }
@@ -762,7 +937,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-radius: 16px;
+  border-radius: 5px;
 }
 
 .section-content {
@@ -776,7 +951,7 @@ body {
 
 .rep-item-wrapper {
   margin-bottom: 14px;
-  border-radius: 20px;
+  border-radius: 5px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.12);
   background: rgba(15, 23, 42, 0.95);
@@ -817,7 +992,7 @@ body {
   color: var(--text-main);
   cursor: pointer;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -840,7 +1015,7 @@ body {
 .train-btn {
   margin-left: auto;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid rgba(122, 174, 203, 0.4);
   background: rgba(122, 174, 203, 0.1);
   color: #dbeafe;
@@ -907,7 +1082,8 @@ body {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  width: min(100%, 560px);
+  width: min(100%, 780px);
+  padding-right: 38px;
 }
 
 .ctrl-btn {
@@ -916,7 +1092,7 @@ body {
   background: rgba(148, 163, 184, 0.06);
   color: var(--text-main);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 16px;
+  border-radius: 5px;
   cursor: pointer;
   display: flex;
   justify-content: center;
@@ -945,7 +1121,7 @@ body {
   position: absolute;
   background: var(--menu-bg);
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 18px;
+  border-radius: 5px;
   width: 240px;
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3);
   z-index: 9999;
@@ -991,7 +1167,7 @@ body {
 .modal-box {
   background: rgba(15, 23, 42, 0.98);
   padding: 26px;
-  border-radius: 24px;
+  border-radius: 5px;
   width: min(100%, 420px);
   max-width: 420px;
   border: 1px solid rgba(148, 163, 184, 0.15);
@@ -1040,7 +1216,7 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: rgba(148, 163, 184, 0.05);
   color: var(--text-main);
-  border-radius: 12px;
+  border-radius: 5px;
   padding: 9px 10px;
   text-align: center;
   cursor: pointer;
@@ -1080,7 +1256,7 @@ body {
   background: rgba(148, 163, 184, 0.05);
   color: var(--text-main);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 16px;
+  border-radius: 5px;
   padding: 14px;
   font-size: 0.95rem;
 }
@@ -1100,7 +1276,7 @@ body {
   flex: 1;
   padding: 12px 0;
   border: 1px solid rgba(148, 163, 184, 0.15);
-  border-radius: 16px;
+  border-radius: 5px;
   cursor: pointer;
   text-align: center;
   font-size: 0.85rem;
@@ -1120,19 +1296,39 @@ body {
 }
 
 .stats-filter-shell {
-  margin: 10px 0 12px;
+  width: 100%;
+  margin: 2px 0 6px;
+}
+
+.candidate-section-title {
+  margin: 2px 0 4px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cbd5e1;
 }
 
 .stats-filter-buttons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: stretch;
+}
+
+.stats-filter-buttons .stats-filter-btn,
+.stats-filter-buttons .stats-sort-menu-wrapper,
+.stats-filter-buttons .stats-sort-menu-wrapper .stats-filter-btn {
+  width: 100%;
+}
+
+.stats-panel {
+  width: 100%;
 }
 
 .stats-filter-badge-row {
-  margin-top: 8px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
 }
@@ -1141,7 +1337,7 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid rgba(122, 174, 203, 0.45);
   background: rgba(122, 174, 203, 0.12);
   color: #e2f2ff;
@@ -1155,13 +1351,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 0 14px;
-  border-radius: 10px;
+  min-height: 27px;
+  padding: 0 11px;
+  border-radius: 5px;
   border: 1px solid rgba(148, 163, 184, 0.26);
   background: rgba(15, 23, 42, 0.62);
   color: #dbeafe;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -1170,6 +1366,41 @@ body {
   white-space: nowrap;
   width: 100px;
   text-align: center;
+}
+
+.stats-filter-btn--split {
+  justify-content: space-between;
+  gap: 5px;
+  padding-right: 4px;
+}
+
+.stats-filter-btn-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  justify-content: center;
+}
+
+.stats-filter-btn-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(148, 163, 184, 0.08);
+  color: #dbeafe;
+  font-size: 0.66rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.stats-filter-btn-mini:hover {
+  background: rgba(122, 174, 203, 0.2);
+  border-color: rgba(122, 174, 203, 0.68);
 }
 
 .stats-filter-btn:hover:not(:disabled) {
@@ -1191,13 +1422,14 @@ body {
 .stats-filter-btn .elo-btn-mini-loader {
   width: 11px;
   height: 11px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 2px solid rgba(224, 242, 254, 0.45);
   border-top-color: #f8fafc;
   opacity: 0;
   transform: scale(0.8);
   transition: opacity 0.2s ease, transform 0.2s ease;
   pointer-events: none;
+  margin-left: 2px;
 }
 
 .stats-filter-btn.is-loading .elo-btn-mini-loader {
@@ -1220,7 +1452,7 @@ body {
   padding: 5px 0;
   background: none;
   border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 6px;
+  border-radius: 5px;
   color: #aaa;
   font-size: 12px;
   cursor: pointer;
@@ -1262,7 +1494,7 @@ body {
   left: 0;
   background: rgba(15, 23, 42, 0.96);
   border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 10px;
+  border-radius: 5px;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -1287,7 +1519,7 @@ body {
   left: 0;
   background: rgba(15, 23, 42, 0.96);
   border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 10px;
+  border-radius: 5px;
   padding: 4px;
   display: flex;
   flex-direction: column;
@@ -1306,7 +1538,7 @@ body {
   align-items: center;
   justify-content: flex-start;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 5px;
   border: none;
   background: transparent;
   color: #dbeafe;
@@ -1335,7 +1567,7 @@ body {
   margin-top: 8px;
   padding: 10px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 12px;
+  border-radius: 5px;
   background: rgba(15, 23, 42, 0.45);
 }
 
@@ -1372,7 +1604,7 @@ body {
   top: 50%;
   transform: translateY(-50%);
   height: 6px;
-  border-radius: 999px;
+  border-radius: 5px;
 }
 
 .elo-range-track {
@@ -1435,7 +1667,7 @@ body {
   gap: 10px;
   margin: 6px 0 10px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 5px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   background: rgba(15, 23, 42, 0.52);
   color: #dbeafe;
@@ -1450,7 +1682,7 @@ body {
 .stats-global-spinner {
   width: 16px;
   height: 16px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 2px solid rgba(148, 163, 184, 0.4);
   border-top-color: #7aaecb;
   animation: stats-global-spin 0.9s linear infinite;
@@ -1565,6 +1797,24 @@ body {
   body {
     padding: 14px;
   }
+  .top-bar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .brand-group,
+  .top-nav,
+  .top-actions {
+    justify-self: stretch;
+  }
+  .top-nav {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .top-actions {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
   .main-layout {
     gap: 18px;
   }
@@ -1582,7 +1832,7 @@ body {
   }
 
   .stats-filter-btn {
-    min-height: 38px;
+    min-height: 29px;
   }
 }
 
@@ -1592,7 +1842,7 @@ body {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 18px;
-  border-radius: 16px;
+  border-radius: 5px;
   background: rgba(251, 191, 36, 0.1);
   border: 1px solid rgba(251, 191, 36, 0.32);
   width: min(100%, 780px);
@@ -1607,7 +1857,7 @@ body {
 
 .training-banner-stop {
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid rgba(251, 113, 133, 0.45);
   background: rgba(251, 113, 133, 0.1);
   color: #fee2e2;
@@ -1684,7 +1934,7 @@ body {
 .splash-logo {
   width: 80px;
   height: 80px;
-  border-radius: 20px;
+  border-radius: 5px;
   background: linear-gradient(135deg, rgba(122, 174, 203, 0.4), rgba(143, 183, 209, 0.15));
   display: grid;
   place-items: center;
@@ -1722,7 +1972,7 @@ body {
 
 .splash-btn {
   padding: 12px 24px;
-  border-radius: 12px;
+  border-radius: 5px;
   font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
@@ -1775,13 +2025,16 @@ body {
 /* ========== ANALYSE ENGINE ========== */
 
 #analysis-panel {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  border-radius: 12px;
-  padding: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 1px 0 0;
   font-size: 0.85rem;
-  max-height: 300px;
-  overflow-y: auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  flex: 0 0 auto;
+  overflow: hidden;
   color: var(--text-main);
 }
 
@@ -1803,7 +2056,7 @@ body {
   position: fixed;
   background: rgba(15, 23, 42, 0.96);
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 8px;
+  border-radius: 5px;
   padding: 12px;
   z-index: 10000;
   font-size: 0.875rem;
@@ -1885,20 +2138,24 @@ body {
 
 .analysis-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 8px;
+  gap: 7px;
+  margin-bottom: 2px;
+  padding: 4px 7px;
   background: rgba(148, 163, 184, 0.04);
-  border-radius: 8px;
+  border-radius: 5px;
   align-items: center;
 }
 
+.analysis-row:last-child {
+  margin-bottom: 0;
+}
+
 .analysis-score {
-  min-width: 45px;
+  min-width: 36px;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.74rem;
   font-family: monospace;
-  padding: 2px 6px;
+  padding: 1px 4px;
   border-radius: 4px;
   text-align: center;
 }
@@ -1921,13 +2178,15 @@ body {
 .analysis-move {
   font-weight: 700;
   color: #e2f2ff;
-  min-width: 30px;
+  min-width: 26px;
+  font-size: 0.82rem;
+  cursor: pointer;
 }
 
 .analysis-pv {
   flex: 1;
   color: #94a3b8;
-  font-size: 0.8rem;
+  font-size: 0.67rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1936,7 +2195,7 @@ body {
 #analysis-depth-panel {
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 10px;
+  border-radius: 5px;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -2079,35 +2338,49 @@ body {
     <div class="monitor-pgn" id="mon-pgn"></div>
     <div class="monitor-comment" id="mon-comment"></div>
     <div id="opening-info"></div>
+    <div class="monitor-analysis-section" id="monitor-analysis-section">
+      <div class="monitor-analysis-header">
+        <div class="monitor-analysis-title-row">
+          <span class="monitor-analysis-title">Analyse</span>
+          <label class="analysis-switch" for="analysis-toggle-switch" aria-label="Activer ou désactiver l'analyse">
+            <input type="checkbox" id="analysis-toggle-switch">
+            <span class="analysis-switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="monitor-analysis-controls">
+          <div class="monitor-analysis-depth" id="analysis-depth-inline" hidden>
+            <div class="monitor-analysis-depth-head">
+              <span class="monitor-analysis-depth-label">Profondeur</span>
+              <span class="monitor-analysis-depth-value" id="analysis-depth-value">10</span>
+            </div>
+            <div style="position: relative;">
+              <div style="position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 6px; border-radius: 5px; background: rgba(148,163,184,0.25);"></div>
+              <div id="analysis-depth-fill" style="position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 6px; border-radius: 5px; background: linear-gradient(90deg,#7aaecb 0%,#9fd4ef 100%); transition: width 0.2s ease; pointer-events: none;"></div>
+              <input type="range" id="analysis-depth-input" min="5" max="20" value="10" style="position: relative; z-index: 1; width: 100%; height: 8px; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; margin: 0;">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="analysis-panel"></div>
+    </div>
   </div>
+  <div class="candidate-section-title">Coups candidats</div>
   <div class="stats-filter-shell" id="stats-filter-shell">
     <div class="stats-filter-buttons">
-      <button type="button" class="stats-filter-btn" id="stats-filter-elo-btn" aria-controls="stats-filter-elo-panel" aria-expanded="false">
-        <span>Elo</span>
+      <button type="button" class="stats-filter-btn stats-filter-btn--split" id="stats-filter-lichess-btn" aria-controls="stats-filter-elo-panel" aria-expanded="false" aria-label="Base Lichess">
+        <span class="stats-filter-btn-label">Lichess</span>
         <span class="elo-btn-mini-loader" aria-hidden="true"></span>
+        <span class="stats-filter-btn-mini" id="stats-filter-lichess-menu-btn" role="button" aria-label="Ouvrir Rating range" tabindex="0">▾</span>
       </button>
       <button type="button" class="stats-filter-btn" id="stats-filter-masters-btn" aria-label="Base Masters">
         <span>Masters</span>
       </button>
-      <div class="stats-analysis-menu-wrapper">
-        <button type="button" class="stats-filter-btn" id="analysis-toggle-btn" aria-label="Activer/Désactiver l'analyse">
-          <span>⚡ Analyse</span>
-        </button>
-        <div class="stats-analysis-menu" id="stats-analysis-menu" hidden>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 8px; padding-top: 8px;">
-            <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Profondeur</span>
-            <span id="analysis-depth-value" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">10</span>
-          </div>
-          <div style="position: relative; padding: 0 8px 12px;">
-            <div style="position: absolute; left: 8px; right: 8px; top: 50%; transform: translateY(-50%); height: 6px; border-radius: 999px; background: rgba(148,163,184,0.25);"></div>
-            <div id="analysis-depth-fill" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); height: 6px; border-radius: 999px; background: linear-gradient(90deg,#7aaecb 0%,#9fd4ef 100%); transition: width 0.2s ease; pointer-events: none;"></div>
-            <input type="range" id="analysis-depth-input" min="5" max="20" value="10" style="position: relative; z-index: 1; width: 100%; height: 8px; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; margin: 0;">
-          </div>
-        </div>
-      </div>
+      <button type="button" class="stats-filter-btn is-disabled" id="stats-filter-player-btn" aria-label="Filtre Joueur (bientot disponible)" disabled>
+        <span>Joueur</span>
+      </button>
       <div class="stats-sort-menu-wrapper">
         <button type="button" class="stats-filter-btn" id="stats-sort-toggle-btn" aria-label="Afficher les options de tri">
-          <span>Trier</span>
+          <span>Affichage</span>
         </button>
         <div class="stats-sort-menu" id="stats-sort-menu" hidden>
           <button type="button" class="stats-sort-menu-item active" data-sort-type="frequency" aria-label="Trier par fréquence">
@@ -2127,8 +2400,8 @@ body {
     </div>
     <div class="stats-filter-badge-row">
       <span class="stats-filter-badge" id="stats-filter-elo-badge">Any rating</span>
-      <span class="stats-filter-badge" id="stats-sort-badge" style="display: none;">Tri : frequency</span>
-      <span class="stats-filter-badge" id="stats-depth-badge" style="display: none;">Prof. 10</span>
+      <span class="stats-filter-badge" id="stats-sort-badge" style="display: none;"></span>
+      <span class="stats-filter-badge" id="stats-depth-badge" style="display: none;"></span>
     </div>
     <div class="stats-filter-panel" id="stats-filter-elo-panel" hidden>
       <div class="stats-filter-panel-head">
@@ -2150,13 +2423,13 @@ body {
 
   <div class="stats-panel" id="stats-panel"></div>
   <div class="stats-details" id="stats-details"></div>
-  <div id="analysis-panel" style="min-height: 100px;"></div>
 </aside>
 
 <div id="ctx-menu" class="ctx-menu">
   <div class="menu-item opt-flip" data-menu-action="flip-board">Retourner l'échiquier</div>
   <div class="menu-item opt-rename-rep" style="display:none" data-menu-action="rename-repertoire">Renommer le répertoire</div>
   <div class="menu-item opt-name-var" style="display:none" data-menu-action="name-variation">Nommer la variante</div>
+  <div class="menu-item opt-add-tree" style="display:none" data-menu-action="add-to-tree">Ajouter à l'arbre</div>
   <div class="menu-item opt-comment" data-menu-action="comment">Commenter</div>
   <div class="menu-item opt-delete" style="color:#f87171" data-menu-action="delete">Supprimer</div>
   <div class="ctx-annot-section">
@@ -2201,13 +2474,13 @@ body {
       
       <div id="splash-form-content" style="margin-top: 32px;">
         <div id="splash-username-row" style="display:none; margin-bottom:14px;">
-          <input type="text" id="splash-username-input" placeholder="Pseudo" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
+          <input type="text" id="splash-username-input" placeholder="Pseudo" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box; font-size:0.95rem;">
         </div>
         <div id="splash-email-row" style="margin-bottom:14px;">
-          <input type="text" id="splash-email-input" placeholder="Email ou pseudo" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
+          <input type="text" id="splash-email-input" placeholder="Email ou pseudo" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box; font-size:0.95rem;">
         </div>
         <div style="margin-bottom:14px;">
-          <input type="password" id="splash-password-input" placeholder="Mot de passe" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
+          <input type="password" id="splash-password-input" placeholder="Mot de passe" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box; font-size:0.95rem;">
         </div>
         <div id="splash-error" style="min-height:20px; margin-bottom:14px; color:#ff7b7b; font-size:0.88rem;"></div>
         <button class="splash-btn primary" id="splash-submit-btn" style="width:100%; margin-bottom:12px;">Se connecter</button>
@@ -2230,7 +2503,7 @@ body {
       </div>
       
       <div style="margin-top: 32px; padding: 0 8px;">
-        <div style="background:rgba(251, 113, 133, 0.1); border: 1px solid rgba(251, 113, 133, 0.2); border-radius: 12px; padding: 16px; margin-bottom:24px; color: var(--text-muted); font-size:0.9rem; line-height:1.6;">
+        <div style="background:rgba(251, 113, 133, 0.1); border: 1px solid rgba(251, 113, 133, 0.2); border-radius: 5px; padding: 16px; margin-bottom:24px; color: var(--text-muted); font-size:0.9rem; line-height:1.6;">
           Les répertoires et annotations créés en mode invité <strong style="color:var(--text-main);">ne seront pas sauvegardés</strong> et seront perdus lorsque vous quitterez l'application.
         </div>
       </div>
@@ -2251,13 +2524,13 @@ body {
   
   <div id="account-form-shell" style="margin-bottom: 16px;">
     <div id="account-username-row" style="display:none; margin-bottom:12px;">
-      <input type="text" id="account-username" placeholder="Pseudo" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
+      <input type="text" id="account-username" placeholder="Pseudo" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box; font-size:0.95rem;">
     </div>
     <div style="margin-bottom:12px;">
-      <input type="text" id="account-email" placeholder="Email" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
+      <input type="text" id="account-email" placeholder="Email" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box; font-size:0.95rem;">
     </div>
     <div style="margin-bottom:12px;">
-      <input type="password" id="account-password" placeholder="Mot de passe" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box; font-size:0.95rem;">
+      <input type="password" id="account-password" placeholder="Mot de passe" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box; font-size:0.95rem;">
     </div>
     <div id="account-error" style="min-height:20px; margin-bottom:12px; color:#ff7b7b; font-size:0.88rem; display:none;"></div>
   </div>
@@ -2291,16 +2564,16 @@ body {
 
 </div>
 
-<input type="text" id="rep-name-input" placeholder="Ex: Gambit Dame" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box;">
+<input type="text" id="rep-name-input" placeholder="Ex: Gambit Dame" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box;">
 
 <div id="rep-current-info" style="display:none; margin-top:12px; color:#cfcfcf; font-size:14px;">La ligne actuellement affichée dans le moniteur sera intégrée au nouveau répertoire.</div>
 
 <div id="rep-pgn-file-container" style="display:none; margin-top:12px;">
-<input type="file" id="pgn-file-input" accept=".pgn,.txt,text/plain,application/x-chess-pgn" style="width:100%; padding:10px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box;">
+<input type="file" id="pgn-file-input" accept=".pgn,.txt,text/plain,application/x-chess-pgn" style="width:100%; padding:10px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box;">
 </div>
 
 <div id="rep-pgn-text-container" style="display:none; margin-top:12px;">
-<textarea id="pgn-import-input" placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5 a6" style="width:100%; height:180px; background:#111; color:white; border:1px solid #333; padding:12px; border-radius:6px; box-sizing:border-box;"></textarea>
+<textarea id="pgn-import-input" placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5 a6" style="width:100%; height:180px; background:#111; color:white; border:1px solid #333; padding:12px; border-radius: 5px; box-sizing:border-box;"></textarea>
 </div>
 
 <div id="rep-create-error" style="min-height:20px; margin-top:10px; color:#ff7b7b;"></div>
@@ -2315,7 +2588,7 @@ body {
 
 <p id="var-name-hint" style="display:none; font-size:0.8rem; color:#94a3b8; margin-bottom:10px;"></p>
 
-<input type="text" id="var-name-input" placeholder="Ex: Variante d'échange" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:6px; box-sizing:border-box;">
+<input type="text" id="var-name-input" placeholder="Ex: Variante d'échange" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box;">
 
 <p id="var-name-warning" style="display:none; font-size:0.8rem; color:#f97316; margin-top:10px;"></p>
 
@@ -2327,7 +2600,7 @@ body {
 
 <h3>Commenter</h3>
 
-<textarea id="comment-input" style="width:100%; height:100px; background:#111; color:white; border:1px solid #333; padding:12px; border-radius:6px; box-sizing:border-box;"></textarea>
+<textarea id="comment-input" style="width:100%; height:100px; background:#111; color:white; border:1px solid #333; padding:12px; border-radius: 5px; box-sizing:border-box;"></textarea>
 
 <button class="ctrl-btn" id="btn-comment-save" style="width:100%; margin-top:10px;">Enregistrer</button>
 

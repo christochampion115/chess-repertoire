@@ -4,6 +4,7 @@ export const state = {
   activeRepIndex: -1,
   selectedSq: null,
   menuTarget: null,
+  contextMenuMove: null,
   redoStack: [],
   openPanels: {
     repertoire: false,
