@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 
 <html lang="fr">
 
@@ -406,6 +406,7 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #cbd5e1;
+  white-space: nowrap;
 }
 
 .monitor-analysis-title-row {
@@ -492,6 +493,62 @@ body {
   font-size: 0.72rem;
   color: var(--text-main);
   font-weight: 700;
+}
+
+.survival-monitor-card {
+  background: rgba(122, 174, 203, 0.08);
+  border: 1px solid rgba(122, 174, 203, 0.24);
+  border-radius: 5px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.survival-monitor-lives {
+  font-size: 0.8rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.survival-monitor-hearts {
+  color: #fb7185;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.survival-monitor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.77rem;
+  color: var(--text-muted);
+}
+
+.survival-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.24);
+  overflow: hidden;
+}
+
+.survival-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(122, 174, 203, 0.7), rgba(159, 212, 239, 0.95));
+  transition: width 0.2s ease;
+}
+
+.survival-monitor-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
 }
 
 .stats-filter-btn.is-disabled {
@@ -968,14 +1025,123 @@ body {
   position: relative;
 }
 
+.rep-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rep-medal-badge {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  background: rgba(148, 163, 184, 0.08);
+  transition: transform 0.2s ease;
+}
+
+.rep-medal-badge:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.rep-medal-badge.tier-bronze {
+  border-color: rgba(217, 119, 6, 0.45);
+  background: rgba(217, 119, 6, 0.14);
+}
+
+.rep-medal-badge.tier-silver {
+  border-color: rgba(148, 163, 184, 0.56);
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.rep-medal-badge.tier-gold {
+  border-color: rgba(251, 191, 36, 0.74);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 238, 180, 0.72), rgba(255, 205, 86, 0.28) 42%, rgba(122, 85, 10, 0.42) 100%);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.35), inset 0 0 0 1px rgba(255, 236, 179, 0.25);
+}
+
+.rep-medal-badge.tier-platinum {
+  border-color: rgba(216, 180, 254, 0.88);
+  background:
+    radial-gradient(circle at 28% 22%, rgba(245, 235, 255, 0.95), rgba(196, 181, 253, 0.6) 38%, rgba(76, 29, 149, 0.7) 100%);
+  box-shadow: 0 0 10px rgba(196, 181, 253, 0.6), 0 0 20px rgba(167, 139, 250, 0.45);
+  color: #e9d5ff;
+  font-size: 1.28rem;
+  line-height: 1;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.9), 0 0 10px rgba(216, 180, 254, 0.85), 0 0 20px rgba(167, 139, 250, 0.6);
+}
+
+.rep-medal-badge.tier-diamond {
+  border-color: rgba(125, 211, 252, 0.92);
+  background:
+    radial-gradient(circle at 28% 22%, rgba(248, 254, 255, 0.98), rgba(186, 230, 253, 0.72) 36%, rgba(14, 116, 144, 0.52) 100%);
+  box-shadow: 0 0 12px rgba(186, 230, 253, 0.8), 0 0 24px rgba(56, 189, 248, 0.6);
+  color: #ffffff;
+  font-size: 1.36rem;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(224, 242, 254, 0.95), 0 0 26px rgba(125, 211, 252, 0.78);
+  box-sizing: border-box;
+ 
+}
+
+.rep-medal-badge.tier-chrome {
+  border-color: rgba(226, 232, 240, 0.98);
+  background:
+    conic-gradient(from 90deg, rgba(241, 245, 249, 0.95), rgba(125, 211, 252, 0.88), rgba(251, 191, 36, 0.88), rgba(244, 114, 182, 0.82), rgba(241, 245, 249, 0.95));
+  box-shadow: 0 0 14px rgba(226, 232, 240, 0.72), 0 0 26px rgba(125, 211, 252, 0.5), 0 0 36px rgba(251, 191, 36, 0.35);
+  animation: chromePulse 1.4s ease-in-out infinite;
+  color: #ffffff;
+  font-size: 1.3rem;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(255, 255, 255, 0.92), 0 0 24px rgba(224, 242, 254, 0.82);
+  box-sizing: border-box;
+  padding-right: 9px;
+  padding-bottom: 2px;
+}
+
+.rep-medal-badge[data-shine='1'],
+.rep-medal-badge[data-shine='2'],
+.rep-medal-badge[data-shine='3'],
+.rep-medal-badge[data-shine='4'],
+.rep-medal-badge[data-shine='5'] {
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.2);
+}
+
+.rep-medal-badge[data-shine='2'] {
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.3);
+}
+
+.rep-medal-badge[data-shine='3'] {
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.38);
+}
+
+.rep-medal-badge[data-shine='4'] {
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.48);
+}
+
+.rep-medal-badge[data-shine='5'] {
+  box-shadow: 0 0 17px rgba(250, 204, 21, 0.62);
+}
+
+.rep-train-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-start;
+}
+
 .rep-header:hover {
   background: rgba(122, 174, 203, 0.08);
   transform: translateY(-1px);
 }
 
 .rep-header.active {
-  background: rgba(122, 174, 203, 0.12);
-  border-right: 5px solid var(--accent-blue);
+  background: rgba(122, 174, 203, 0.08);
+  border-right: 4px solid rgba(122, 174, 203, 0.45);
 }
 
 .sub-variants-container {
@@ -994,11 +1160,18 @@ body {
   padding: 12px 14px;
   border-radius: 5px;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   border: 1px solid rgba(148, 163, 184, 0.12);
   background: rgba(148, 163, 184, 0.04);
   transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sub-var-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .sub-var-item:hover {
@@ -1007,13 +1180,14 @@ body {
 }
 
 .sub-var-item.active {
-  background: var(--accent-blue);
-  color: white;
-  border-color: transparent;
+  background: rgba(122, 174, 203, 0.2);
+  color: var(--text-strong);
+  border-color: rgba(122, 174, 203, 0.35);
 }
 
 .train-btn {
-  margin-left: auto;
+  margin-left: 0;
+  align-self: flex-start;
   padding: 4px 10px;
   border-radius: 5px;
   border: 1px solid rgba(122, 174, 203, 0.4);
@@ -1072,6 +1246,29 @@ body {
   font-size: 1rem;
   font-weight: 900;
   color: #ef4444;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  z-index: 2;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.sq-retry::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(59, 130, 246, 0.26);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sq-retry::before {
+  content: '↻';
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #60a5fa;
   text-shadow: 0 1px 3px rgba(0,0,0,0.6);
   z-index: 2;
   pointer-events: none;
@@ -1177,6 +1374,321 @@ body {
   transition: transform 220ms ease, opacity 220ms ease;
 }
 
+#modal-training-confirm,
+#modal-training-interrupt,
+#modal-training-stop,
+#modal-training-done,
+#modal-training-defeat {
+  background:
+    linear-gradient(160deg, rgba(18, 33, 54, 0.98) 0%, rgba(11, 24, 41, 0.98) 100%);
+  border: 1px solid rgba(122, 174, 203, 0.28);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+#modal-training-defeat {
+  width: min(100%, 680px);
+  max-width: 680px;
+}
+
+#modal-training-confirm h3,
+#modal-training-interrupt h3,
+#modal-training-stop h3,
+#modal-training-done h3,
+#modal-training-defeat h3 {
+  color: #e8f3fb;
+}
+
+#modal-training-confirm .modal-body,
+#modal-training-interrupt .modal-body,
+#modal-training-stop .modal-body,
+#modal-training-done .modal-body,
+#modal-training-defeat .modal-body {
+  color: #b8c9dc;
+}
+
+.survival-defeat-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 0.86rem;
+}
+
+.survival-defeat-score {
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.survival-defeat-title {
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+  color: #f8fafc;
+}
+
+.survival-defeat-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.survival-mistake-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 5px;
+  padding: 8px;
+}
+
+.survival-mistake-head {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.survival-mistake-moves {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.survival-defeat-empty {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
+.survival-earned-medal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.survival-earned-medal-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(148, 163, 184, 0.12);
+  font-size: 1rem;
+}
+
+.survival-earned-medal-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.survival-earned-medal.tier-none {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.survival-next-reward--compact {
+  font-size: 0.77rem;
+  color: #93c5fd;
+  opacity: 0.9;
+}
+
+.survival-mini-board {
+  display: grid;
+  grid-template-columns: repeat(8, 16px);
+  grid-template-rows: repeat(8, 16px);
+  width: 128px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.survival-mini-square {
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.survival-mini-square.is-light {
+  background: #ebecd0;
+  color: #111827;
+}
+
+.survival-mini-square.is-dark {
+  background: #779556;
+  color: #0f172a;
+}
+
+.medals-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.medal-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 5px;
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.medal-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.medal-card-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(148, 163, 184, 0.14);
+  font-size: 0.95rem;
+}
+
+.medal-card-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.medal-card-rule {
+  font-size: 0.77rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.medal-card-variants {
+  margin-top: 7px;
+  font-size: 0.74rem;
+  color: #cfe5f5;
+}
+
+.medal-showcase-row {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.medal-showcase-token {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.09);
+}
+
+.medal-showcase-token.tier-bronze {
+  border-color: rgba(217, 119, 6, 0.5);
+  background: radial-gradient(circle at 30% 25%, rgba(253, 230, 138, 0.45), rgba(180, 83, 9, 0.38));
+}
+
+.medal-showcase-token.tier-silver {
+  border-color: rgba(203, 213, 225, 0.66);
+  background: radial-gradient(circle at 30% 25%, rgba(248, 250, 252, 0.65), rgba(100, 116, 139, 0.42));
+}
+
+.medal-showcase-token.tier-gold {
+  border-color: rgba(251, 191, 36, 0.78);
+  background: radial-gradient(circle at 30% 25%, rgba(255, 243, 200, 0.9), rgba(202, 138, 4, 0.46));
+}
+
+.medal-showcase-token.tier-platinum {
+  border-color: rgba(216, 180, 254, 0.9);
+  background: radial-gradient(circle at 28% 22%, rgba(245, 235, 255, 0.95), rgba(196, 181, 253, 0.6) 38%, rgba(76, 29, 149, 0.7) 100%);
+  box-shadow: 0 0 12px rgba(196, 181, 253, 0.62), 0 0 22px rgba(167, 139, 250, 0.45);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: #e9d5ff;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.9), 0 0 10px rgba(216, 180, 254, 0.9), 0 0 22px rgba(167, 139, 250, 0.65);
+}
+
+.medal-showcase-token.tier-diamond {
+  border-color: rgba(125, 211, 252, 0.92);
+  background: radial-gradient(circle at 28% 22%, rgba(248, 254, 255, 0.98), rgba(186, 230, 253, 0.72) 36%, rgba(14, 116, 144, 0.52) 100%);
+  box-shadow: 0 0 14px rgba(186, 230, 253, 0.8), 0 0 26px rgba(56, 189, 248, 0.6);
+  font-size: 1.62rem;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 16px rgba(224, 242, 254, 0.96), 0 0 28px rgba(125, 211, 252, 0.8);
+  box-sizing: border-box;
+
+}
+
+.medal-showcase-token.tier-chrome {
+  border-color: rgba(226, 232, 240, 0.98);
+  background: conic-gradient(from 90deg, rgba(241,245,249,0.95), rgba(125,211,252,0.88), rgba(251,191,36,0.88), rgba(244,114,182,0.82), rgba(241,245,249,0.95));
+  box-shadow: 0 0 16px rgba(226,232,240,0.72), 0 0 28px rgba(125,211,252,0.5);
+  animation: chromePulse 1.4s ease-in-out infinite;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 6px rgba(255,255,255,1), 0 0 16px rgba(255,255,255,0.92), 0 0 28px rgba(224, 242, 254, 0.84);
+  box-sizing: border-box;
+  padding-right: 12px;
+  padding-bottom: 3px;
+}
+
+.medal-showcase-token[data-shine="0"] { filter: saturate(0.9) brightness(0.92); }
+.medal-showcase-token[data-shine="1"] { filter: saturate(1) brightness(0.98); }
+.medal-showcase-token[data-shine="2"] { filter: saturate(1.08) brightness(1.04); }
+.medal-showcase-token[data-shine="3"] { filter: saturate(1.15) brightness(1.11); }
+.medal-showcase-token[data-shine="4"] { filter: saturate(1.24) brightness(1.2); }
+.medal-showcase-token[data-shine="5"] {
+  filter: saturate(1.34) brightness(1.3);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.45), 0 0 18px rgba(125, 211, 252, 0.36);
+}
+
+.medal-card.tier-bronze {
+  border-color: rgba(217, 119, 6, 0.34);
+}
+
+.medal-card.tier-silver {
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.medal-card.tier-gold {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.medal-card.tier-platinum {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+.medal-card.tier-diamond {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.medal-card.tier-chrome {
+  border-color: rgba(148, 163, 184, 0.7);
+  background: linear-gradient(135deg, rgba(148,163,184,0.14), rgba(122,174,203,0.14), rgba(148,163,184,0.14));
+}
+
+@keyframes chromePulse {
+  0% {
+    box-shadow: 0 0 8px rgba(148, 163, 184, 0.45), 0 0 14px rgba(56, 189, 248, 0.24);
+    filter: saturate(1);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(148, 163, 184, 0.7), 0 0 24px rgba(56, 189, 248, 0.4);
+    filter: saturate(1.24);
+  }
+  100% {
+    box-shadow: 0 0 8px rgba(148, 163, 184, 0.45), 0 0 14px rgba(56, 189, 248, 0.24);
+    filter: saturate(1);
+  }
+}
+
 #modal-overlay[style*='display: flex'] .modal-box {
   transform: translateY(0);
   opacity: 1;
@@ -1211,6 +1723,10 @@ body {
   margin-top: 10px;
 }
 
+.training-mode-survival-wrap {
+  margin-top: 10px;
+}
+
 .training-mode-option {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -1218,13 +1734,36 @@ body {
   color: var(--text-main);
   border-radius: 5px;
   padding: 9px 10px;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
-  min-height: 42px;
+  min-height: 62px;
+  gap: 4px;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.training-mode-option-survival {
+  border-color: rgba(252, 211, 77, 0.58);
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255, 236, 179, 0.35), transparent 38%),
+    linear-gradient(135deg, rgba(128, 91, 20, 0.52), rgba(255, 201, 80, 0.2), rgba(103, 72, 18, 0.5));
+  box-shadow: inset 0 0 0 1px rgba(255, 226, 148, 0.14), 0 8px 18px rgba(251, 191, 36, 0.12);
+}
+
+.training-mode-option-survival[data-selected='true'] {
+  border-color: rgba(251, 191, 36, 0.92);
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255, 236, 179, 0.46), transparent 42%),
+    linear-gradient(135deg, rgba(145, 103, 22, 0.64), rgba(255, 213, 128, 0.28), rgba(117, 81, 20, 0.58));
+  box-shadow: inset 0 0 0 1px rgba(255, 226, 148, 0.2), 0 10px 24px rgba(251, 191, 36, 0.24);
+}
+
+.training-mode-option-survival:hover {
+  border-color: rgba(251, 191, 36, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(255, 226, 148, 0.22), 0 12px 28px rgba(251, 191, 36, 0.28);
 }
 
 .training-mode-option:hover {
@@ -1242,6 +1781,12 @@ body {
   font-size: 0.84rem;
   font-weight: 700;
   color: var(--text-strong);
+}
+
+.training-mode-option-desc {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--text-muted);
 }
 
 .modal-actions {
@@ -2266,6 +2811,7 @@ body {
     <div class="top-tab">Statistiques</div>
   </nav>
   <div class="top-actions">
+    <button class="top-action" id="btn-open-medals">Médailles</button>
     <button class="top-action">Paramètres</button>
     <button class="top-action">Aide</button>
     <button class="top-action">Contact</button>
@@ -2654,6 +3200,96 @@ body {
   <div class="modal-body">Vous avez parcouru toutes les variantes de cet entraînement.</div>
   <div class="modal-actions">
     <button class="ctrl-btn" id="btn-training-done-close">Retour</button>
+  </div>
+</div>
+
+<div class="modal-box" id="modal-training-defeat" style="display:none">
+  <h3>Fin de partie</h3>
+  <div class="modal-body" id="modal-training-defeat-body"></div>
+  <div class="modal-actions">
+    <button class="ctrl-btn" id="btn-training-defeat-abandon">Abandonner</button>
+    <button class="ctrl-btn" id="btn-training-defeat-retry">Réessayer</button>
+  </div>
+</div>
+
+<div class="modal-box" id="modal-medals" style="display:none; max-width:760px; width:min(100%,760px);">
+  <h3>Galerie des médailles</h3>
+  <div class="modal-body">
+    <p style="margin-top:0; margin-bottom:10px;">Outil visuel: affichage de toutes les variantes de rendu (sans jouer).</p>
+    <div class="medals-gallery">
+      <div class="medal-card tier-bronze">
+        <div class="medal-card-head"><span class="medal-card-icon">🥉</span><span class="medal-card-title">Bronze</span></div>
+        <div class="medal-card-rule">Débloquée au-delà de 30% de progression.</div>
+        <div class="medal-card-variants">Brillance par taille: 0-50, 51-100, 101-200, 201-350, 351-500, 500+ coups.</div>
+        <div class="medal-showcase-row">
+          <span class="medal-showcase-token tier-bronze" data-shine="0">🥉</span>
+          <span class="medal-showcase-token tier-bronze" data-shine="1">🥉</span>
+          <span class="medal-showcase-token tier-bronze" data-shine="2">🥉</span>
+          <span class="medal-showcase-token tier-bronze" data-shine="3">🥉</span>
+          <span class="medal-showcase-token tier-bronze" data-shine="4">🥉</span>
+          <span class="medal-showcase-token tier-bronze" data-shine="5">🥉</span>
+        </div>
+      </div>
+      <div class="medal-card tier-silver">
+        <div class="medal-card-head"><span class="medal-card-icon">🥈</span><span class="medal-card-title">Argent</span></div>
+        <div class="medal-card-rule">Débloquée au-delà de 60% de progression.</div>
+        <div class="medal-card-variants">Brillance par taille: 0-50, 51-100, 101-200, 201-350, 351-500, 500+ coups.</div>
+        <div class="medal-showcase-row">
+          <span class="medal-showcase-token tier-silver" data-shine="0">🥈</span>
+          <span class="medal-showcase-token tier-silver" data-shine="1">🥈</span>
+          <span class="medal-showcase-token tier-silver" data-shine="2">🥈</span>
+          <span class="medal-showcase-token tier-silver" data-shine="3">🥈</span>
+          <span class="medal-showcase-token tier-silver" data-shine="4">🥈</span>
+          <span class="medal-showcase-token tier-silver" data-shine="5">🥈</span>
+        </div>
+      </div>
+      <div class="medal-card tier-gold">
+        <div class="medal-card-head"><span class="medal-card-icon">🥇</span><span class="medal-card-title">Or</span></div>
+        <div class="medal-card-rule">Débloquée quand la progression atteint 100% sur les positions cibles.</div>
+        <div class="medal-card-variants">Si répertoire &gt; 200 coups: évolue en Platine.</div>
+        <div class="medal-showcase-row">
+          <span class="medal-showcase-token tier-gold" data-shine="0">🥇</span>
+          <span class="medal-showcase-token tier-gold" data-shine="1">🥇</span>
+          <span class="medal-showcase-token tier-gold" data-shine="2">🥇</span>
+          <span class="medal-showcase-token tier-gold" data-shine="3">🥇</span>
+          <span class="medal-showcase-token tier-gold" data-shine="4">🥇</span>
+          <span class="medal-showcase-token tier-gold" data-shine="5">🥇</span>
+        </div>
+      </div>
+      <div class="medal-card tier-platinum">
+        <div class="medal-card-head"><span class="medal-card-icon">✦</span><span class="medal-card-title">Platine</span></div>
+        <div class="medal-card-rule">Version évoluée de l'or si le répertoire dépasse 200 coups.</div>
+        <div class="medal-card-variants">Si répertoire &gt; 350 coups: évolue en Diamant.</div>
+        <div class="medal-showcase-row">
+          <span class="medal-showcase-token tier-platinum">✦</span>
+          <span class="medal-showcase-token tier-platinum">✦</span>
+          <span class="medal-showcase-token tier-platinum">✦</span>
+        </div>
+      </div>
+      <div class="medal-card tier-diamond">
+        <div class="medal-card-head"><span class="medal-card-icon">💎</span><span class="medal-card-title">Diamant</span></div>
+        <div class="medal-card-rule">Version évoluée si le répertoire dépasse 350 coups.</div>
+        <div class="medal-card-variants">Si répertoire &gt; 500 coups: évolue en Chromée.</div>
+        <div class="medal-showcase-row">
+          <span class="medal-showcase-token tier-diamond">◆</span>
+          <span class="medal-showcase-token tier-diamond">◆</span>
+          <span class="medal-showcase-token tier-diamond">◆</span>
+        </div>
+      </div>
+      <div class="medal-card tier-chrome">
+        <div class="medal-card-head"><span class="medal-card-icon">🌟</span><span class="medal-card-title">Chromée animée</span></div>
+        <div class="medal-card-rule">Version ultime si le répertoire dépasse 500 coups.</div>
+        <div class="medal-card-variants">Animation brillante permanente + halo intensifié.</div>
+        <div class="medal-showcase-row">
+          <span class="medal-showcase-token tier-chrome">✦</span>
+          <span class="medal-showcase-token tier-chrome">✦</span>
+          <span class="medal-showcase-token tier-chrome">✦</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button class="ctrl-btn" id="btn-medals-close">Fermer</button>
   </div>
 </div>
 

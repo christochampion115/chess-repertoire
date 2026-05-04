@@ -81,7 +81,13 @@ div.style.backgroundColor = isLight ? state.boardTheme.light : state.boardTheme.
       if (state.trainingFeedback) {
         const { type, from, to } = state.trainingFeedback;
         if (sq === from || sq === to) {
-          div.classList.add(type === 'correct' ? 'sq-correct' : 'sq-wrong');
+          if (type === 'correct') {
+            div.classList.add('sq-correct');
+          } else if (type === 'retry') {
+            div.classList.add('sq-retry');
+          } else {
+            div.classList.add('sq-wrong');
+          }
         }
       }
 
