@@ -50,6 +50,18 @@ async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS training_stats (
+      id SERIAL PRIMARY KEY,
+      "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "repertoireId" INTEGER REFERENCES repertoires(id) ON DELETE CASCADE,
+      "variantKey" TEXT NOT NULL,
+      "bestSurvivalScore" INTEGER DEFAULT 0,
+      "updatedAt" TIMESTAMP DEFAULT NOW(),
+      UNIQUE("userId", "variantKey")
+    )
+  `);
+
   // Nettoyage des tokens expirés au démarrage
   await pool.query('DELETE FROM revoked_tokens WHERE "expiresAt" < $1', [new Date().toISOString()]);
 }
