@@ -15,6 +15,9 @@ import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRep
 import { apiRequest } from './api.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
+import { saveState, loadState } from './storage.js';
+
+const BOARD_THEME_KEY = 'alphaChess.boardTheme';
 
 const ELO_MIN = 0;
 const ELO_MAX = 3000;
@@ -1112,36 +1115,42 @@ export function openBoardThemeMenu() {
     // Handlers des boutons
     document.getElementById('theme-classic').onclick = () => {
         state.boardTheme = { light: '#ebecd0', dark: '#779556' };
+        saveState(BOARD_THEME_KEY, state.boardTheme);
         closeModals();
         render();
     };
 
     document.getElementById('theme-blue').onclick = () => {
         state.boardTheme = { light: '#d0e7ff', dark: '#4a90e2' };
+        saveState(BOARD_THEME_KEY, state.boardTheme);
         closeModals();
         render();
     };
 
     document.getElementById('theme-gray').onclick = () => {
         state.boardTheme = { light: '#e5e5e5', dark: '#666' };
+        saveState(BOARD_THEME_KEY, state.boardTheme);
         closeModals();
         render();
     };
 
     document.getElementById('theme-rose').onclick = () => {
         state.boardTheme = { light: '#ffd6e7', dark: '#ff8ab8' };
+        saveState(BOARD_THEME_KEY, state.boardTheme);
         closeModals();
         render();
     };
 
     document.getElementById('theme-mauve').onclick = () => {
         state.boardTheme = { light: '#f3e8ff', dark: '#b388ff' };
+        saveState(BOARD_THEME_KEY, state.boardTheme);
         closeModals();
         render();
     };
 
     document.getElementById('theme-wood').onclick = () => {
         state.boardTheme = { light: '#f0d9b5', dark: '#b58863' };
+        saveState(BOARD_THEME_KEY, state.boardTheme);
         closeModals();
         render();
     };
@@ -2062,9 +2071,12 @@ function renderMiniBoardFromFen(fen) {
     }
   }
 
+  // Respecter l'orientation du grand échiquier
+  const displaySquares = state.boardFlipped ? squares.slice(0, 64).reverse() : squares.slice(0, 64);
+
   return `
     <div class="survival-mini-board">
-      ${squares.slice(0, 64).map((piece, idx) => {
+      ${displaySquares.map((piece, idx) => {
         const rank = Math.floor(idx / 8);
         const file = idx % 8;
         const dark = (rank + file) % 2 === 1;
@@ -2438,6 +2450,29 @@ export function hideSplashScreen() {
   }
 }
 
+/* ========== NAVIGATION ENTRE VUES ========== */
+
+/**
+ * Affiche une vue applicative et cache toutes les autres.
+ * @param {string} viewId - l'id HTML de la vue à afficher ('view-home' | 'view-app')
+ */
+export function showView(viewId) {
+  document.querySelectorAll('.app-view').forEach(v => {
+    v.classList.toggle('hidden', v.id !== viewId);
+  });
+}
+
+/** Affiche la page d'accueil (landing page). */
+export function showHomeView() {
+  showView('view-home');
+}
+
+/** Affiche l'interface principale et force un render. */
+export function showAppView() {
+  showView('view-app');
+  render();
+}
+
 export function showSplashForm(mode) {
   // Masquer la section bienvenue et invité
   const welcomeEl = document.getElementById('splash-welcome');
@@ -2532,7 +2567,7 @@ export async function submitSplashForm() {
   if (state.auth.error) {
     errorEl.textContent = state.auth.error;
   } else if (state.auth.user) {
-    // Succès ! Fermer la splash screen et afficher l'app
+    // Succès — fermer le splash, rester sur la vue courante
     hideSplashScreen();
     render();
   }
@@ -2542,6 +2577,7 @@ export function confirmGuestMode() {
   initExampleData();
   closeModals();
   hideSplashScreen();
+  showHomeView();
   render();
 }
 
@@ -2643,119 +2679,384 @@ export async function submitAccountForm() {
 export function updateAccountUI() {
   const topAccountEl = document.querySelector('.top-account');
   if (!topAccountEl) return;
-  
+
+  const userPanel  = document.getElementById('top-account-user');
+  const guestPanel = document.getElementById('top-account-guest');
+
   if (state.auth.user) {
-    // Utilisateur connecté
-    const avatarEl = topAccountEl.querySelector('.account-avatar');
-    const nameEl = topAccountEl.querySelector('.account-name');
-    const statusEl = topAccountEl.querySelector('.account-status');
-    
+    // ── Utilisateur connecté ──────────────────────────────────────
+    const avatarEl = document.getElementById('top-account-avatar');
+    const nameEl   = document.getElementById('top-account-name');
+    const statusEl = document.getElementById('top-account-status');
+
     if (avatarEl) {
-      // Afficher les initiales
-      const initials = state.auth.user.username 
+      avatarEl.textContent = state.auth.user.username
         ? state.auth.user.username.substring(0, 2).toUpperCase()
-        : 'TS';
-      avatarEl.textContent = initials;
+        : 'US';
     }
-    if (nameEl) nameEl.textContent = state.auth.user.username || 'Utilisateur';
+    if (nameEl)   nameEl.textContent   = state.auth.user.username || 'Utilisateur';
     if (statusEl) statusEl.textContent = 'Connecté';
-    
-    topAccountEl.style.display = 'flex';
-    topAccountEl.style.cursor = 'pointer';
-    topAccountEl.onclick = () => {
-      if (confirm('Déconnecter du compte ' + state.auth.user.username + ' ?')) {
-        logoutAccount();
-      }
-    };
+
+    if (userPanel)  userPanel.style.display  = 'flex';
+    if (guestPanel) guestPanel.style.display = 'none';
+
+    topAccountEl.onclick = () => openProfileModal();
   } else {
-    // Utilisateur non connecté (mode invité)
-    const avatarEl = topAccountEl.querySelector('.account-avatar');
-    const nameEl = topAccountEl.querySelector('.account-name');
-    const statusEl = topAccountEl.querySelector('.account-status');
-    
-    if (avatarEl) avatarEl.textContent = '👤';
-    if (nameEl) nameEl.textContent = 'Invité';
-    if (statusEl) statusEl.textContent = 'Mode invité';
-    
-    topAccountEl.style.display = 'flex';
-    topAccountEl.style.cursor = 'pointer';
-    topAccountEl.onclick = showGuestAccountMenu;
+    // ── Mode invité / non connecté ────────────────────────────────
+    if (userPanel)  userPanel.style.display  = 'none';
+    if (guestPanel) guestPanel.style.display = 'flex';
+
+    topAccountEl.onclick = () => openAuthModal();
   }
 }
 
-function showGuestAccountMenu() {
-  // Créer un menu contextuel simple
-  const menu = document.createElement('div');
-  menu.className = 'guest-account-menu';
-  menu.style.cssText = `
-    position: fixed;
-    top: 70px;
-    right: 24px;
-    background: rgba(15, 23, 42, 0.98);
-    border: 1px solid rgba(148, 163, 184, 0.15);
-    border-radius: 5px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    z-index: 10001;
-    padding: 8px 0;
-    min-width: 200px;
-  `;
-  
-  const loginBtn = document.createElement('div');
-  loginBtn.style.cssText = `
-    padding: 12px 18px;
-    cursor: pointer;
-    color: #e2e8f0;
-    font-size: 0.9rem;
-    font-weight: 700;
-    transition: background 0.2s ease;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  `;
-  loginBtn.textContent = '🔓 Se connecter';
-  loginBtn.onmouseenter = () => { loginBtn.style.background = 'rgba(122, 174, 203, 0.1)'; };
-  loginBtn.onmouseleave = () => { loginBtn.style.background = ''; };
-  loginBtn.onclick = () => {
-    menu.remove();
-    openAccountModal('login');
-  };
-  
-  const signupBtn = document.createElement('div');
-  signupBtn.style.cssText = `
-    padding: 12px 18px;
-    cursor: pointer;
-    color: #e2e8f0;
-    font-size: 0.9rem;
-    font-weight: 700;
-    transition: background 0.2s ease;
-  `;
-  signupBtn.textContent = '✏️ Créer un compte';
-  signupBtn.onmouseenter = () => { signupBtn.style.background = 'rgba(122, 174, 203, 0.1)'; };
-  signupBtn.onmouseleave = () => { signupBtn.style.background = ''; };
-  signupBtn.onclick = () => {
-    menu.remove();
-    openAccountModal('signup');
-  };
-  
-  menu.appendChild(loginBtn);
-  menu.appendChild(signupBtn);
-  document.body.appendChild(menu);
-  
-  // Fermer le menu quand on clique ailleurs
-  setTimeout(() => {
-    const closeMenuHandler = (e) => {
-      if (!menu.contains(e.target) && e.target !== document.querySelector('.top-account')) {
-        menu.remove();
-        document.removeEventListener('click', closeMenuHandler);
-      }
-    };
-    document.addEventListener('click', closeMenuHandler);
-  }, 100);
+/* ========== MODALE AUTH (non connecté) ========== */
+
+/** Ouvre la modale d'authentification sur le panneau de bienvenue. */
+export function openAuthModal() {
+  showAuthPanel('welcome');
+  document.getElementById('auth-error').textContent = '';
+  document.getElementById('auth-username-input').value = '';
+  document.getElementById('auth-email-input').value = '';
+  document.getElementById('auth-password-input').value = '';
+
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('modal-auth').style.display = 'block';
+}
+
+export function closeAuthModal() {
+  const modal = document.getElementById('modal-auth');
+  if (modal) modal.style.display = 'none';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) {
+    const anyVisible = Array.from(overlay.querySelectorAll('.modal-box'))
+      .some(m => m.style.display !== 'none' && m.id !== 'modal-auth');
+    if (!anyVisible) overlay.style.display = 'none';
+  }
+}
+
+/**
+ * Bascule l'affichage interne de la modale auth.
+ * @param {'welcome'|'login'|'signup'|'guest'} panel
+ */
+export function showAuthPanel(panel) {
+  const welcome = document.getElementById('auth-panel-welcome');
+  const form    = document.getElementById('auth-panel-form');
+  const guest   = document.getElementById('auth-panel-guest');
+
+  if (welcome) welcome.style.display = panel === 'welcome' ? 'block' : 'none';
+  if (form)    form.style.display    = (panel === 'login' || panel === 'signup') ? 'block' : 'none';
+  if (guest)   guest.style.display   = panel === 'guest' ? 'block' : 'none';
+
+  if (panel === 'login' || panel === 'signup') {
+    const isSignup = panel === 'signup';
+    const loginTab   = document.getElementById('auth-tab-login');
+    const signupTab  = document.getElementById('auth-tab-signup');
+    const usernameRow = document.getElementById('auth-username-row');
+    const emailRow    = document.getElementById('auth-email-row');
+    const submitBtn   = document.getElementById('auth-submit-btn');
+    const pwdInput    = document.getElementById('auth-password-input');
+
+    if (loginTab)    loginTab.classList.toggle('active', !isSignup);
+    if (signupTab)   signupTab.classList.toggle('active', isSignup);
+    if (usernameRow) usernameRow.style.display = isSignup ? 'block' : 'none';
+    if (emailRow)    emailRow.style.display    = isSignup ? 'none' : 'block';
+    if (submitBtn)   submitBtn.textContent = isSignup ? 'Créer le compte' : 'Se connecter';
+    if (pwdInput)    pwdInput.setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
+
+    const errorEl = document.getElementById('auth-error');
+    if (errorEl) errorEl.textContent = '';
+  }
+}
+
+export async function submitAuthForm() {
+  const loginTab  = document.getElementById('auth-tab-login');
+  const isSignup  = loginTab && !loginTab.classList.contains('active');
+  const username  = document.getElementById('auth-username-input')?.value.trim() || '';
+  const email     = document.getElementById('auth-email-input')?.value.trim()    || '';
+  const password  = document.getElementById('auth-password-input')?.value        || '';
+  const errorEl   = document.getElementById('auth-error');
+  const submitBtn = document.getElementById('auth-submit-btn');
+
+  errorEl.textContent = '';
+
+  if (isSignup) {
+    if (!username || !password) { errorEl.textContent = 'Remplissez tous les champs.'; return; }
+    if (password.length < 8)   { errorEl.textContent = 'Mot de passe : 8 caractères minimum.'; return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Chargement…';
+    await signupWithCredentials({ username, password });
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Créer le compte';
+  } else {
+    if (!email || !password) { errorEl.textContent = 'Email/pseudo et mot de passe requis.'; return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Chargement…';
+    await loginWithCredentials({ email, password });
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Se connecter';
+  }
+
+  if (state.auth.error) {
+    errorEl.textContent = state.auth.error;
+  } else if (state.auth.user) {
+    // Rester sur la vue courante, juste fermer la modale
+    closeAuthModal();
+    render();
+  }
+}
+
+export function confirmAuthGuest() {
+  initExampleData();
+  closeAuthModal();
+  showHomeView();
+  render();
 }
 
 export function logoutAccount() {
   logoutSession();
   closeModals();
-  showSplashScreen();
+  // Masquer toutes les vues et retourner à la page d'accueil (mode invité)
+  showHomeView();
+  render();
 }
+
+/* ========== MODALE PROFIL / PARAMÈTRES ========== */
+
+/** Ouvre la modale profil et pré-remplit les champs avec les données du compte. */
+export function openProfileModal() {
+  const user = state.auth.user;
+  if (!user) return;
+
+  const usernameInput = document.getElementById('profile-username-input');
+  const emailInput    = document.getElementById('profile-email-input');
+  const pwdCurrent    = document.getElementById('profile-password-current');
+  const pwdNew        = document.getElementById('profile-password-new');
+  const msgEl         = document.getElementById('profile-account-message');
+
+  if (usernameInput) usernameInput.value = user.username || '';
+  if (emailInput)    emailInput.value    = user.email    || '';
+  if (pwdCurrent)    pwdCurrent.value    = '';
+  if (pwdNew)        pwdNew.value        = '';
+  if (msgEl)         msgEl.textContent   = '';
+
+  // Toujours ouvrir sur l'onglet Paramètres
+  switchProfileTab('settings');
+
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('modal-profile').style.display = 'block';
+}
+
+export function closeProfileModal() {
+  const modal = document.getElementById('modal-profile');
+  if (modal) modal.style.display = 'none';
+  const overlay = document.getElementById('modal-overlay');
+  // Ne fermer l'overlay que si aucune autre modale n'est ouverte
+  if (overlay) {
+    const anyVisible = Array.from(overlay.querySelectorAll('.modal-box'))
+      .some(m => m.style.display !== 'none' && m.id !== 'modal-profile');
+    if (!anyVisible) overlay.style.display = 'none';
+  }
+}
+
+/** Bascule entre les onglets 'settings' et 'stats' de la modale profil. */
+export function switchProfileTab(tab) {
+  document.querySelectorAll('.profile-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-profile-tab') === tab);
+  });
+  const settingsEl = document.getElementById('profile-tab-settings');
+  const statsEl    = document.getElementById('profile-tab-stats');
+  if (settingsEl) settingsEl.classList.toggle('hidden', tab !== 'settings');
+  if (statsEl)    statsEl.classList.toggle('hidden', tab !== 'stats');
+}
+
+export function saveProfileUsername() {
+  const msgEl = document.getElementById('profile-account-message');
+  if (msgEl) {
+    msgEl.style.color = 'var(--text-muted)';
+    msgEl.textContent = 'Modification du pseudo disponible prochainement.';
+  }
+}
+
+export function saveProfileEmail() {
+  const msgEl = document.getElementById('profile-account-message');
+  if (msgEl) {
+    msgEl.style.color = 'var(--text-muted)';
+    msgEl.textContent = "Association d'e-mail disponible prochainement.";
+  }
+}
+
+export function saveProfilePassword() {
+  const msgEl = document.getElementById('profile-account-message');
+  if (msgEl) {
+    msgEl.style.color = 'var(--text-muted)';
+    msgEl.textContent = 'Modification du mot de passe disponible prochainement.';
+  }
+}
+
+/* ========== MODALE ENTRAÎNEMENT DEPUIS L'ACCUEIL ========== */
+
+// État interne de la modale home-training
+let _htrRepIndex = null;   // index dans state.repertoires
+let _htrMode = 'vertical'; // mode sélectionné
+
+/**
+ * Ouvre la modale "lancer un entraînement" depuis la page d'accueil.
+ * Construit dynamiquement la liste des répertoires et le sélecteur de mode.
+ */
+export function openHomeTrainingModal() {
+  state.dynamicModals.innerHTML = '';
+  state.modalOverlayEl.style.display = 'flex';
+
+  // Pré-sélection : dernier répertoire actif (si valide) ou le premier disponible
+  const activeIdx = state.activeRepIndex;
+  _htrRepIndex = state.repertoires.length > 0
+    ? (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < state.repertoires.length ? activeIdx : 0)
+    : null;
+  _htrMode = pendingTrainingMode || 'vertical';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-box modal-home-training';
+  modal.style.display = 'block';
+  modal.onclick = (e) => e.stopPropagation();
+
+  state.dynamicModals.appendChild(modal);
+  _renderHomeTrainingModal(modal);
+}
+
+function _renderHomeTrainingModal(modal) {
+  modal.innerHTML = '';
+
+  // ── Titre ──
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Lancer un entraînement';
+  modal.appendChild(h3);
+
+  // ── Liste des répertoires ──
+  const repLabel = document.createElement('div');
+  repLabel.className = 'htr-section-label';
+  repLabel.style.marginTop = '18px';
+  repLabel.textContent = 'Choisir un répertoire';
+  modal.appendChild(repLabel);
+
+  if (state.repertoires.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'htr-status-msg';
+    empty.textContent = 'Aucun répertoire — créez-en un d\'abord depuis l\'éditeur.';
+    modal.appendChild(empty);
+  } else {
+    const repList = document.createElement('div');
+    repList.className = 'htr-rep-list';
+
+    state.repertoires.forEach((rep, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'htr-rep-btn';
+      btn.dataset.selected = idx === _htrRepIndex ? 'true' : 'false';
+
+      const dot = document.createElement('span');
+      dot.className = `htr-rep-color-dot htr-rep-color-dot--${rep.color || 'w'}`;
+
+      const name = document.createElement('span');
+      name.textContent = rep.name || `Répertoire ${idx + 1}`;
+
+      btn.appendChild(dot);
+      btn.appendChild(name);
+      btn.onclick = () => {
+        _htrRepIndex = idx;
+        _renderHomeTrainingModal(modal);
+      };
+      repList.appendChild(btn);
+    });
+
+    modal.appendChild(repList);
+  }
+
+  // ── Sélecteur de mode ──
+  const modeLabel = document.createElement('div');
+  modeLabel.className = 'htr-section-label';
+  modeLabel.textContent = 'Mode d\'entraînement';
+  modal.appendChild(modeLabel);
+
+  const grid = document.createElement('div');
+  grid.className = 'htr-modes-grid';
+
+  // Survie en premier (pleine largeur)
+  const survivalBtn = _buildHtrModeBtn('survival', TRAINING_MODES.survival, modal);
+  survivalBtn.classList.add('htr-mode-survival');
+  grid.appendChild(survivalBtn);
+
+  // Autres modes
+  Object.entries(TRAINING_MODES).forEach(([modeId, meta]) => {
+    if (modeId === 'survival') return;
+    grid.appendChild(_buildHtrModeBtn(modeId, meta, modal));
+  });
+
+  modal.appendChild(grid);
+
+  // ── Actions ──
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  actions.style.marginTop = '4px';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'ctrl-btn';
+  cancelBtn.textContent = 'Annuler';
+  cancelBtn.onclick = () => closeModals();
+
+  const startBtn = document.createElement('button');
+  startBtn.className = 'ctrl-btn';
+  startBtn.textContent = 'Démarrer →';
+  startBtn.disabled = _htrRepIndex === null;
+  startBtn.onclick = () => _launchHomeTraining();
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(startBtn);
+  modal.appendChild(actions);
+}
+
+function _buildHtrModeBtn(modeId, meta, modal) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'htr-mode-btn';
+  btn.dataset.selected = _htrMode === modeId ? 'true' : 'false';
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'htr-mode-name';
+  nameEl.textContent = meta.label;
+
+  const descEl = document.createElement('span');
+  descEl.className = 'htr-mode-desc';
+  descEl.textContent = meta.description;
+
+  btn.appendChild(nameEl);
+  btn.appendChild(descEl);
+  btn.onclick = () => {
+    _htrMode = modeId;
+    _renderHomeTrainingModal(modal);
+  };
+  return btn;
+}
+
+function _launchHomeTraining() {
+  if (_htrRepIndex === null || !state.repertoires[_htrRepIndex]) return;
+
+  const rep = state.repertoires[_htrRepIndex];
+  const repColor = rep.color || 'w';
+  // Le répertoire est lui-même le nœud racine (pas de propriété .root)
+  const rootNode = rep;
+
+  // Configurer les variables de l'entraînement en attente
+  pendingTrainingNode = rootNode;
+  pendingTrainingColor = repColor;
+  pendingTrainingMissingNodes = collectMissingReplyNodes(rootNode, repColor);
+  pendingTrainingMode = _htrMode;
+
+  closeModals();
+  showAppView();
+  _doStartTraining();
+}
+
 // ─────── TOOLTIP SYSTEM ───────
 
 let currentTooltip = null;
@@ -2830,8 +3131,11 @@ function generateMiniboardHtml(fen, move) {
       for (let c = 0; c < 8; c++) {
         const isLight = (r + c) % 2 === 0;
         const bg = isLight ? lightSquare : darkSquare;
-        const piece = board[r][c];
-        const sq = String.fromCharCode(97 + c) + (8 - r);
+        // Respecter l'orientation du grand échiquier
+        const row = state.boardFlipped ? 7 - r : r;
+        const col = state.boardFlipped ? 7 - c : c;
+        const piece = board[row][col];
+        const sq = String.fromCharCode(97 + col) + (8 - row);
         
         let highlight = '';
         if (sq === from || sq === to) {

@@ -562,7 +562,8 @@ export function handleSquareClick(sq) {
           state.chess.load(existing.fen);
           state.redoStack = [];
           expandPathToCurrentNode();
-          state.pendingAnimation = { fromSq, toSq: sq };
+          if (!state.skipNextAnimation) state.pendingAnimation = { fromSq, toSq: sq };
+          state.skipNextAnimation = false;
           state.trainingFeedback = { type: 'correct', from: fromSq, to: sq };
           eventBus.emit('render');
           // Effacer le feedback après 200ms et lancer l'autoplay immédiatement

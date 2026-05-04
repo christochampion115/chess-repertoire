@@ -5,39 +5,77 @@ import { toggleAnalysis, setAnalysisDepth } from './analysis.js';
 import { updateStatsSortBy } from './ui.js';
 
 const BUTTON_BINDINGS = [
-  ['btn-open-medals', () => ui.openMedalsModal()],
-  ['btn-training-stop', () => ui.showStopTrainingModal()],
-  ['btn-reset-position', () => ui.resetPosition()],
-  ['btn-nav-back', () => ui.navBack()],
-  ['btn-nav-forward', () => ui.navForward()],
-  ['btn-open-board-theme', () => ui.openBoardThemeMenu()],
-  ['monitor-menu-trigger', (event) => ui.toggleMonitorMenu(event)],
-  ['btn-open-new-rep', (event) => ui.openNewRepModal(event)],
-  ['btn-splash-login', () => ui.showSplashForm('login')],
-  ['btn-splash-signup', () => ui.showSplashForm('signup')],
-  ['btn-splash-guest', () => ui.showSplashGuest()],
-  ['splash-submit-btn', () => ui.submitSplashForm()],
-  ['btn-splash-tab-login', () => ui.showSplashForm('login')],
-  ['btn-splash-tab-signup', () => ui.showSplashForm('signup')],
-  ['btn-splash-back', () => ui.backToSplashWelcome()],
-  ['btn-splash-guest-confirm', () => ui.confirmGuestMode()],
-  ['btn-splash-guest-back', () => ui.backToSplashWelcome()],
-  ['btn-account-switch-mode', () => ui.switchAuthMode()],
-  ['account-submit-btn', () => ui.submitAccountForm()],
-  ['btn-var-save', () => repertoire.confirmNameVar()],
-  ['btn-comment-save', () => ui.confirmComment()],
-  ['btn-delete-cancel', () => ui.closeModals()],
-  ['btn-delete-confirm', () => repertoire.confirmDelete()],
-  ['btn-training-start-cancel', () => ui.cancelStartTraining()],
-  ['modal-training-confirm-button', () => ui.confirmStartTraining()],
-  ['btn-training-interrupt-cancel', () => ui.cancelTrainingInterrupt()],
-  ['btn-training-interrupt-confirm', () => ui.confirmTrainingInterrupt()],
-  ['btn-training-stop-cancel', () => ui.cancelStopTraining()],
-  ['btn-training-stop-confirm', () => ui.confirmStopTraining()],
-  ['btn-training-done-close', () => ui.closeTrainingDone()],
-  ['btn-training-defeat-retry', () => ui.retrySurvivalTraining()],
-  ['btn-training-defeat-abandon', () => ui.abandonSurvivalTraining()],
-  ['btn-medals-close', () => ui.closeModals()],
+  // ── Navigation entre vues ──
+  ['btn-nav-home',              () => ui.showHomeView()],
+  ['feature-card-repertoire',   () => ui.showAppView()],
+  ['feature-card-training',     () => ui.openHomeTrainingModal()],
+
+  // ── Top-bar ──
+  ['btn-open-medals',            () => ui.openMedalsModal()],
+
+  // ── Modale auth (non connecté) ──
+  ['btn-auth-go-login',          () => ui.showAuthPanel('login')],
+  ['btn-auth-go-signup',         () => ui.showAuthPanel('signup')],
+  ['btn-auth-go-guest',          () => ui.showAuthPanel('guest')],
+  ['auth-submit-btn',            () => ui.submitAuthForm()],
+  ['btn-auth-back',              () => ui.showAuthPanel('welcome')],
+  ['btn-auth-guest-confirm',     () => ui.confirmAuthGuest()],
+  ['btn-auth-guest-back',        () => ui.showAuthPanel('welcome')],
+
+  // ── Modale profil ──
+  ['btn-profile-close',          () => ui.closeProfileModal()],
+  ['btn-profile-logout',         () => ui.logoutAccount()],
+  ['btn-profile-save-username',  () => ui.saveProfileUsername()],
+  ['btn-profile-save-email',     () => ui.saveProfileEmail()],
+  ['btn-profile-save-password',  () => ui.saveProfilePassword()],
+
+  // ── Entraînement ──
+  ['btn-training-stop',          () => ui.showStopTrainingModal()],
+
+  // ── Contrôles échiquier ──
+  ['btn-reset-position',         () => ui.resetPosition()],
+  ['btn-nav-back',               () => ui.navBack()],
+  ['btn-nav-forward',            () => ui.navForward()],
+  ['btn-open-board-theme',       () => ui.openBoardThemeMenu()],
+
+  // ── Moniteur ──
+  ['monitor-menu-trigger',       (event) => ui.toggleMonitorMenu(event)],
+  ['btn-open-new-rep',           (event) => ui.openNewRepModal(event)],
+
+  // ── Splash screen ──
+  ['btn-splash-login',           () => ui.showSplashForm('login')],
+  ['btn-splash-signup',          () => ui.showSplashForm('signup')],
+  ['btn-splash-guest',           () => ui.showSplashGuest()],
+  ['splash-submit-btn',          () => ui.submitSplashForm()],
+  ['btn-splash-tab-login',       () => ui.showSplashForm('login')],
+  ['btn-splash-tab-signup',      () => ui.showSplashForm('signup')],
+  ['btn-splash-back',            () => ui.backToSplashWelcome()],
+  ['btn-splash-guest-confirm',   () => ui.confirmGuestMode()],
+  ['btn-splash-guest-back',      () => ui.backToSplashWelcome()],
+
+  // ── Modale compte ──
+  ['btn-account-switch-mode',    () => ui.switchAuthMode()],
+  ['account-submit-btn',         () => ui.submitAccountForm()],
+
+  // ── Modales répertoire ──
+  ['btn-var-save',               () => repertoire.confirmNameVar()],
+  ['btn-comment-save',           () => ui.confirmComment()],
+  ['btn-delete-cancel',          () => ui.closeModals()],
+  ['btn-delete-confirm',         () => repertoire.confirmDelete()],
+
+  // ── Modales entraînement ──
+  ['btn-training-start-cancel',        () => ui.cancelStartTraining()],
+  ['modal-training-confirm-button',    () => ui.confirmStartTraining()],
+  ['btn-training-interrupt-cancel',    () => ui.cancelTrainingInterrupt()],
+  ['btn-training-interrupt-confirm',   () => ui.confirmTrainingInterrupt()],
+  ['btn-training-stop-cancel',         () => ui.cancelStopTraining()],
+  ['btn-training-stop-confirm',        () => ui.confirmStopTraining()],
+  ['btn-training-done-close',          () => ui.closeTrainingDone()],
+  ['btn-training-defeat-retry',        () => ui.retrySurvivalTraining()],
+  ['btn-training-defeat-abandon',      () => ui.abandonSurvivalTraining()],
+
+  // ── Médailles ──
+  ['btn-medals-close',           () => ui.closeModals()],
 ];
 
 function shouldIgnoreKeyboardNavigationTarget(target) {
@@ -268,4 +306,32 @@ export function initDomBindings() {
   initSortMenuToggle();
   initAnalysisSwitchToggle();
   initAnalysisControls();
+  initProfileModalBindings();
+}
+
+/**
+ * Gère les clics sur les onglets de la modale profil (.profile-tab)
+ * et les onglets de la modale auth (.auth-tab-btn).
+ * Utilise la délégation sur le document pour éviter les double-bindings.
+ */
+function initProfileModalBindings() {
+  if (document.body.dataset.profiletabsbound) return;
+  document.body.dataset.profiletabsbound = '1';
+
+  document.addEventListener('click', (event) => {
+    // Onglets modale profil
+    const profileTab = event.target.closest('.profile-tab[data-profile-tab]');
+    if (profileTab) {
+      const tab = profileTab.getAttribute('data-profile-tab');
+      if (tab) ui.switchProfileTab(tab);
+      return;
+    }
+
+    // Onglets modale auth (login / signup)
+    const authTab = event.target.closest('.auth-tab-btn[data-auth-tab]');
+    if (authTab) {
+      const tab = authTab.getAttribute('data-auth-tab');
+      if (tab) ui.showAuthPanel(tab);
+    }
+  });
 }
