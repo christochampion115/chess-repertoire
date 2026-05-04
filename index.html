@@ -1050,8 +1050,8 @@ body {
 
 .rep-medal-badge.tier-bronze {
   border-color: rgba(217, 119, 6, 0.5);
-  background: radial-gradient(circle at 30% 25%, rgba(253, 230, 138, 0.45), rgba(180, 83, 9, 0.38));
-  box-shadow: 0 0 8px rgba(180, 83, 9, 0.35), inset 0 0 0 1px rgba(217, 119, 6, 0.2);
+  background: radial-gradient(circle at 30% 25%, rgba(253, 230, 138, 0.45), rgba(180, 83, 9, 0.619));
+  box-shadow: 0 0 8px rgba(180, 83, 9, 0.35), inset 0 0 0 1px rgba(217, 119, 6, 0.305);
 }
 
 .rep-medal-badge.tier-silver {
@@ -1062,7 +1062,7 @@ body {
 
 .rep-medal-badge.tier-gold {
   border-color: rgba(251, 191, 36, 0.78);
-  background: radial-gradient(circle at 30% 25%, rgba(255, 198, 42, 0.95), rgba(252, 202, 4, 0.625));
+  background: radial-gradient(circle at 30% 25%, rgba(255, 198, 42, 0.95), rgba(255, 208, 0, 0.923));
   box-shadow: 0 0 8px rgba(247, 200, 13, 0.689), inset 0 0 0 1px rgba(255, 185, 35, 0.607);
 }
 
@@ -2786,6 +2786,591 @@ body {
   background: transparent;
   border: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME DE VUES (view-home / view-app)
+════════════════════════════════════════════════════════════════ */
+
+.app-view.hidden {
+  display: none !important;
+}
+
+#view-app {
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE D'ACCUEIL — HERO
+════════════════════════════════════════════════════════════════ */
+
+#view-home {
+  width: min(100%, 1360px);
+  display: flex;
+  flex-direction: column;
+  gap: 52px;
+  padding-bottom: 48px;
+}
+
+.home-hero {
+  padding: 72px 24px 48px;
+  text-align: center;
+  position: relative;
+}
+
+.home-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center top, rgba(122, 174, 203, 0.1), transparent 60%);
+  pointer-events: none;
+}
+
+.home-hero-inner {
+  position: relative;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.home-hero-title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 900;
+  color: var(--text-strong);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0 0 20px;
+}
+
+.home-hero-subtitle {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin: 0 0 36px;
+}
+
+.home-hero-cta {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.home-cta-btn {
+  padding: 13px 28px;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  border: none;
+}
+
+.home-cta-btn--primary {
+  background: var(--accent-blue);
+  color: #08101d;
+  box-shadow: 0 4px 20px rgba(122, 174, 203, 0.3);
+}
+
+.home-cta-btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(122, 174, 203, 0.45);
+}
+
+.home-cta-btn--secondary {
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+}
+
+.home-cta-btn--secondary:hover {
+  background: var(--accent-blue-soft);
+  transform: translateY(-2px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE D'ACCUEIL — GRILLE DE FONCTIONNALITÉS
+════════════════════════════════════════════════════════════════ */
+
+.home-features {
+  padding: 0 24px;
+}
+
+.home-features-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+  margin: 0 0 28px;
+  text-align: center;
+}
+
+.home-features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-card--active {
+  cursor: pointer;
+}
+
+.feature-card--active:hover {
+  border-color: rgba(122, 174, 203, 0.55);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(122, 174, 203, 0.12);
+}
+
+.feature-card--active:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+.feature-card--soon {
+  opacity: 0.55;
+}
+
+.feature-card-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(122, 174, 203, 0.12);
+  color: var(--accent-blue);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1px solid rgba(122, 174, 203, 0.22);
+}
+
+.feature-card-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.feature-card-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.feature-card-desc {
+  font-size: 0.87rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin: 0;
+  flex: 1;
+}
+
+.feature-card-link {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  margin-top: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE D'ACCUEIL — FOOTER
+════════════════════════════════════════════════════════════════ */
+
+.home-footer {
+  text-align: center;
+  padding: 0 24px 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODALE PROFIL / PARAMÈTRES
+════════════════════════════════════════════════════════════════ */
+
+.modal-profile {
+  max-width: 520px;
+  width: min(100%, 520px);
+}
+
+.profile-modal-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-tab {
+  padding: 9px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+  margin-bottom: -1px;
+}
+
+.profile-tab.active {
+  color: var(--text-strong);
+  border-bottom-color: var(--accent-blue);
+}
+
+.profile-tab:hover:not(.active) {
+  color: var(--text-main);
+}
+
+.profile-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.profile-tab-content.hidden {
+  display: none;
+}
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-section-heading {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-field label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.profile-field-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.profile-field-row input {
+  flex: 1;
+  padding: 9px 12px;
+  background: #111;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 5px;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.profile-section-empty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 20px 0;
+  text-align: center;
+}
+
+#profile-account-message {
+  min-height: 20px;
+  font-size: 0.82rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODALE AUTH (connexion sans splash-screen)
+   Style volontairement similaire à la splash screen d'origine.
+════════════════════════════════════════════════════════════════ */
+
+.modal-auth {
+  max-width: 400px;
+  width: min(100%, 400px);
+  text-align: center;
+}
+
+.modal-auth .auth-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(122, 174, 203, 0.35), rgba(143, 183, 209, 0.08));
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 900;
+  font-size: 1.4rem;
+  margin: 0 auto 16px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+.modal-auth .auth-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--text-strong);
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.modal-auth .auth-subtitle {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0 0 32px;
+}
+
+.auth-welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Réutilisation des classes .splash-btn pour les boutons d'auth */
+.auth-btn {
+  padding: 13px 20px;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+  border: none;
+  width: 100%;
+}
+
+.auth-btn--primary {
+  background: var(--accent-blue);
+  color: #08101d;
+}
+
+.auth-btn--primary:hover { transform: translateY(-1px); }
+
+.auth-btn--secondary {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.auth-btn--secondary:hover {
+  background: rgba(148, 163, 184, 0.14);
+  transform: translateY(-1px);
+}
+
+.auth-btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+}
+
+.auth-btn--ghost:hover { color: var(--text-main); }
+
+.modal-auth .auth-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.modal-auth .auth-form-section input {
+  width: 100%;
+  padding: 12px;
+  background: #111;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 5px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.modal-auth .auth-error {
+  min-height: 20px;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(148, 163, 184, 0.06);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.auth-tab-btn.active {
+  background: rgba(122, 174, 203, 0.14);
+  color: var(--text-strong);
+  border-color: rgba(122, 174, 203, 0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODALE ENTRAÎNEMENT DEPUIS L'ACCUEIL
+════════════════════════════════════════════════════════════════ */
+
+.modal-home-training {
+  max-width: 540px;
+  width: min(100%, 540px);
+}
+
+/* Sélecteur de répertoire */
+.htr-rep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(122, 174, 203, 0.4) transparent;
+}
+
+.htr-rep-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.htr-rep-btn:hover {
+  background: rgba(122, 174, 203, 0.07);
+  border-color: rgba(122, 174, 203, 0.3);
+}
+
+.htr-rep-btn[data-selected="true"] {
+  border-color: var(--accent-blue);
+  background: rgba(122, 174, 203, 0.12);
+  color: var(--text-strong);
+}
+
+.htr-rep-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.htr-rep-color-dot--w { background: #f8fafc; border: 1px solid rgba(148,163,184,0.3); }
+.htr-rep-color-dot--b { background: #334155; border: 1px solid rgba(148,163,184,0.3); }
+
+/* Section modes */
+.htr-section-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.htr-modes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.htr-mode-btn {
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.htr-mode-btn[data-selected="true"] {
+  border-color: var(--accent-blue);
+  background: rgba(122, 174, 203, 0.12);
+}
+
+.htr-mode-btn:hover:not([data-selected="true"]) {
+  background: rgba(122, 174, 203, 0.05);
+  border-color: rgba(122, 174, 203, 0.25);
+}
+
+.htr-mode-name {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  margin-bottom: 3px;
+}
+
+.htr-mode-desc {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* Survie (pleine largeur) */
+.htr-mode-survival {
+  grid-column: 1 / -1;
+  border-color: rgba(251, 113, 133, 0.25);
+}
+
+.htr-mode-survival .htr-mode-name { color: #fca5a5; }
+
+.htr-mode-survival[data-selected="true"] {
+  border-color: rgba(251, 113, 133, 0.6);
+  background: rgba(251, 113, 133, 0.08);
+}
+
+/* Message d'état (aucun répertoire, etc.) */
+.htr-status-msg {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px 0;
+  font-style: italic;
+}
+
 </style>
 
 </head>
@@ -2793,7 +3378,7 @@ body {
 <body>
 
 <header class="top-bar">
-  <div class="brand-group">
+  <div class="brand-group" id="btn-nav-home" role="button" tabindex="0" title="Retour à l'accueil" style="cursor: pointer;">
     <div class="brand-logo">A</div>
     <div class="brand-label">
       <div class="brand-title">Alpha Chess</div>
@@ -2805,6 +3390,7 @@ body {
     <div class="top-tab">Analyse</div>
     <div class="top-tab">Répertoires</div>
     <div class="top-tab">Statistiques</div>
+    <div class="top-tab top-tab--soon" title="Bientôt disponible" style="opacity:0.45; cursor:default;">Tutoriel</div>
   </nav>
   <div class="top-actions">
     <button class="top-action" id="btn-open-medals">Médailles</button>
@@ -2813,14 +3399,112 @@ body {
     <button class="top-action">Contact</button>
     <button class="top-action">Abonnement</button>
     <div class="top-account" style="cursor: pointer;" id="top-account-btn">
-      <div class="account-avatar">TS</div>
-      <div class="account-details">
-        <div class="account-name">tsili</div>
-        <div class="account-status">Compte premium</div>
+      <!-- État connecté (caché par défaut, affiché par updateAccountUI) -->
+      <div id="top-account-user" style="display:none; align-items:center; gap:7px;">
+        <div class="account-avatar" id="top-account-avatar">TS</div>
+        <div class="account-details">
+          <div class="account-name" id="top-account-name">tsili</div>
+          <div class="account-status" id="top-account-status">Connecté</div>
+        </div>
+      </div>
+      <!-- État non connecté (affiché par défaut) -->
+      <div id="top-account-guest" style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:1rem;">👤</span>
+        <span style="font-size:0.78rem; font-weight:800;">Connexion</span>
       </div>
     </div>
   </div>
 </header>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VUE ACCUEIL — Page de présentation (landing page)
+     Accessible depuis le logo en haut à gauche.
+════════════════════════════════════════════════════════════════ -->
+<div id="view-home" class="app-view hidden">
+
+  <!-- HERO -->
+  <section class="home-hero">
+    <div class="home-hero-inner">
+      <h1 class="home-hero-title">Maîtrisez vos ouvertures</h1>
+      <p class="home-hero-subtitle">
+        Construisez votre répertoire coup par coup, entraînez-vous avec des systèmes
+        de drill, et progressez avec des données réelles à votre niveau Elo.
+      </p>
+      <div class="home-hero-cta">
+        <button class="home-cta-btn home-cta-btn--primary" id="btn-home-tutorial" disabled>
+          Tutoriel — bientôt disponible
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GRILLE DE FONCTIONNALITÉS -->
+  <section class="home-features">
+    <h2 class="home-features-title">Tout ce dont vous avez besoin</h2>
+
+    <div class="home-features-grid">
+
+      <!-- ── Répertoires (actif) ── -->
+      <div class="feature-card feature-card--active" id="feature-card-repertoire" role="button" tabindex="0">
+        <div class="feature-card-icon">♟</div>
+        <h3 class="feature-card-title">Répertoires</h3>
+        <p class="feature-card-desc">
+          Construisez vos variantes coup par coup avec les coups les plus joués
+          à votre niveau Elo, assisté d'une analyse Stockfish intégrée.
+        </p>
+        <span class="feature-card-link">Commencer →</span>
+      </div>
+
+      <!-- ── Entraînement (actif) ── -->
+      <div class="feature-card feature-card--active" id="feature-card-training" role="button" tabindex="0">
+        <div class="feature-card-icon">⚔</div>
+        <h3 class="feature-card-title">Entraînement</h3>
+        <p class="feature-card-desc">
+          Mode survie, système de rewards et drills intensifs pour
+          ancrer vos variantes durablement en mémoire.
+        </p>
+        <span class="feature-card-link">S'entraîner →</span>
+      </div>
+
+      <!-- ── Apprentissage (bientôt) ── -->
+      <div class="feature-card feature-card--soon">
+        <div class="feature-card-badge">Bientôt</div>
+        <div class="feature-card-icon">📖</div>
+        <h3 class="feature-card-title">Apprentissage</h3>
+        <p class="feature-card-desc">
+          Accédez à des répertoires déjà construits par niveau et style de jeu
+          pour démarrer rapidement sans partir de zéro.
+        </p>
+      </div>
+
+      <!-- ── Analyse des performances (bientôt) ── -->
+      <div class="feature-card feature-card--soon">
+        <div class="feature-card-badge">Bientôt</div>
+        <div class="feature-card-icon">📊</div>
+        <h3 class="feature-card-title">Analyse des performances</h3>
+        <p class="feature-card-desc">
+          Analysez vos performances en ouverture depuis votre compte
+          Chess.com, Lichess, ou en important un fichier PGN.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="home-footer">
+    Alpha Chess — Répertoire &amp; analyse
+  </footer>
+
+</div><!-- /#view-home -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VUE APPLICATION — Interface principale répertoire / entraînement
+     Accessible depuis les cards actives de la page d'accueil.
+════════════════════════════════════════════════════════════════ -->
+<div id="view-app" class="app-view hidden">
 
 <div class="main-layout">
 
@@ -2987,7 +3671,10 @@ body {
   </div>
 </div>
 
-</div>
+</div><!-- /.main-layout -->
+
+</div><!-- /#view-app -->
+
 
 <!-- SPLASH SCREEN -->
 <div id="splash-screen" class="hidden">
@@ -3288,6 +3975,135 @@ body {
     <button class="ctrl-btn" id="btn-medals-close">Fermer</button>
   </div>
 </div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL AUTH — Connexion / Inscription (utilisateur non connecté)
+     Ouvert en cliquant sur "Connexion" dans la top bar.
+     Remplace la splash screen pour les utilisateurs qui naviguent
+     librement sans être connectés.
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-box modal-auth" id="modal-auth" style="display:none">
+
+  <div class="auth-logo">A</div>
+  <h2 class="auth-title">Alpha Chess</h2>
+  <p class="auth-subtitle">Répertoire &amp; analyse</p>
+
+  <!-- Panneau d'accueil (choix initial) -->
+  <div id="auth-panel-welcome">
+    <div class="auth-welcome-actions">
+      <button class="auth-btn auth-btn--primary" id="btn-auth-go-login">Se connecter</button>
+      <button class="auth-btn auth-btn--secondary" id="btn-auth-go-signup">Créer un compte</button>
+      <button class="auth-btn auth-btn--ghost" id="btn-auth-go-guest">Continuer en tant qu'invité</button>
+    </div>
+  </div>
+
+  <!-- Panneau formulaire (connexion / création) -->
+  <div id="auth-panel-form" style="display:none">
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" id="auth-tab-login" data-auth-tab="login">Connexion</button>
+      <button class="auth-tab-btn" id="auth-tab-signup" data-auth-tab="signup">Créer un compte</button>
+    </div>
+
+    <div class="auth-form-section">
+      <div id="auth-username-row" style="display:none">
+        <input type="text" id="auth-username-input" placeholder="Pseudo" autocomplete="username">
+      </div>
+      <div id="auth-email-row">
+        <input type="text" id="auth-email-input" placeholder="Email ou pseudo" autocomplete="email">
+      </div>
+      <div>
+        <input type="password" id="auth-password-input" placeholder="Mot de passe" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="auth-error"></div>
+    </div>
+
+    <button class="auth-btn auth-btn--primary" id="auth-submit-btn">Se connecter</button>
+    <button class="auth-btn auth-btn--ghost" style="margin-top:10px;" id="btn-auth-back">← Retour</button>
+  </div>
+
+  <!-- Panneau avertissement invité -->
+  <div id="auth-panel-guest" style="display:none">
+    <div style="background:rgba(251,113,133,0.1); border:1px solid rgba(251,113,133,0.2); border-radius:5px; padding:16px; margin-bottom:24px; color:var(--text-muted); font-size:0.88rem; line-height:1.6; text-align:left;">
+      Les répertoires créés en mode invité <strong style="color:var(--text-main);">ne seront pas sauvegardés</strong> et seront perdus à la fermeture de l'application.
+    </div>
+    <div class="auth-welcome-actions">
+      <button class="auth-btn auth-btn--primary" id="btn-auth-guest-confirm">Continuer sans compte</button>
+      <button class="auth-btn auth-btn--ghost" id="btn-auth-guest-back">← Retour</button>
+    </div>
+  </div>
+
+</div><!-- /#modal-auth -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL PROFIL — Paramètres & Statistiques
+     Ouvert en cliquant sur le pseudo de l'utilisateur (top-right).
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-box modal-profile" id="modal-profile" style="display:none">
+
+  <!-- Onglets -->
+  <div class="profile-modal-tabs">
+    <button class="profile-tab active" data-profile-tab="settings">Paramètres</button>
+    <button class="profile-tab" data-profile-tab="stats">Statistiques</button>
+  </div>
+
+  <!-- ONGLET : PARAMÈTRES -->
+  <div id="profile-tab-settings" class="profile-tab-content">
+
+    <!-- Section : Paramètres du compte -->
+    <section class="profile-section">
+      <h4 class="profile-section-heading">Paramètres du compte</h4>
+
+      <div class="profile-field">
+        <label for="profile-username-input">Pseudo</label>
+        <div class="profile-field-row">
+          <input type="text" id="profile-username-input" placeholder="Votre pseudo" autocomplete="username">
+          <button class="ctrl-btn" id="btn-profile-save-username">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="profile-field">
+        <label for="profile-email-input">Adresse e-mail</label>
+        <div class="profile-field-row">
+          <input type="email" id="profile-email-input" placeholder="votre@email.com" autocomplete="email">
+          <button class="ctrl-btn" id="btn-profile-save-email">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="profile-field">
+        <label>Mot de passe</label>
+        <div class="profile-field-row">
+          <input type="password" id="profile-password-current" placeholder="Mot de passe actuel" autocomplete="current-password">
+          <input type="password" id="profile-password-new" placeholder="Nouveau mot de passe" autocomplete="new-password">
+          <button class="ctrl-btn" id="btn-profile-save-password">Modifier</button>
+        </div>
+      </div>
+
+      <div id="profile-account-message"></div>
+    </section>
+
+    <!-- Section : Paramètres du site -->
+    <section class="profile-section">
+      <h4 class="profile-section-heading">Paramètres du site</h4>
+      <p class="profile-section-empty">Options à venir…</p>
+    </section>
+
+  </div><!-- /#profile-tab-settings -->
+
+  <!-- ONGLET : STATISTIQUES -->
+  <div id="profile-tab-stats" class="profile-tab-content hidden">
+    <p class="profile-section-empty">Statistiques à venir…</p>
+  </div><!-- /#profile-tab-stats -->
+
+  <!-- Actions -->
+  <div class="modal-actions" style="margin-top: 24px;">
+    <button class="ctrl-btn danger" id="btn-profile-logout">Se déconnecter</button>
+    <button class="ctrl-btn" id="btn-profile-close">Fermer</button>
+  </div>
+
+</div><!-- /#modal-profile -->
+
 
 <div id="dynamic-modals"></div>
 
