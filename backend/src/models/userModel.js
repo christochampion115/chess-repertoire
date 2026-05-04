@@ -16,7 +16,7 @@ async function createUser({ username, email, passwordHash }) {
   const createdAt = new Date().toISOString();
   const result = await run(
     getDb(),
-    'INSERT INTO users (username, email, passwordHash, createdAt) VALUES (?, ?, ?, ?)',
+    'INSERT INTO users (username, email, "passwordHash", "createdAt") VALUES (?, ?, ?, ?) RETURNING id',
     [username, email, passwordHash, createdAt]
   );
 

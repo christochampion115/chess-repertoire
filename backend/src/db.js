@@ -1,93 +1,98 @@
-const sqlite3 = require('sqlite3').verbose();
-const { dbPath } = require('./config');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-let db;
+let pool;
 
-function openDb() {
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  return new Promise((resolve, reject) => {
-    const instance = new sqlite3.Database(dbPath, (err) => {
-      if (err) return reject(err);
-      resolve(instance);
-    });
-  });
-}
-
-function run(dbInstance, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    dbInstance.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
-}
-
-function get(dbInstance, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    dbInstance.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
-}
-
-function all(dbInstance, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    dbInstance.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+// Converts SQLite-style ? placeholders to PostgreSQL $1, $2, ... style
+function convertPlaceholders(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
 }
 
 async function initDb() {
-  db = await openDb();
-  await run(db, `CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    passwordHash TEXT NOT NULL,
-    createdAt TEXT NOT NULL
-  )`);
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
 
-  await run(db, `CREATE TABLE IF NOT EXISTS repertoires (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    userId INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    color TEXT NOT NULL,
-    fen TEXT NOT NULL,
-    san TEXT NOT NULL,
-    comment TEXT,
-    createdAt TEXT NOT NULL,
-    updatedAt TEXT NOT NULL,
-    FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
-  )`);
+  // Test connection and log
+  const testRes = await pool.query('SELECT NOW()');
+  console.log('DB OK :', testRes.rows);
 
-  const repertoireColumns = await all(db, 'PRAGMA table_info(repertoires)');
-  if (!repertoireColumns.some((column) => column.name === 'payload')) {
-    await run(db, 'ALTER TABLE repertoires ADD COLUMN payload TEXT');
-  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      "passwordHash" TEXT NOT NULL,
+      "createdAt" TEXT NOT NULL
+    )
+  `);
 
-  await run(db, `CREATE TABLE IF NOT EXISTS revoked_tokens (
-    token TEXT PRIMARY KEY NOT NULL,
-    expiresAt TEXT NOT NULL
-  )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS repertoires (
+      id SERIAL PRIMARY KEY,
+      "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      fen TEXT NOT NULL,
+      san TEXT NOT NULL,
+      comment TEXT,
+      payload TEXT,
+      "createdAt" TEXT NOT NULL,
+      "updatedAt" TEXT NOT NULL
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS revoked_tokens (
+      token TEXT PRIMARY KEY NOT NULL,
+      "expiresAt" TEXT NOT NULL
+    )
+  `);
 
   // Nettoyage des tokens expirés au démarrage
-  await run(db, 'DELETE FROM revoked_tokens WHERE expiresAt < ?', [new Date().toISOString()]);
+  await pool.query('DELETE FROM revoked_tokens WHERE "expiresAt" < $1', [new Date().toISOString()]);
 }
 
 function getDb() {
-  if (!db) {
+  if (!pool) {
     throw new Error('Database is not initialized');
   }
-  return db;
+  return pool;
+}
+
+async function run(dbInstance, sql, params = []) {
+  const pgSql = convertPlaceholders(sql);
+  const res = await pool.query(pgSql, params);
+  return { lastID: res.rows[0]?.id, changes: res.rowCount };
+}
+
+async function get(dbInstance, sql, params = []) {
+  const pgSql = convertPlaceholders(sql);
+  const res = await pool.query(pgSql, params);
+  return res.rows[0] || null;
+}
+
+async function all(dbInstance, sql, params = []) {
+  const pgSql = convertPlaceholders(sql);
+  const res = await pool.query(pgSql, params);
+  return res.rows;
+}
+
+// Runs a function inside a pg transaction using a dedicated client
+async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = {
@@ -95,5 +100,6 @@ module.exports = {
   getDb,
   run,
   get,
-  all
+  all,
+  withTransaction
 };

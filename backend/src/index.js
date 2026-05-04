@@ -4,7 +4,7 @@ const helmet = require('helmet');
 const authRoutes = require('./routes/authRoutes');
 const repertoireRoutes = require('./routes/repertoireRoutes');
 const lichessStatsRoutes = require('./routes/lichessStatsRoutes');
-const { initDb } = require('./db');
+const { initDb, getDb } = require('./db');
 const { corsOrigin } = require('./config');
 
 const app = express();
@@ -22,6 +22,29 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/repertoires', repertoireRoutes);
 app.use('/api/lichess', lichessStatsRoutes);
+
+// --- Routes de test DB temporaires (à supprimer après validation) ---
+app.get('/test-db', async (req, res) => {
+  try {
+    const result = await getDb().query('SELECT NOW()');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send(err.toString());
+  }
+});
+
+app.get('/add-test-user', async (req, res) => {
+  try {
+    await getDb().query(
+      'INSERT INTO users (username, email, "passwordHash", "createdAt") VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
+      ['test_user', 'test@alpha-chess.local', 'hashed_placeholder', new Date().toISOString()]
+    );
+    res.send('user ajouté (ou déjà existant)');
+  } catch (err) {
+    res.status(500).send(err.toString());
+  }
+});
+// --- Fin routes de test ---
 
 app.use((err, req, res, next) => {
   console.error(err);

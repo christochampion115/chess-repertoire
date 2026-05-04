@@ -1,4 +1,4 @@
-const { getDb, run, get, all } = require('../db');
+const { getDb, run, get, all, withTransaction } = require('../db');
 
 function buildLegacyPayload(row) {
   const createdAt = Date.parse(row.createdAt);
@@ -65,11 +65,11 @@ function findById(id) {
 }
 
 function findByIdAndUser(id, userId) {
-  return get(getDb(), 'SELECT * FROM repertoires WHERE id = ? AND userId = ?', [id, userId]);
+  return get(getDb(), 'SELECT * FROM repertoires WHERE id = ? AND "userId" = ?', [id, userId]);
 }
 
 function listByUser(userId) {
-  return all(getDb(), 'SELECT * FROM repertoires WHERE userId = ? ORDER BY createdAt DESC', [userId]);
+  return all(getDb(), 'SELECT * FROM repertoires WHERE "userId" = ? ORDER BY "createdAt" DESC', [userId]);
 }
 
 async function listPayloadsByUser(userId) {
@@ -82,7 +82,7 @@ async function createRepertoire({ userId, data }) {
   const now = new Date().toISOString();
   const result = await run(
     getDb(),
-    'INSERT INTO repertoires (userId, name, color, fen, san, comment, payload, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO repertoires ("userId", name, color, fen, san, comment, payload, "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
     [userId, stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, now, now]
   );
 
@@ -90,28 +90,19 @@ async function createRepertoire({ userId, data }) {
 }
 
 async function replaceAllByUser(userId, payloads) {
-  const db = getDb();
   const now = new Date().toISOString();
 
-  await run(db, 'BEGIN TRANSACTION');
-
-  try {
-    await run(db, 'DELETE FROM repertoires WHERE userId = ?', [userId]);
+  await withTransaction(async (client) => {
+    await client.query('DELETE FROM repertoires WHERE "userId" = $1', [userId]);
 
     for (const payload of payloads) {
       const stored = getStoredFieldsFromSerializedData(payload);
-      await run(
-        db,
-        'INSERT INTO repertoires (userId, name, color, fen, san, comment, payload, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      await client.query(
+        'INSERT INTO repertoires ("userId", name, color, fen, san, comment, payload, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
         [userId, stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, now, now]
       );
     }
-
-    await run(db, 'COMMIT');
-  } catch (error) {
-    await run(db, 'ROLLBACK');
-    throw error;
-  }
+  });
 
   return listPayloadsByUser(userId);
 }
@@ -139,7 +130,7 @@ async function updateRepertoire(id, userId, updates) {
   const updatedAt = new Date().toISOString();
   await run(
     getDb(),
-    'UPDATE repertoires SET name = ?, color = ?, fen = ?, san = ?, comment = ?, payload = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+    'UPDATE repertoires SET name = ?, color = ?, fen = ?, san = ?, comment = ?, payload = ?, "updatedAt" = ? WHERE id = ? AND "userId" = ?',
     [stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, updatedAt, id, userId]
   );
 
@@ -147,7 +138,7 @@ async function updateRepertoire(id, userId, updates) {
 }
 
 async function deleteRepertoire(id, userId) {
-  const result = await run(getDb(), 'DELETE FROM repertoires WHERE id = ? AND userId = ?', [id, userId]);
+  const result = await run(getDb(), 'DELETE FROM repertoires WHERE id = ? AND "userId" = ?', [id, userId]);
   return result.changes > 0;
 }
 

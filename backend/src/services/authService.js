@@ -11,7 +11,7 @@ async function revokeToken(token) {
     const expiresAt = payload?.exp
       ? new Date(payload.exp * 1000).toISOString()
       : new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-    await run(getDb(), 'INSERT OR IGNORE INTO revoked_tokens (token, expiresAt) VALUES (?, ?)', [token, expiresAt]);
+    await run(getDb(), 'INSERT INTO revoked_tokens (token, "expiresAt") VALUES (?, ?) ON CONFLICT DO NOTHING', [token, expiresAt]);
   } catch {
     // Ignorer les erreurs de révocation (token malformé, base indisponible)
   }
