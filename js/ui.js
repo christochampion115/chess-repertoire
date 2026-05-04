@@ -12,6 +12,7 @@ import {
 } from './repertoire.js';
 import { fetchLichessStats } from './stats.js';
 import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync } from './auth.js';
+import { apiRequest } from './api.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 
@@ -1463,31 +1464,30 @@ function getNextRewardHint(completed, total, moveCount) {
   };
 }
 
-function tryUpgradeRepertoireMedal(rootRep, progressPercent) {
-  if (!rootRep) return;
+function tryUpgradeRepertoireMedal(trainingNode, progressPercent, trainingColor) {
+  if (!trainingNode || !trainingColor) return;
 
-  const repertoireRoot = getRepertoireRoot(rootRep);
-  if (!repertoireRoot?.color) return;
-
-  const moveCount = countMoves(repertoireRoot, repertoireRoot.color);
+  // Count moves only within the training subtree (this node only, never the parent)
+  const moveCount = countMoves(trainingNode, trainingColor);
   const medal = getMedalFromProgress(progressPercent, moveCount);
   if (medal.tier === 'none') return;
 
-  const previousTier = repertoireRoot.trainingMedalTier || 'none';
+  const previousTier = trainingNode.trainingMedalTier || 'none';
   if ((MEDAL_RANK[medal.tier] || 0) < (MEDAL_RANK[previousTier] || 0)) {
     return;
   }
 
   if ((MEDAL_RANK[medal.tier] || 0) === (MEDAL_RANK[previousTier] || 0)) {
-    const previousShine = Number.isFinite(repertoireRoot.trainingMedalShineLevel)
-      ? repertoireRoot.trainingMedalShineLevel
+    const previousShine = Number.isFinite(trainingNode.trainingMedalShineLevel)
+      ? trainingNode.trainingMedalShineLevel
       : 0;
     if (medal.shineLevel <= previousShine) return;
   }
 
-  repertoireRoot.trainingMedalTier = medal.tier;
-  repertoireRoot.trainingMedalShineLevel = medal.shineLevel;
-  repertoireRoot.trainingMedalUpdatedAt = Date.now();
+  // Store medal ONLY on the training node, never on parents
+  trainingNode.trainingMedalTier = medal.tier;
+  trainingNode.trainingMedalShineLevel = medal.shineLevel;
+  trainingNode.trainingMedalUpdatedAt = Date.now();
   scheduleRepertoireSync();
 }
 
@@ -2022,7 +2022,16 @@ function renderTrainingConfirmModal() {
 function showTrainingDoneModal() {
   if (state.trainingMode === 'survival') {
     const snapshot = getSurvivalProgressSnapshot();
-    tryUpgradeRepertoireMedal(state.trainingRoot, snapshot.progressPercent);
+    const trainingRootBeforeStop = state.trainingRoot;
+    const trainingColorBeforeStop = state.trainingRepColor;
+    tryUpgradeRepertoireMedal(trainingRootBeforeStop, snapshot.progressPercent, trainingColorBeforeStop);
+    if (state.auth?.token && trainingRootBeforeStop?.id) {
+      apiRequest('/training-stats', {
+        method: 'POST',
+        token: state.auth.token,
+        body: { variantKey: String(trainingRootBeforeStop.id), score: snapshot.completed }
+      }).catch(() => {});
+    }
   }
 
   // Fin d'entrainement effective : on repasse en mode normal avant d'afficher la modale.
@@ -2078,11 +2087,20 @@ function showTrainingDefeatModal() {
   };
   state.trainingLastSurvivalReport = report;
 
-  tryUpgradeRepertoireMedal(state.trainingRoot, report.progressPercent);
+  // Upgrade medal on the exact training node (not parent)
+  tryUpgradeRepertoireMedal(report.startNode, report.progressPercent, report.repColor);
 
-  const repertoireRoot = getRepertoireRoot(report.startNode);
-  const moveCount = repertoireRoot?.color ? countMoves(repertoireRoot, repertoireRoot.color) : 0;
-  const earnedMeta = repertoireRoot ? getMedalDisplayMeta(repertoireRoot) : null;
+  if (state.auth?.token && report.startNode?.id) {
+    apiRequest('/training-stats', {
+      method: 'POST',
+      token: state.auth.token,
+      body: { variantKey: String(report.startNode.id), score: report.completed }
+    }).catch(() => {});
+  }
+
+  // Display medal from the exact training node only
+  const earnedMeta = getMedalDisplayMeta(report.startNode);
+  const moveCount = countMoves(report.startNode, report.repColor);
   const nextReward = getNextRewardHint(report.completed, report.total, moveCount);
 
   const modalBody = document.getElementById('modal-training-defeat-body');
@@ -2288,6 +2306,15 @@ function createSection(label, items, key, container) {
           const childAnnotStyle = ANNOTATION_STYLE[child.varAnnotation] || null;
           nameSpan.innerHTML = `${child.varName}${child.varAnnotation ? ` <span class="annotation-tag"${childAnnotStyle ? ` style="color:${childAnnotStyle.color}"` : ''}>${child.varAnnotation}</span>` : ''}`;  
           subVarMain.appendChild(nameSpan);
+          const childMedalMeta = getMedalDisplayMeta(child);
+          if (childMedalMeta) {
+            const childMedalEl = document.createElement('div');
+            childMedalEl.className = `rep-medal-badge tier-${childMedalMeta.tier}`;
+            childMedalEl.dataset.shine = String(childMedalMeta.shine);
+            childMedalEl.title = `${childMedalMeta.label} · niveau ${childMedalMeta.shine + 1}`;
+            childMedalEl.textContent = childMedalMeta.icon;
+            subVarMain.appendChild(childMedalEl);
+          }
           item.appendChild(subVarMain);
           const moveCount = countMoves(child, rep.color);
           const trainBtn = document.createElement('button');
