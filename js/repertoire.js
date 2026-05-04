@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { eventBus } from './events.js';
-import { isDescendant } from './arbre.js';
+import { isDescendant, getPathString } from './arbre.js';
 import { scheduleRepertoireSync, registerCreatedRepertoire, deleteRepertoireFromBackend } from './auth.js';
 
 export function normalizeFen(fen) {
@@ -544,10 +544,17 @@ export function handleSquareClick(sq) {
         const wasDirectTargetMode = state.trainingMode === 'express' || state.trainingMode === 'randomizer';
         const testedNodeId = state.currentNode.id;
         const existing = state.currentNode.children.find(c => c.san === move.san);
+        const expectedChild = state.currentNode.children.find(c => c.id === state.trainingExpectedChildId)
+          || state.currentNode.children[0]
+          || null;
+        const isExpectedMove = Boolean(existing && expectedChild && existing.id === expectedChild.id);
+        const isAlternativeRepertoireMove = Boolean(existing && expectedChild && existing.id !== expectedChild.id);
         state.selectedSq = null;
-        if (existing) {
+        if (isExpectedMove || (existing && !expectedChild)) {
           // Coup correct : bouger la pièce immédiatement + feedback simultané
           state.trainingAnswered.add(testedNodeId);
+          state.trainingSkippedByError.delete(testedNodeId);
+          state.trainingCompletedTargets.add(testedNodeId);
           if (wasDirectTargetMode) {
             state.trainingVisited.add(testedNodeId);
           }
@@ -565,14 +572,44 @@ export function handleSquareClick(sq) {
             eventBus.emit('render');
             eventBus.emit(wasDirectTargetMode ? 'trainingTargetCompleted' : 'trainingPlayerMoved');
           }, 200);
-        } else {
-          // Coup incorrect : feedback rouge 500ms, position inchangée
-          state.trainingFeedback = { type: 'wrong', from: fromSq, to: sq };
+        } else if (isAlternativeRepertoireMove) {
+          // Coup jouable dans le répertoire mais pas celui attendu : demander de réessayer.
+          state.trainingFeedback = { type: 'retry', from: fromSq, to: sq };
           eventBus.emit('render');
           setTimeout(() => {
             if (!state.trainingActive) return;
             state.trainingFeedback = null;
             eventBus.emit('render');
+          }, 420);
+        } else {
+          // Coup incorrect : en survie, on consomme une vie puis on passe à la suite.
+          state.trainingFeedback = { type: 'wrong', from: fromSq, to: sq };
+          if (state.trainingMode === 'survival') {
+            state.trainingSurvivalLives = Math.max(0, (state.trainingSurvivalLives || 0) - 1);
+            state.trainingSkippedByError.add(testedNodeId);
+            state.trainingCompletedTargets.add(testedNodeId);
+            state.trainingVisited.add(testedNodeId);
+            state.trainingSurvivalMistakes.push({
+              nodeId: testedNodeId,
+              fen: state.currentNode.fen,
+              path: getPathString(state.currentNode),
+              expectedSan: expectedChild?.san || '(aucun)',
+              playedSan: move.san,
+              nodeTurn: state.currentNode.turn,
+            });
+          }
+          eventBus.emit('render');
+          setTimeout(() => {
+            if (!state.trainingActive) return;
+            state.trainingFeedback = null;
+            eventBus.emit('render');
+            if (state.trainingMode === 'survival') {
+              if (state.trainingSurvivalLives <= 0) {
+                eventBus.emit('trainingSurvivalDefeat');
+              } else {
+                eventBus.emit('trainingPlayerMoved');
+              }
+            }
           }, 500);
         }
         return;

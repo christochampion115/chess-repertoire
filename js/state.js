@@ -47,7 +47,15 @@ export const state = {
   trainingVisited: new Set(),
   trainingIgnoredNoReply: new Set(), // lignes ignorées (pas de réponse du joueur)
   trainingAnswered: new Set(),  // positions où le joueur a déjà correctement répondu
-  trainingFeedback: null,   // { type: 'correct'|'wrong', from: sq, to: sq }
+  trainingSkippedByError: new Set(), // positions sautées (mode survie)
+  trainingCompletedTargets: new Set(), // positions joueur traitées (correctes ou sautées)
+  trainingExpectedChildId: null,
+  trainingTotalTargets: 0,
+  trainingSurvivalLives: 3,
+  trainingSurvivalMaxLives: 3,
+  trainingSurvivalMistakes: [], // [{ nodeId, fen, path, expectedSan, playedSan, nodeTurn }]
+  trainingLastSurvivalReport: null,
+  trainingFeedback: null,   // { type: 'correct'|'wrong'|'retry', from: sq, to: sq }
   boardEl: null,
   ctxMenuEl: null,
   modalOverlayEl: null,

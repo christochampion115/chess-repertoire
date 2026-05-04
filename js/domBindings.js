@@ -5,6 +5,7 @@ import { toggleAnalysis, setAnalysisDepth } from './analysis.js';
 import { updateStatsSortBy } from './ui.js';
 
 const BUTTON_BINDINGS = [
+  ['btn-open-medals', () => ui.openMedalsModal()],
   ['btn-training-stop', () => ui.showStopTrainingModal()],
   ['btn-reset-position', () => ui.resetPosition()],
   ['btn-nav-back', () => ui.navBack()],
@@ -34,6 +35,9 @@ const BUTTON_BINDINGS = [
   ['btn-training-stop-cancel', () => ui.cancelStopTraining()],
   ['btn-training-stop-confirm', () => ui.confirmStopTraining()],
   ['btn-training-done-close', () => ui.closeTrainingDone()],
+  ['btn-training-defeat-retry', () => ui.retrySurvivalTraining()],
+  ['btn-training-defeat-abandon', () => ui.abandonSurvivalTraining()],
+  ['btn-medals-close', () => ui.closeModals()],
 ];
 
 function shouldIgnoreKeyboardNavigationTarget(target) {

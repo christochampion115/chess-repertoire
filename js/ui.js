@@ -11,7 +11,7 @@ import {
   confirmDelete as confirmDeleteMove,
 } from './repertoire.js';
 import { fetchLichessStats } from './stats.js';
-import { loginWithCredentials, signupWithCredentials, logoutSession } from './auth.js';
+import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync } from './auth.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 
@@ -108,7 +108,23 @@ let pendingTrainingMode = 'vertical';
 let pendingTrainingInterruptAction = null;
 let trainingAutoPlayTimer = null;
 
+const SURVIVAL_LIVES = 3;
+
+const MEDAL_RANK = {
+  none: 0,
+  bronze: 1,
+  silver: 2,
+  gold: 3,
+  platinum: 4,
+  diamond: 5,
+  chrome: 6,
+};
+
 const TRAINING_MODES = {
+  survival: {
+    label: 'Survie',
+    description: '3 vies, les erreurs font avancer la ligne, objectif: couvrir tout le répertoire.'
+  },
   horizontal: {
     label: 'Mode horizontal',
     description: 'Va au bout d’une variante, puis remonte à la bifurcation la plus proche de sa fin.'
@@ -133,6 +149,10 @@ eventBus.on('trainingPlayerMoved', () => {
 
 eventBus.on('trainingTargetCompleted', () => {
   showNextTrainingTarget(50);
+});
+
+eventBus.on('trainingSurvivalDefeat', () => {
+  showTrainingDefeatModal();
 });
 
 eventBus.on('openMoveContextMenu', ({ event, source, move }) => {
@@ -167,15 +187,36 @@ export function render() {
   const analysisDepthValue = document.getElementById('analysis-depth-value');
   const analysisDepthInput = document.getElementById('analysis-depth-input');
   const analysisDepthFill = document.getElementById('analysis-depth-fill');
+  const analysisPanel = document.getElementById('analysis-panel');
+  const analysisTitle = document.querySelector('.monitor-analysis-title');
+  const analysisSwitchWrap = analysisSwitch?.closest('.analysis-switch');
+  const analysisControls = document.querySelector('.monitor-analysis-controls');
+  const isTraining = state.trainingActive;
+  const isSurvivalTraining = isTraining && state.trainingMode === 'survival';
   const depth = state.analysisDepth ?? 10;
   if (analysisSwitch) {
     analysisSwitch.checked = Boolean(state.isAnalysisEnabled);
   }
+  if (analysisTitle) {
+    analysisTitle.textContent = isSurvivalTraining ? 'Mode survie' : 'Analyse';
+  }
+  if (analysisSwitchWrap) {
+    analysisSwitchWrap.style.display = isSurvivalTraining ? 'none' : '';
+  }
+  if (analysisControls) {
+    analysisControls.style.display = isSurvivalTraining ? 'none' : '';
+  }
   if (analysisDepthInline) {
-    analysisDepthInline.hidden = !state.isAnalysisEnabled;
+    analysisDepthInline.hidden = isTraining || !state.isAnalysisEnabled;
   }
   if (monitorAnalysisSection) {
-    monitorAnalysisSection.classList.toggle('is-collapsed', !state.isAnalysisEnabled);
+    monitorAnalysisSection.classList.toggle('is-collapsed', !isSurvivalTraining && !state.isAnalysisEnabled);
+    monitorAnalysisSection.style.display = isTraining && !isSurvivalTraining ? 'none' : '';
+  }
+  if (isSurvivalTraining && analysisPanel) {
+    renderSurvivalMonitorPanel(analysisPanel);
+  } else if (isTraining && analysisPanel) {
+    analysisPanel.textContent = '';
   }
   if (analysisDepthValue) {
     analysisDepthValue.textContent = String(depth);
@@ -197,8 +238,12 @@ export function render() {
 
   if (repertoireContainer) {
     repertoireContainer.innerHTML = '';
-    repertoireContainer.classList.toggle('open', state.openPanels.repertoire);
-    if (state.openPanels.repertoire) {
+    const repertoireOpen = !isTraining && state.openPanels.repertoire;
+    repertoireContainer.classList.toggle('open', repertoireOpen);
+    if (isTraining) {
+      state.openPanels.repertoire = false;
+      repertoireContainer.innerHTML = '<div class="panel-empty">Répertoires verrouillés pendant le mode entraînement.</div>';
+    } else if (repertoireOpen) {
       renderRepertoireList(repertoireContainer);
     } else {
       repertoireContainer.innerHTML = '<div class="panel-empty">Cliquez pour ouvrir les répertoires.</div>';
@@ -237,7 +282,6 @@ export function render() {
   const statsLoader = document.getElementById('stats-global-loader');
   const statsDetailsEl = document.getElementById('stats-details');
   const openingInfoEl = document.getElementById('opening-info');
-  const isTraining = state.trainingActive;
   if (statsShell) statsShell.style.display = isTraining ? 'none' : '';
   if (statsLoader) statsLoader.style.display = isTraining ? 'none !important' : '';
   if (statsDetailsEl) statsDetailsEl.style.display = isTraining ? 'none' : '';
@@ -897,7 +941,7 @@ function updateSortButtonStates() {
 
 export function togglePanel(panel) {
   if (!state.openPanels.hasOwnProperty(panel)) return;
-  if (state.trainingActive && panel === 'arbre') return;
+  if (state.trainingActive && (panel === 'arbre' || panel === 'repertoire')) return;
   const isOpen = state.openPanels[panel];
   Object.keys(state.openPanels).forEach(key => {
     state.openPanels[key] = false;
@@ -1293,6 +1337,174 @@ function countMoves(node, repColor) {
   return count;
 }
 
+function collectTrainableTargetsCount(root) {
+  if (!root) return 0;
+  let count = 0;
+
+  function walk(node) {
+    if (!node) return;
+    if (isTrainablePlayerNode(node)) {
+      count += 1;
+    }
+    node.children.forEach(child => {
+      if (!isInTrainingSubtree(child)) return;
+      walk(child);
+    });
+  }
+
+  walk(root);
+  return count;
+}
+
+function getSurvivalProgressSnapshot() {
+  const total = Math.max(0, state.trainingTotalTargets || 0);
+  const completed = Math.min(total, state.trainingCompletedTargets?.size || 0);
+  const correct = Math.min(completed, state.trainingAnswered?.size || 0);
+  const mistakes = state.trainingSurvivalMistakes?.length || 0;
+  const progressPercent = total > 0 ? (completed / total) * 100 : 0;
+
+  return {
+    total,
+    completed,
+    correct,
+    mistakes,
+    progressPercent,
+  };
+}
+
+function getRepertoireSizeBucket(moveCount) {
+  if (moveCount > 500) return 5;
+  if (moveCount > 350) return 4;
+  if (moveCount > 200) return 3;
+  if (moveCount > 100) return 2;
+  if (moveCount > 50) return 1;
+  return 0;
+}
+
+function getMedalFromProgress(progressPercent, moveCount) {
+  if (progressPercent < 30) {
+    return { tier: 'none', shineLevel: 0 };
+  }
+
+  const shineLevel = getRepertoireSizeBucket(moveCount);
+
+  if (progressPercent < 60) {
+    return { tier: 'bronze', shineLevel };
+  }
+
+  if (progressPercent < 100) {
+    return { tier: 'silver', shineLevel };
+  }
+
+  if (moveCount > 500) return { tier: 'chrome', shineLevel };
+  if (moveCount > 350) return { tier: 'diamond', shineLevel };
+  if (moveCount > 200) return { tier: 'platinum', shineLevel };
+  return { tier: 'gold', shineLevel };
+}
+
+function getMedalLabel(tier) {
+  const labels = {
+    none: 'Aucune médaille',
+    bronze: 'Médaille bronze',
+    silver: 'Médaille argent',
+    gold: 'Médaille or',
+    platinum: 'Médaille platine',
+    diamond: 'Médaille diamant',
+    chrome: 'Médaille chromée'
+  };
+  return labels[tier] || 'Médaille';
+}
+
+function getMedalIcon(tier) {
+  const icons = {
+    none: '○',
+    bronze: '🥉',
+    silver: '🥈',
+    gold: '🥇',
+    platinum: '✦',
+    diamond: '◆',
+    chrome: '✦',
+  };
+  return icons[tier] || '🏅';
+}
+
+function getRepertoireRoot(node) {
+  if (!node) return null;
+  let root = node;
+  while (root.parent) root = root.parent;
+  return root;
+}
+
+function getNextRewardHint(completed, total, moveCount) {
+  if (!total) return null;
+
+  const progressPercent = (completed / total) * 100;
+  let targetPercent = 0;
+  let nextTier = 'none';
+
+  if (progressPercent < 30) {
+    targetPercent = 30;
+    nextTier = 'bronze';
+  } else if (progressPercent < 60) {
+    targetPercent = 60;
+    nextTier = 'silver';
+  } else if (progressPercent < 100) {
+    targetPercent = 100;
+    nextTier = getMedalFromProgress(100, moveCount).tier;
+  } else {
+    return null;
+  }
+
+  const needed = Math.max(0, Math.ceil((targetPercent / 100) * total) - completed);
+  return {
+    needed,
+    nextTier,
+    targetPercent,
+  };
+}
+
+function tryUpgradeRepertoireMedal(rootRep, progressPercent) {
+  if (!rootRep) return;
+
+  const repertoireRoot = getRepertoireRoot(rootRep);
+  if (!repertoireRoot?.color) return;
+
+  const moveCount = countMoves(repertoireRoot, repertoireRoot.color);
+  const medal = getMedalFromProgress(progressPercent, moveCount);
+  if (medal.tier === 'none') return;
+
+  const previousTier = repertoireRoot.trainingMedalTier || 'none';
+  if ((MEDAL_RANK[medal.tier] || 0) < (MEDAL_RANK[previousTier] || 0)) {
+    return;
+  }
+
+  if ((MEDAL_RANK[medal.tier] || 0) === (MEDAL_RANK[previousTier] || 0)) {
+    const previousShine = Number.isFinite(repertoireRoot.trainingMedalShineLevel)
+      ? repertoireRoot.trainingMedalShineLevel
+      : 0;
+    if (medal.shineLevel <= previousShine) return;
+  }
+
+  repertoireRoot.trainingMedalTier = medal.tier;
+  repertoireRoot.trainingMedalShineLevel = medal.shineLevel;
+  repertoireRoot.trainingMedalUpdatedAt = Date.now();
+  scheduleRepertoireSync();
+}
+
+function getMedalDisplayMeta(rep) {
+  const tier = rep.trainingMedalTier || 'none';
+  const shine = Number.isFinite(rep.trainingMedalShineLevel) ? rep.trainingMedalShineLevel : 0;
+
+  if (tier === 'none') return null;
+
+  return {
+    tier,
+    shine,
+    label: getMedalLabel(tier),
+    icon: getMedalIcon(tier),
+  };
+}
+
 function findRepIndexForNode(node) {
   let temp = node;
   while (temp.parent) temp = temp.parent;
@@ -1394,10 +1606,42 @@ function appendTrainingModeSelector(container) {
   title.textContent = 'Choisissez un mode d’entraînement :';
   container.appendChild(title);
 
+  const survivalMeta = TRAINING_MODES.survival;
+  if (survivalMeta) {
+    const survivalWrap = document.createElement('div');
+    survivalWrap.className = 'training-mode-survival-wrap';
+
+    const survivalOption = document.createElement('button');
+    survivalOption.type = 'button';
+    survivalOption.className = 'training-mode-option training-mode-option-survival';
+    survivalOption.dataset.selected = pendingTrainingMode === 'survival' ? 'true' : 'false';
+    survivalOption.title = survivalMeta.description;
+
+    const label = document.createElement('span');
+    label.className = 'training-mode-option-label';
+    label.textContent = survivalMeta.label;
+
+    const description = document.createElement('span');
+    description.className = 'training-mode-option-desc';
+    description.textContent = survivalMeta.description;
+
+    survivalOption.appendChild(label);
+    survivalOption.appendChild(description);
+    survivalOption.onclick = () => {
+      pendingTrainingMode = 'survival';
+      renderTrainingConfirmModal();
+    };
+
+    survivalWrap.appendChild(survivalOption);
+    container.appendChild(survivalWrap);
+  }
+
   const options = document.createElement('div');
   options.className = 'training-mode-options';
 
   Object.entries(TRAINING_MODES).forEach(([modeId, meta]) => {
+    if (modeId === 'survival') return;
+
     const option = document.createElement('button');
     option.type = 'button';
     option.className = 'training-mode-option';
@@ -1408,7 +1652,12 @@ function appendTrainingModeSelector(container) {
     label.className = 'training-mode-option-label';
     label.textContent = meta.label;
 
+    const description = document.createElement('span');
+    description.className = 'training-mode-option-desc';
+    description.textContent = meta.description;
+
     option.appendChild(label);
+    option.appendChild(description);
     option.onclick = () => {
       pendingTrainingMode = modeId;
       renderTrainingConfirmModal();
@@ -1505,6 +1754,7 @@ function showNextTrainingTarget(delay = 0) {
     if (!state.trainingActive) return;
     state.currentNode = target;
     state.chess.load(target.fen);
+    state.trainingExpectedChildId = target.children?.[0]?.id || null;
     expandPathToCurrentNode();
     render();
   }, delay);
@@ -1523,6 +1773,7 @@ function getPathFromRoot(targetNode) {
 
 function handleLineComplete() {
   state.trainingVisited.add(state.currentNode.id);
+  state.trainingExpectedChildId = null;
 
   if (isDirectTargetTrainingMode()) {
     showNextTrainingTarget();
@@ -1548,7 +1799,9 @@ function collectTrainingCandidatePaths(node, currentPath = [], results = []) {
 
   if (currentPath.length > 0) {
     const nextToPlay = getTrainingNodeTurn(node);
-    const isPlayerStop = nextToPlay === state.trainingRepColor && !state.trainingAnswered.has(node.id);
+    const isPlayerStop = nextToPlay === state.trainingRepColor
+      && !state.trainingAnswered.has(node.id)
+      && !state.trainingSkippedByError.has(node.id);
     if (node.children.length === 0 || isPlayerStop) {
       results.push(currentPath.slice());
       return results;
@@ -1589,6 +1842,10 @@ function selectTrainingPath(node) {
     return paths[Math.floor(Math.random() * paths.length)];
   }
 
+  if (state.trainingMode === 'survival') {
+    return paths[0];
+  }
+
   return paths[0];
 }
 
@@ -1611,16 +1868,22 @@ function advanceAutoPlay(forcedDelay = null) {
 
   // Tour du JOUEUR : stopper SAUF si la position a déjà été répondue correctement
   if (nextToPlay === state.trainingRepColor) {
-    if (!state.trainingAnswered.has(node.id)) return;
+    if (!state.trainingAnswered.has(node.id) && !state.trainingSkippedByError.has(node.id)) {
+      const expectedPath = selectTrainingPath(node);
+      state.trainingExpectedChildId = expectedPath?.[0]?.id || node.children?.[0]?.id || null;
+      return;
+    }
   }
 
   const selectedPath = selectTrainingPath(node);
   if (!selectedPath || selectedPath.length === 0) {
+    state.trainingExpectedChildId = null;
     handleLineComplete();
     return;
   }
 
   const nextNode = selectedPath[0];
+  state.trainingExpectedChildId = nextNode?.id || null;
   const steps = selectedPath.length;
   // forcedDelay : utilisé uniquement pour le 1er coup après un coup validé (réponse immédiate)
   // sinon délai calculé selon la distance au prochain tour joueur (reroll)
@@ -1632,6 +1895,7 @@ function advanceAutoPlay(forcedDelay = null) {
     const tmp = new Chess(node.fen);
     const mv = tmp.move(nextNode.san);
     if (mv) state.pendingAnimation = { fromSq: mv.from, toSq: mv.to };
+    state.trainingExpectedChildId = null;
     state.currentNode = nextNode;
     state.chess.load(nextNode.fen);
     render();
@@ -1653,6 +1917,14 @@ function _doStartTraining() {
   state.trainingIgnoredNoReply = new Set(pendingTrainingMissingNodes.map(n => n.id));
   state.trainingVisited = new Set(state.trainingIgnoredNoReply);
   state.trainingAnswered = new Set();
+  state.trainingSkippedByError = new Set();
+  state.trainingCompletedTargets = new Set();
+  state.trainingExpectedChildId = null;
+  state.trainingTotalTargets = collectTrainableTargetsCount(startNode);
+  state.trainingSurvivalMaxLives = SURVIVAL_LIVES;
+  state.trainingSurvivalLives = SURVIVAL_LIVES;
+  state.trainingSurvivalMistakes = [];
+  state.trainingLastSurvivalReport = null;
   const repIdx = findRepIndexForNode(startNode);
   state.activeRepIndex = repIdx;
   state.currentNode = startNode;
@@ -1679,6 +1951,12 @@ function stopTraining() {
   state.trainingVisited = new Set();
   state.trainingIgnoredNoReply = new Set();
   state.trainingAnswered = new Set();
+  state.trainingSkippedByError = new Set();
+  state.trainingCompletedTargets = new Set();
+  state.trainingExpectedChildId = null;
+  state.trainingTotalTargets = 0;
+  state.trainingSurvivalLives = SURVIVAL_LIVES;
+  state.trainingSurvivalMistakes = [];
   render();
 }
 
@@ -1742,6 +2020,11 @@ function renderTrainingConfirmModal() {
 }
 
 function showTrainingDoneModal() {
+  if (state.trainingMode === 'survival') {
+    const snapshot = getSurvivalProgressSnapshot();
+    tryUpgradeRepertoireMedal(state.trainingRoot, snapshot.progressPercent);
+  }
+
   // Fin d'entrainement effective : on repasse en mode normal avant d'afficher la modale.
   // Cela garantit que la bannière "mode entrainement" disparaît toujours.
   stopTraining();
@@ -1749,9 +2032,118 @@ function showTrainingDoneModal() {
   document.getElementById('modal-training-done').style.display = 'block';
 }
 
+function renderMiniBoardFromFen(fen) {
+  const pieceMap = {
+    p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
+    P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
+  };
+  const rows = (fen?.split(' ')[0] || '').split('/');
+  if (rows.length !== 8) return '';
+
+  const squares = [];
+  for (let r = 0; r < 8; r += 1) {
+    const row = rows[r] || '';
+    for (const ch of row) {
+      if (/\d/.test(ch)) {
+        const emptyCount = Number(ch);
+        for (let k = 0; k < emptyCount; k += 1) squares.push('');
+      } else {
+        squares.push(pieceMap[ch] || '');
+      }
+    }
+  }
+
+  return `
+    <div class="survival-mini-board">
+      ${squares.slice(0, 64).map((piece, idx) => {
+        const rank = Math.floor(idx / 8);
+        const file = idx % 8;
+        const dark = (rank + file) % 2 === 1;
+        return `<div class="survival-mini-square ${dark ? 'is-dark' : 'is-light'}">${piece}</div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function showTrainingDefeatModal() {
+  if (!state.trainingActive || state.trainingMode !== 'survival') return;
+
+  const snapshot = getSurvivalProgressSnapshot();
+  const report = {
+    livesLeft: state.trainingSurvivalLives,
+    ...snapshot,
+    mistakes: (state.trainingSurvivalMistakes || []).slice(),
+    startNode: state.trainingRoot,
+    repColor: state.trainingRepColor,
+  };
+  state.trainingLastSurvivalReport = report;
+
+  tryUpgradeRepertoireMedal(state.trainingRoot, report.progressPercent);
+
+  const repertoireRoot = getRepertoireRoot(report.startNode);
+  const moveCount = repertoireRoot?.color ? countMoves(repertoireRoot, repertoireRoot.color) : 0;
+  const earnedMeta = repertoireRoot ? getMedalDisplayMeta(repertoireRoot) : null;
+  const nextReward = getNextRewardHint(report.completed, report.total, moveCount);
+
+  const modalBody = document.getElementById('modal-training-defeat-body');
+  if (modalBody) {
+    const mistakesHtml = report.mistakes.length === 0
+      ? '<div class="survival-defeat-empty">Aucune erreur enregistrée.</div>'
+      : report.mistakes.map((entry, index) => `
+          <div class="survival-mistake-card">
+            <div class="survival-mistake-head">Erreur ${index + 1} · ${entry.path || 'Position'}</div>
+            <div class="survival-mistake-moves">
+              <span>Joué: <b>${entry.playedSan}</b></span>
+              <span>Attendu: <b>${entry.expectedSan}</b></span>
+            </div>
+            ${renderMiniBoardFromFen(entry.fen)}
+          </div>
+        `).join('');
+
+    const scoreLine = report.total > 0
+      ? `${report.completed}/${report.total}`
+      : '0/0';
+    const earnedMedalHtml = earnedMeta
+      ? `<div class="survival-earned-medal">
+          <div class="rep-medal-badge tier-${earnedMeta.tier}" data-shine="${earnedMeta.shine}">${earnedMeta.icon}</div>
+          <span class="survival-earned-medal-label">${earnedMeta.label}</span>
+        </div>`
+      : `<div class="survival-earned-medal">
+          <div class="rep-medal-badge">${getMedalIcon('none')}</div>
+          <span class="survival-earned-medal-label">${getMedalLabel('none')}</span>
+        </div>`;
+
+    const nextRewardHtml = nextReward
+      ? `Réussissez <b>${nextReward.needed}</b> coups de plus pour déverouiller la prochaine récompense.`
+      : 'Objectif maximal atteint.';
+
+    modalBody.innerHTML = `
+      <div class="survival-defeat-summary">
+        <div class="survival-defeat-score">Score final: <b>${scoreLine}</b></div>
+        ${earnedMedalHtml}
+        <div class="survival-next-reward--compact">${nextRewardHtml}</div>
+      </div>
+      <div class="survival-defeat-list">${mistakesHtml}</div>
+    `;
+  }
+
+  stopTraining();
+  document.getElementById('modal-overlay').style.display = 'flex';
+  const modal = document.getElementById('modal-training-defeat');
+  if (modal) modal.style.display = 'block';
+}
+
 export function showStopTrainingModal() {
   document.getElementById('modal-overlay').style.display = 'flex';
   document.getElementById('modal-training-stop').style.display = 'block';
+}
+
+export function openMedalsModal() {
+  const overlay = document.getElementById('modal-overlay');
+  const modal = document.getElementById('modal-medals');
+  if (!overlay || !modal) return;
+  overlay.style.display = 'flex';
+  modal.style.display = 'block';
 }
 
 export function confirmStartTraining() { closeModals(); _doStartTraining(); }
@@ -1759,6 +2151,21 @@ export function cancelStartTraining() { closeModals(); }
 export function confirmStopTraining() { stopTraining(); closeModals(); }
 export function cancelStopTraining() { closeModals(); }
 export function closeTrainingDone() { stopTraining(); closeModals(); }
+export function retrySurvivalTraining() {
+  const report = state.trainingLastSurvivalReport;
+  if (!report?.startNode) {
+    closeModals();
+    return;
+  }
+
+  pendingTrainingNode = report.startNode;
+  pendingTrainingColor = report.repColor;
+  pendingTrainingMode = 'survival';
+  pendingTrainingMissingNodes = collectMissingReplyNodes(report.startNode, report.repColor);
+  closeModals();
+  _doStartTraining();
+}
+export function abandonSurvivalTraining() { closeModals(); }
 export function confirmTrainingInterrupt() {
   const action = pendingTrainingInterruptAction;
   pendingTrainingInterruptAction = null;
@@ -1787,6 +2194,7 @@ function createSection(label, items, key, container) {
   header.className = 'section-header';
   header.innerHTML = `<span>${label} (${items.length})</span> <span>${state.sectionStates[key] ? '▼' : '▶'}</span>`;
   header.onclick = () => {
+    if (state.trainingActive) return;
     state.sectionStates[key] = !state.sectionStates[key];
     render();
   };
@@ -1817,7 +2225,7 @@ function createSection(label, items, key, container) {
     const repHeader = document.createElement('div');
     repHeader.className = `rep-header ${state.activeRepIndex === index ? 'active' : ''}`;
     const repRow = document.createElement('div');
-    repRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    repRow.className = 'rep-row';
     if (hasNamedDescendants(rep)) {
       repRow.appendChild(makeRepToggle(rep.id));
     }
@@ -1826,15 +2234,31 @@ function createSection(label, items, key, container) {
     const repAnnotStyle = ANNOTATION_STYLE[rep.varAnnotation] || null;
     repNameEl.innerHTML = `${rep.name}${rep.varAnnotation ? ` <span class="annotation-tag"${repAnnotStyle ? ` style="color:${repAnnotStyle.color}"` : ''}>${rep.varAnnotation}</span>` : ''}`;  
     repRow.appendChild(repNameEl);
+
+    const medalMeta = getMedalDisplayMeta(rep);
+    if (medalMeta) {
+      const medalEl = document.createElement('div');
+      medalEl.className = `rep-medal-badge tier-${medalMeta.tier}`;
+      medalEl.dataset.shine = String(medalMeta.shine);
+      medalEl.title = `${medalMeta.label} · niveau ${medalMeta.shine + 1}`;
+      medalEl.textContent = medalMeta.icon;
+      repRow.appendChild(medalEl);
+    }
+
+    repHeader.appendChild(repRow);
+
+    const repTrainRow = document.createElement('div');
+    repTrainRow.className = 'rep-train-row';
     const repMoveCount = countMoves(rep, rep.color);
     const repTrainBtn = document.createElement('button');
     repTrainBtn.className = 'train-btn';
     repTrainBtn.textContent = `S'entraîner (${repMoveCount} coups)`;
     repTrainBtn.onclick = e => { e.stopPropagation(); showTrainingConfirmModal(rep, rep.color); };
-    repRow.appendChild(repTrainBtn);
-    repHeader.appendChild(repRow);
+    repTrainRow.appendChild(repTrainBtn);
+    repHeader.appendChild(repTrainRow);
     repHeader.onclick = e => {
       e.stopPropagation();
+      if (state.trainingActive) return;
       state.activeRepIndex = index;
       state.currentNode = findLastUniquePosition(rep);
       expandPathToCurrentNode();
@@ -1854,14 +2278,17 @@ function createSection(label, items, key, container) {
           const item = document.createElement('div');
           item.className = `sub-var-item ${state.currentNode.id === child.id ? 'active' : ''}`;
           item.style.marginLeft = depth * 15 + 'px';
+          const subVarMain = document.createElement('div');
+          subVarMain.className = 'sub-var-main';
           if (hasNamedDescendants(child)) {
-            item.appendChild(makeRepToggle(child.id));
+            subVarMain.appendChild(makeRepToggle(child.id));
           }
           const nameSpan = document.createElement('span');
           nameSpan.style.cssText = 'flex:1;min-width:0;';
           const childAnnotStyle = ANNOTATION_STYLE[child.varAnnotation] || null;
           nameSpan.innerHTML = `${child.varName}${child.varAnnotation ? ` <span class="annotation-tag"${childAnnotStyle ? ` style="color:${childAnnotStyle.color}"` : ''}>${child.varAnnotation}</span>` : ''}`;  
-          item.appendChild(nameSpan);
+          subVarMain.appendChild(nameSpan);
+          item.appendChild(subVarMain);
           const moveCount = countMoves(child, rep.color);
           const trainBtn = document.createElement('button');
           trainBtn.className = 'train-btn';
@@ -1870,6 +2297,7 @@ function createSection(label, items, key, container) {
           item.appendChild(trainBtn);
           item.onclick = e => {
             e.stopPropagation();
+            if (state.trainingActive) return;
             state.activeRepIndex = index;
             state.currentNode = child;
             expandPathToCurrentNode();
@@ -1917,6 +2345,28 @@ function findLastUniquePosition(node) {
     current = current.children[0];
   }
   return current;
+}
+
+function renderSurvivalMonitorPanel(container) {
+  const snapshot = getSurvivalProgressSnapshot();
+  const lives = Math.max(0, state.trainingSurvivalLives || 0);
+  const maxLives = Math.max(1, state.trainingSurvivalMaxLives || SURVIVAL_LIVES);
+  const hearts = Array.from({ length: maxLives }, (_, idx) => idx < lives ? '♥' : '♡').join(' ');
+  const progressValue = Math.min(100, Math.max(0, snapshot.progressPercent));
+  const progressText = `${Math.round(snapshot.progressPercent)}%`;
+
+  container.innerHTML = `
+    <div class="survival-monitor-card">
+      <div class="survival-monitor-lives">Vies: <span class="survival-monitor-hearts">${hearts}</span></div>
+      <div class="survival-monitor-row">
+        <span>Progression</span>
+        <strong>${progressText}</strong>
+      </div>
+      <div class="survival-progress-track">
+        <div class="survival-progress-fill" style="width:${progressValue}%"></div>
+      </div>
+    </div>
+  `;
 }
 
 function updateMonitor() {
