@@ -184,6 +184,7 @@ function initCoreUiBindings() {
         if (action === 'rename-repertoire') ui.openRenameRepModal();
         if (action === 'name-variation') ui.openNameVarModal();
         if (action === 'add-to-tree') ui.addSelectedMoveToTree();
+        if (action === 'open-in-tree') ui.openCurrentNodeInTree();
         if (action === 'comment') ui.openCommentModal();
         if (action === 'delete') ui.openDeleteClick();
         return;
