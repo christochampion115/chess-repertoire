@@ -8,6 +8,7 @@ const AUTH_TOKEN_KEY = 'alphaChess.authToken';
 const AUTH_USER_KEY = 'alphaChess.authUser';
 const LOCAL_REPERTOIRES_KEY = 'alphaChess.localRepertoires';
 const SELECTION_KEY = 'alphaChess.workspaceSelection';
+const DELETED_REP_IDS_KEY = 'alphaChess.deletedRepertoireIds';
 const SYNC_DEBOUNCE_MS = 1000;
 
 let syncTimer = null;
@@ -21,6 +22,36 @@ const pendingCreateIds = new Set();
 function persistSession(token, user) {
   saveState(AUTH_TOKEN_KEY, token);
   saveState(AUTH_USER_KEY, user);
+}
+
+// ─── Suppressions persistantes ────────────────────────────────────────────────
+// Garde une liste des runtimeIds supprim\u00e9s localement.
+// Quand le bootstrap re\u00e7oit ces r\u00e9pertoires depuis le serveur (DELETE n'a pas
+// encore abouti), ils sont ignor\u00e9s et un nouveau DELETE est relanc\u00e9.
+
+function loadDeletedRepIds() {
+  const stored = loadState(DELETED_REP_IDS_KEY);
+  return new Set(Array.isArray(stored) ? stored.map(String) : []);
+}
+
+function persistDeletedRepIds(set) {
+  if (set.size === 0) {
+    clearState(DELETED_REP_IDS_KEY);
+  } else {
+    saveState(DELETED_REP_IDS_KEY, Array.from(set));
+  }
+}
+
+function markRepertoireDeleted(runtimeId) {
+  const ids = loadDeletedRepIds();
+  ids.add(String(runtimeId));
+  persistDeletedRepIds(ids);
+}
+
+function unmarkRepertoireDeleted(runtimeId) {
+  const ids = loadDeletedRepIds();
+  ids.delete(String(runtimeId));
+  persistDeletedRepIds(ids);
 }
 
 function clearPersistedSession() {
@@ -392,6 +423,10 @@ function applyRemoteRepertoires(repertoires) {
   for (const [k, v] of savedRemoteIds) remoteRepertoireIds.set(k, v);
   // Restaurer les créations en cours pour éviter un double POST si un répertoire était en cours de création.
   for (const id of savedPendingCreateIds) pendingCreateIds.add(id);
+
+  // Répertoires supprimés localement mais peut-être encore présents côté serveur.
+  const deletedIds = loadDeletedRepIds();
+
   const loadedRepertoires = [];
 
   for (const entry of Array.isArray(repertoires) ? repertoires : []) {
@@ -411,6 +446,23 @@ function applyRemoteRepertoires(repertoires) {
     }
 
     const runtimeId = String(runtimeRepertoire.id);
+
+    // Si ce répertoire a été supprimé localement mais que le DELETE n'a pas encore
+    // abouti côté serveur, on l'ignore et on relance le DELETE.
+    if (deletedIds.has(runtimeId)) {
+      window.DEBUG_MODE && console.log('[DEBUG]', { step: 'applyRemoteRepertoires:skip_deleted', runtimeId });
+      if (entry && typeof entry === 'object' && entry.serverId != null) {
+        // Retenter le DELETE avec le serverId connu depuis la réponse serveur
+        const serverId = Number(entry.serverId);
+        remoteRepertoireIds.set(runtimeId, serverId);
+        if (state.auth.token && state.auth.user) {
+          apiRequest(`/repertoires/${serverId}`, { method: 'DELETE', token: state.auth.token })
+            .then(() => { remoteRepertoireIds.delete(runtimeId); unmarkRepertoireDeleted(runtimeId); })
+            .catch(() => {});
+        }
+      }
+      continue;
+    }
     const localRepertoire = localById.get(runtimeId);
     if (localRepertoire && shouldPreferLocalRepertoire(localRepertoire, runtimeRepertoire)) {
       runtimeRepertoire = localRepertoire;
@@ -462,6 +514,7 @@ function clearSessionState({ message = '', loadGuestData = false } = {}) {
   // ni un autre compte qui se connecterait sur le même navigateur.
   clearState(LOCAL_REPERTOIRES_KEY);
   clearState(SELECTION_KEY);
+  clearState(DELETED_REP_IDS_KEY);
   resetWorkspaceState();
 
   state.auth.user = null;
@@ -887,13 +940,24 @@ export function registerCreatedRepertoire(repertoire) {
 }
 
 export function deleteRepertoireFromBackend(repertoire) {
-  if (!repertoire || !state.auth.token || !state.auth.user) {
+  if (!repertoire) {
     return;
   }
 
   const runtimeId = String(repertoire.id);
+
+  // Marquer la suppression localement d\u00e8s maintenant, m\u00eame si le DELETE r\u00e9seau
+  // \u00e9choue ou si le backend n'est pas joignable. Sera nettoy\u00e9 apr\u00e8s succ\u00e8s.
+  markRepertoireDeleted(runtimeId);
+
+  if (!state.auth.token || !state.auth.user) {
+    return;
+  }
+
   const serverId = remoteRepertoireIds.get(runtimeId);
   if (serverId == null) {
+    // Pas encore synchronis\u00e9 avec le serveur : rien \u00e0 DELETE c\u00f4t\u00e9 backend.
+    // L'entr\u00e9e dans DELETED_REP_IDS_KEY suffit pour bloquer une r\u00e9apparition.
     return;
   }
 
@@ -906,6 +970,8 @@ export function deleteRepertoireFromBackend(repertoire) {
   })
     .then(() => {
       remoteRepertoireIds.delete(runtimeId);
+      // DELETE confirm\u00e9 : on peut retirer l'entr\u00e9e de la liste des suppression
+      unmarkRepertoireDeleted(runtimeId);
       setSyncSavedState();
     })
     .catch((error) => {
@@ -913,7 +979,7 @@ export function deleteRepertoireFromBackend(repertoire) {
         markTokenExpired();
         return;
       }
-
+      // Erreur r\u00e9seau : on garde l'entr\u00e9e dans DELETED_REP_IDS_KEY pour retenter plus tard.
       setSyncErrorState(error);
     })
     .finally(() => {

@@ -7,6 +7,19 @@ export function normalizeFen(fen) {
   return fen.split(' ')[0];
 }
 
+/**
+ * Compteur de création monotone.
+ * Garantit que chaque nœud créé reçoit un createdAt strictement supérieur
+ * au précédent, même quand plusieurs nœuds sont créés dans la même milliseconde
+ * (cas typique des imports PGN). Crucial pour la détection de transpositions.
+ */
+let _lastCreatedAt = 0;
+function nextCreatedAt() {
+  const now = Date.now();
+  _lastCreatedAt = now > _lastCreatedAt ? now : _lastCreatedAt + 1;
+  return _lastCreatedAt;
+}
+
 export function createNewRepertoire(config = null) {
   if (config instanceof Event) config = null;
   const name = config ? config.name : document.getElementById('rep-name-input').value.trim();
@@ -120,20 +133,32 @@ function buildRepertoireFromMoves(moves, fallbackName) {
 }
 
 function importPgnVariationTree(moves, parent) {
+  // ── Passe 1 : construire TOUTE la ligne principale en premier ──────────────
+  // Cela garantit que les nœuds de la ligne principale ont un createdAt
+  // inférieur à ceux des variantes. Ainsi, quand une variante atteint la même
+  // position (transposition réelle), c'est elle qui sera marquée ↩ et non la
+  // ligne principale, ce qui préserve l'arbre de la théorie principale.
+  const mainLineEntries = [];
   let currentParent = parent;
 
   for (const move of moves) {
-    const branchParent = currentParent;
     const san = move?.notation?.notation;
     if (!san) {
       throw new Error('PGN invalide');
     }
 
+    const branchParent = currentParent;
     const nextNode = addMove(branchParent, san);
     if (!nextNode) {
       throw new Error('Import impossible');
     }
 
+    mainLineEntries.push({ move, branchParent });
+    currentParent = nextNode;
+  }
+
+  // ── Passe 2 : traiter les variantes maintenant que la ligne principale existe ─
+  for (const { move, branchParent } of mainLineEntries) {
     const variations = Array.isArray(move.variations)
       ? move.variations
       : (Array.isArray(move.ravs) ? move.ravs : []);
@@ -143,8 +168,6 @@ function importPgnVariationTree(moves, parent) {
         importPgnVariationTree(variation, branchParent);
       }
     }
-
-    currentParent = nextNode;
   }
 }
 
@@ -476,7 +499,7 @@ export function addMove(parent, san) {
     if (repIdx !== -1) state.activeRepIndex = repIdx;
   }
 
-  const now = Date.now();
+  const now = nextCreatedAt();
   const transpo = state.activeRepIndex !== -1 ? findTranspositionInActiveRep(targetFen, now) : null;
   const node = {
     id: Math.random().toString(36).substr(2, 9),
