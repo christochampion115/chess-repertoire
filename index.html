@@ -48,6 +48,10 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: auto;
+}
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: radial-gradient(circle at top, rgba(122, 174, 203, 0.08), transparent 25%), linear-gradient(180deg, #07111d 0%, #0b1523 100%);
@@ -56,6 +60,7 @@ body {
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
+  min-width: 900px;
   margin: 0;
   padding: 24px;
   user-select: none;
@@ -1007,19 +1012,37 @@ body {
 }
 
 .rep-item-wrapper {
-  margin-bottom: 14px;
+  margin-bottom: 15px;
   border-radius: 5px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.12);
   background: rgba(15, 23, 42, 0.95);
 }
 
+.rep-item-wrapper.rep-dragging { opacity: 0.35; }
+.rep-item-wrapper.active {
+  background: rgba(20, 32, 58, 0.97);
+  border-color: rgba(122, 174, 203, 0.22);
+}
+
+.rep-drop-zone {
+  height: 4px;
+  margin: 1px 4px;
+  border-radius: 3px;
+  transition: height 0.15s, background 0.15s, border-color 0.15s;
+}
+.rep-drop-zone.active {
+  height: 12px;
+  background: rgba(122, 174, 203, 0.15);
+  border: 1px dashed rgba(122, 174, 203, 0.5);
+}
+
 .rep-header {
-  padding: 18px;
+  padding: 8px 18px;
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  background: rgba(148, 163, 184, 0.03);
+  background: transparent;
   border-left: 5px solid transparent;
   transition: background 0.2s ease, transform 0.2s ease;
   position: relative;
@@ -1129,30 +1152,31 @@ body {
   transform: translateY(-1px);
 }
 
-.rep-header.active {
-  background: rgba(122, 174, 203, 0.08);
-  border-right: 4px solid rgba(122, 174, 203, 0.45);
+.rep-item-wrapper.active > .rep-header {
+  border-left-color: rgba(122, 174, 203, 0.55);
+
 }
 
 .sub-variants-container {
-  padding: 12px;
-  background: rgba(148, 163, 184, 0.03);
+  padding: 4px 0 6px 10px;
+  margin: 0 0 0 20px;
+  background: transparent;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  gap: 5px;
+  border-left: 2px transparent ba(148, 163, 184, 0.2);
 }
 
 .sub-var-item {
   font-size: 0.82rem;
   color: var(--text-main);
   cursor: pointer;
-  padding: 12px 14px;
-  border-radius: 5px;
+  padding: 5px 12px;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 5px;
   border: 1px solid rgba(148, 163, 184, 0.12);
   background: rgba(148, 163, 184, 0.04);
   transition: background 0.2s ease, border-color 0.2s ease;
@@ -1850,6 +1874,52 @@ body {
   color: #cbd5e1;
 }
 
+/* Collapsible candidates header */
+.cands-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  margin-bottom: 2px;
+  text-align: left;
+}
+
+.cands-toggle-btn:hover {
+  background: rgba(122, 174, 203, 0.1);
+  color: var(--text-main);
+}
+
+.cands-arrow {
+  font-size: 0.68rem;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.cands-toggle-btn[aria-expanded="true"] .cands-arrow {
+  transform: rotate(90deg);
+}
+
+.cands-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cands-body.is-collapsed {
+  display: none;
+}
+
 .stats-filter-buttons {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2248,10 +2318,11 @@ body {
 
 .stats-row > div:last-child {
   display: grid;
-  grid-template-columns: 32px 32px 38px 120px 1fr;
+  grid-template-columns: 52px 34px 44px 1fr 44px;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding-right: 4px;
+  overflow: hidden;
 }
 
 
@@ -2278,13 +2349,12 @@ body {
 .bars {
   display: flex;
   height: 15px;
-  width: 175%;
-  background: #eee;
+  width: 100%;
+  background: #2c2b2b;
   border-radius: 3px;
-  border: 1px solid #000;
+  border: 1px solid rgba(0,0,0,0.5);
   box-sizing: border-box;
   overflow: hidden;
-  margin-left: 5px;
 }
 
 /* Colonne 5 : elo */
@@ -2797,6 +2867,9 @@ body {
 
 #view-app {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3590,7 +3663,12 @@ body {
       <div id="analysis-panel"></div>
     </div>
   </div>
-  <div class="candidate-section-title">Coups candidats</div>
+  <div class="cands-section" id="cands-section">
+    <button type="button" class="cands-toggle-btn" id="cands-toggle-btn" aria-expanded="true" aria-controls="cands-body">
+      <span>COUPS CANDIDATS</span>
+      <span class="cands-arrow">▶</span>
+    </button>
+    <div class="cands-body" id="cands-body">
   <div class="stats-filter-shell" id="stats-filter-shell">
     <div class="stats-filter-buttons">
       <button type="button" class="stats-filter-btn stats-filter-btn--split" id="stats-filter-lichess-btn" aria-controls="stats-filter-elo-panel" aria-expanded="false" aria-label="Base Lichess">
@@ -3649,6 +3727,8 @@ body {
 
   <div class="stats-panel" id="stats-panel"></div>
   <div class="stats-details" id="stats-details"></div>
+    </div><!-- /.cands-body -->
+  </div><!-- /.cands-section -->
 </aside>
 
 <div id="ctx-menu" class="ctx-menu">
@@ -3656,6 +3736,7 @@ body {
   <div class="menu-item opt-rename-rep" style="display:none" data-menu-action="rename-repertoire">Renommer le répertoire</div>
   <div class="menu-item opt-name-var" style="display:none" data-menu-action="name-variation">Nommer la variante</div>
   <div class="menu-item opt-add-tree" style="display:none" data-menu-action="add-to-tree">Ajouter à l'arbre</div>
+  <div class="menu-item opt-open-in-tree" style="display:none" data-menu-action="open-in-tree">Ouvrir dans l'arbre</div>
   <div class="menu-item opt-comment" data-menu-action="comment">Commenter</div>
   <div class="menu-item opt-delete" style="color:#f87171" data-menu-action="delete">Supprimer</div>
   <div class="ctx-annot-section">

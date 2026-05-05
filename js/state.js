@@ -35,7 +35,8 @@ export const state = {
     eloMin: 0,
     eloMax: 3000,
     currentDatabase: 'lichess',  // 'lichess' | 'masters'
-    sortBy: 'frequency'
+    sortBy: 'frequency',
+    candidatesOpen: true
   },
   deleteTargetIdx: -1,
   pendingDeleteType: '',
