@@ -114,6 +114,8 @@ function sortStatsMoves(moves, fen) {
 let pendingTrainingNode = null;
 let pendingTrainingColor = null;
 let pendingTrainingMissingNodes = [];
+let pendingTrainingOutOfScopeTranspos = [];
+let pendingTrainingIncludeOutOfScope = true;
 let pendingTrainingMode = 'vertical';
 let pendingTrainingInterruptAction = null;
 let trainingAutoPlayTimer = null;
@@ -1110,8 +1112,8 @@ function setRepCreationMode(mode) {
   document.querySelectorAll('.rep-create-mode-btn').forEach(button => {
     const active = button.dataset.repCreateMode === mode;
     button.dataset.selected = active ? 'true' : 'false';
-    button.style.background = active ? '#2b2b2b' : '';
-    button.style.borderColor = active ? '#555' : '';
+    button.style.background = active ? 'rgba(122, 174, 203, 0.18)' : '';
+    button.style.borderColor = active ? 'rgba(122, 174, 203, 0.55)' : '';
   });
 
   if (infoEl) infoEl.style.display = mode === 'current' ? 'block' : 'none';
@@ -1608,10 +1610,24 @@ function isFullyExplored(node) {
   return node.children.every(c => isFullyExplored(c));
 }
 
+// Vérifie si un nœud appartient au sous-arbre d'un nœud racine donné.
+function isNodeInSubtree(node, subtreeRoot) {
+  let temp = node;
+  while (temp) {
+    if (temp.id === subtreeRoot.id) return true;
+    temp = temp.parent;
+  }
+  return false;
+}
+
 function collectMissingReplyNodes(root, repColor) {
   const missing = [];
 
   function walk(node) {
+    // Nœud de transposition valide : la continuation existe via sourceNode.
+    // Ne pas signaler comme réponse manquante — géré séparément.
+    if (node.isTransposition && node.sourceNode) return;
+
     const nextToPlay = node.turn === 'w' ? 'b' : 'w';
 
     if (nextToPlay === repColor && node.children.length === 0) {
@@ -1627,6 +1643,25 @@ function collectMissingReplyNodes(root, repColor) {
 
   walk(root);
   return missing;
+}
+
+// Collecte les nœuds de transposition dont le sourceNode est EN DEHORS du sous-arbre entraîné.
+// Ces lignes transposent dans une autre variante : l'utilisateur peut choisir de les inclure ou non.
+function collectOutOfScopeTranspositionNodes(root) {
+  const outOfScope = [];
+
+  function walk(node) {
+    if (node.isTransposition && node.sourceNode) {
+      if (!isNodeInSubtree(node.sourceNode, root)) {
+        outOfScope.push(node);
+      }
+      return; // feuille de transposition, pas de récursion
+    }
+    node.children.forEach(walk);
+  }
+
+  walk(root);
+  return outOfScope;
 }
 
 function appendLineBreak(container) {
@@ -1673,6 +1708,74 @@ function appendTrainingMissingLines(container, repColor, missingNodes) {
   note.style.fontStyle = 'italic';
   note.textContent = 'Ces lignes seront ignorées pendant l\'entraînement.';
   container.appendChild(note);
+}
+
+// Section affichée dans la modale lorsqu'il existe des transpositions hors-variante.
+// En mode Survie : note informative (elles sont toujours ignorées).
+// Autres modes : case à cocher pour inclure ou non ces lignes.
+function appendOutOfScopeTranspoSection(container, transpoNodes) {
+  if (transpoNodes.length === 0) return;
+
+  appendLineBreak(container);
+  appendLineBreak(container);
+
+  const headerLabel = document.createElement('div');
+  headerLabel.style.fontSize = '0.9em';
+  headerLabel.style.color = '#666';
+  headerLabel.innerHTML = `<b>↔️ ${transpoNodes.length} transposition(s) vers une autre variante :</b>`;
+  container.appendChild(headerLabel);
+
+  const sample = transpoNodes.slice(0, 3)
+    .map(n => `• ${getPathString(n) || n.san}`)
+    .join('<br>');
+
+  const sampleDiv = document.createElement('div');
+  sampleDiv.style.fontSize = '0.85em';
+  sampleDiv.style.color = '#888';
+  sampleDiv.style.marginTop = '4px';
+  sampleDiv.innerHTML = sample;
+  container.appendChild(sampleDiv);
+
+  if (transpoNodes.length > 3) {
+    const tail = document.createElement('div');
+    tail.style.fontSize = '0.85em';
+    tail.style.color = '#888';
+    tail.style.marginTop = '4px';
+    tail.textContent = `…et ${transpoNodes.length - 3} autre(s).`;
+    container.appendChild(tail);
+  }
+
+  if (pendingTrainingMode === 'survival') {
+    // En Survie : toujours ignorées, juste une note
+    const note = document.createElement('div');
+    note.style.fontSize = '0.85em';
+    note.style.color = '#999';
+    note.style.marginTop = '4px';
+    note.style.fontStyle = 'italic';
+    note.textContent = 'Ces lignes sont ignorées en mode Survie.';
+    container.appendChild(note);
+  } else {
+    // Autres modes : case à cocher
+    const checkRow = document.createElement('label');
+    checkRow.style.display = 'flex';
+    checkRow.style.alignItems = 'center';
+    checkRow.style.gap = '8px';
+    checkRow.style.marginTop = '8px';
+    checkRow.style.fontSize = '0.85em';
+    checkRow.style.color = '#bbb';
+    checkRow.style.cursor = 'pointer';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = pendingTrainingIncludeOutOfScope;
+    checkbox.addEventListener('change', () => {
+      pendingTrainingIncludeOutOfScope = checkbox.checked;
+    });
+
+    checkRow.appendChild(checkbox);
+    checkRow.append('Inclure ces lignes dans l\'entraînement');
+    container.appendChild(checkRow);
+  }
 }
 
 function appendTrainingModeSelector(container) {
@@ -1993,6 +2096,11 @@ function _doStartTraining() {
   const bannerLabel = document.getElementById('training-banner-label');
   if (bannerLabel) bannerLabel.textContent = state.trainingLabel;
   state.trainingIgnoredNoReply = new Set(pendingTrainingMissingNodes.map(n => n.id));
+  // Transpositions hors-variante : toujours ignorées en Survie, sinon selon le choix utilisateur.
+  const ignoreOutOfScope = pendingTrainingMode === 'survival' || !pendingTrainingIncludeOutOfScope;
+  if (ignoreOutOfScope) {
+    pendingTrainingOutOfScopeTranspos.forEach(n => state.trainingIgnoredNoReply.add(n.id));
+  }
   state.trainingVisited = new Set(state.trainingIgnoredNoReply);
   state.trainingAnswered = new Set();
   state.trainingSkippedByError = new Set();
@@ -2051,6 +2159,8 @@ function showTrainingConfirmModal(node, repColor) {
   pendingTrainingNode = node;
   pendingTrainingColor = repColor;
   pendingTrainingMissingNodes = collectMissingReplyNodes(node, repColor);
+  pendingTrainingOutOfScopeTranspos = collectOutOfScopeTranspositionNodes(node);
+  pendingTrainingIncludeOutOfScope = true; // inclure par défaut (sauf Survie, géré dans _doStartTraining)
   pendingTrainingMode = state.trainingMode || 'vertical';
 
   renderTrainingConfirmModal();
@@ -2094,6 +2204,7 @@ function renderTrainingConfirmModal() {
   }
 
   appendTrainingMissingLines(modalBody, pendingTrainingColor, pendingTrainingMissingNodes);
+  appendOutOfScopeTranspoSection(modalBody, pendingTrainingOutOfScopeTranspos);
   appendTrainingModeSelector(modalBody);
 }
 
