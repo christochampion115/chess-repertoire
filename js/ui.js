@@ -17,6 +17,12 @@ import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 import { saveState, loadState } from './storage.js';
 
+let currentDragColor = null;
+
+function saveRepOrder() {
+  saveState('rep-display-order', state.repertoires.map(r => r.id));
+}
+
 const BOARD_THEME_KEY = 'alphaChess.boardTheme';
 
 const ELO_MIN = 0;
@@ -170,6 +176,24 @@ export function render() {
   updateMonitor();
   renderBoard(handleSquareClick);
 
+  // Bind candidates toggle (once)
+  const candsBtn = document.getElementById('cands-toggle-btn');
+  const candsBody = document.getElementById('cands-body');
+  if (candsBtn && !candsBtn.dataset.bound) {
+    candsBtn.addEventListener('click', () => {
+      if (!state.statsFilters) state.statsFilters = {};
+      state.statsFilters.candidatesOpen = !(state.statsFilters.candidatesOpen !== false);
+      if (candsBody) candsBody.classList.toggle('is-collapsed', !state.statsFilters.candidatesOpen);
+      candsBtn.setAttribute('aria-expanded', state.statsFilters.candidatesOpen ? 'true' : 'false');
+    });
+    candsBtn.dataset.bound = '1';
+  }
+  if (candsBtn && candsBody) {
+    const open = state.statsFilters?.candidatesOpen !== false;
+    candsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    candsBody.classList.toggle('is-collapsed', !open);
+  }
+
   const repertoireContainer = document.getElementById('repertoire-content');
   const arbreContainer = document.getElementById('arbre-content');
   const statsPanel = document.getElementById('stats-panel');
@@ -286,10 +310,12 @@ export function render() {
   const statsLoader = document.getElementById('stats-global-loader');
   const statsDetailsEl = document.getElementById('stats-details');
   const openingInfoEl = document.getElementById('opening-info');
+  const candsSection = document.getElementById('cands-section');
   if (statsShell) statsShell.style.display = isTraining ? 'none' : '';
   if (statsLoader) statsLoader.style.display = isTraining ? 'none !important' : '';
   if (statsDetailsEl) statsDetailsEl.style.display = isTraining ? 'none' : '';
   if (openingInfoEl) openingInfoEl.style.display = isTraining ? 'none' : '';
+  if (candsSection) candsSection.style.display = isTraining ? 'none' : '';
 
   if (!isTraining) loadStatsIfNeeded(state.currentNode?.fen);
 
@@ -824,7 +850,7 @@ const freqPct = Math.round((total / totalGames) * 100);
   // Créer la cellule contenant tous les détails du coup
   const contentCell = document.createElement('div');
   contentCell.style.display = 'grid';
-  contentCell.style.gridTemplateColumns = '32px 32px 38px 120px 1fr';
+  contentCell.style.gridTemplateColumns = '52px 34px 44px 1fr 44px';
   contentCell.style.alignItems = 'center';
   contentCell.style.gap = '4px';
   contentCell.style.paddingRight = '4px';
@@ -934,12 +960,22 @@ function updateSortButtonStates() {
   
   const badge = document.getElementById('stats-sort-badge');
   if (badge) {
-    badge.style.display = 'none';
+    badge.textContent = displayLabel;
+    badge.style.display = 'inline-flex';
+    badge.style.marginLeft = 'auto';
   }
 
   const depthBadge = document.getElementById('stats-depth-badge');
   if (depthBadge) {
     depthBadge.style.display = 'none';
+  }
+
+  // Update active state on sort menu items
+  const sortMenu = document.getElementById('stats-sort-menu');
+  if (sortMenu) {
+    sortMenu.querySelectorAll('.stats-sort-menu-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.sortType === sortType);
+    });
   }
 }
 
@@ -973,6 +1009,37 @@ function handleTreeContext(event, node) {
 export function hideMenus() {
   state.ctxMenuEl.style.display = 'none';
   state.contextMenuMove = null;
+}
+
+export function openCurrentNodeInTree() {
+  const target = state.menuTarget;
+  hideMenus();
+  if (!target) return;
+
+  // Find the repertoire index for this target (root or variant)
+  const repIdx = state.repertoires.findIndex(r => r === target || isDescendantOf(r, target));
+  if (repIdx !== -1) {
+    state.activeRepIndex = repIdx;
+  }
+
+  // Navigate to the target's starting position
+  state.currentNode = target;
+  state.chess.load(target.fen);
+
+  // Open arbre, close all other panels
+  Object.keys(state.openPanels).forEach(k => { state.openPanels[k] = false; });
+  state.openPanels.arbre = true;
+
+  render();
+}
+
+function isDescendantOf(root, node) {
+  if (!root || !node) return false;
+  function walk(n) {
+    if (n === node) return true;
+    return (n.children || []).some(walk);
+  }
+  return walk(root);
 }
 
 export function addSelectedMoveToTree() {
@@ -1269,11 +1336,13 @@ export function handleRightClick(event, type, target = null, index = -1) {
   const renameEl = menu.querySelector('.opt-rename-rep');
   const nameVarEl = menu.querySelector('.opt-name-var');
   const addTreeEl = menu.querySelector('.opt-add-tree');
+  const openInTreeEl = menu.querySelector('.opt-open-in-tree');
   const commentEl = menu.querySelector('.opt-comment');
   const deleteEl = menu.querySelector('.opt-delete');
 
   if (flipEl) flipEl.style.display = isMoveContext ? 'none' : 'block';
   if (renameEl) renameEl.style.display = isRepRoot ? 'block' : 'none';
+  if (openInTreeEl) openInTreeEl.style.display = (isRepRoot || isRepSub) ? 'block' : 'none';
   if (deleteEl) {
     deleteEl.textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
     deleteEl.style.display = isMoveContext ? 'none' : (isRepRoot || (isNode && isNotRoot) ? 'block' : 'none');
@@ -2206,6 +2275,17 @@ export function confirmTrainingInterrupt() {
 export function cancelTrainingInterrupt() { closeModals(); }
 
 function renderRepertoireList(container) {
+  const savedOrder = loadState('rep-display-order');
+  if (savedOrder && Array.isArray(savedOrder)) {
+    state.repertoires.sort((a, b) => {
+      const ia = savedOrder.indexOf(a.id);
+      const ib = savedOrder.indexOf(b.id);
+      if (ia === -1 && ib === -1) return 0;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  }
   if (state.repertoires.length === 0) {
     container.innerHTML = '<div class="panel-empty">Utilisez le bouton "CRÉER RÉP." pour commencer.</div>';
     return;
@@ -2249,11 +2329,50 @@ function createSection(label, items, key, container) {
     return toggle;
   }
 
+  // Drop zone at top of section so items can be moved to first position
+  const sectionColor = key === 'white' ? 'w' : 'b';
+  function makeDropZone(insertBeforeId) {
+    const dz = document.createElement('div');
+    dz.className = 'rep-drop-zone';
+    dz.addEventListener('dragover', e => {
+      if (!currentDragColor || currentDragColor !== sectionColor) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      dz.classList.add('active');
+    });
+    dz.addEventListener('dragleave', e => {
+      if (!dz.contains(e.relatedTarget)) dz.classList.remove('active');
+    });
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      dz.classList.remove('active');
+      const fromId = e.dataTransfer.getData('text/plain');
+      if (!fromId || fromId === insertBeforeId) return;
+      const fromIdx = state.repertoires.findIndex(r => r.id === fromId);
+      if (fromIdx === -1 || state.repertoires[fromIdx].color !== sectionColor) return;
+      const activeRepId = state.repertoires[state.activeRepIndex]?.id ?? null;
+      const moved = state.repertoires.splice(fromIdx, 1)[0];
+      let insertAt;
+      if (insertBeforeId) {
+        insertAt = state.repertoires.findIndex(r => r.id === insertBeforeId);
+        if (insertAt === -1) insertAt = state.repertoires.length;
+      } else {
+        insertAt = state.repertoires.reduce((acc, r, i) => r.color === sectionColor ? i + 1 : acc, 0);
+      }
+      state.repertoires.splice(insertAt, 0, moved);
+      if (activeRepId != null) state.activeRepIndex = state.repertoires.findIndex(r => r.id === activeRepId);
+      saveRepOrder();
+      render();
+    });
+    return dz;
+  }
+
   items.forEach(({ rep, index }) => {
     const wrap = document.createElement('div');
     wrap.className = 'rep-item-wrapper';
     const repHeader = document.createElement('div');
-    repHeader.className = `rep-header ${state.activeRepIndex === index ? 'active' : ''}`;
+    repHeader.className = 'rep-header';
+    if (state.activeRepIndex === index) wrap.classList.add('active');
     const repRow = document.createElement('div');
     repRow.className = 'rep-row';
     if (hasNamedDescendants(rep)) {
@@ -2360,8 +2479,30 @@ function createSection(label, items, key, container) {
       wrap.appendChild(subContainer);
     }
 
+    // Drag-to-reorder: hold anywhere on the card (excluding interactive elements)
+    wrap.dataset.repId = rep.id;
+    wrap.addEventListener('mousedown', e => {
+      if (e.target.closest('button, .tree-toggle, .rep-medal-badge, a')) return;
+      wrap.draggable = true;
+    });
+    wrap.addEventListener('mouseup', () => { wrap.draggable = false; });
+    wrap.addEventListener('dragstart', e => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', rep.id);
+      currentDragColor = rep.color;
+      setTimeout(() => wrap.classList.add('rep-dragging'), 0);
+    });
+    wrap.addEventListener('dragend', () => {
+      wrap.draggable = false;
+      currentDragColor = null;
+      wrap.classList.remove('rep-dragging');
+      content.querySelectorAll('.rep-drop-zone').forEach(el => el.classList.remove('active'));
+    });
+
+    content.appendChild(makeDropZone(rep.id));
     content.appendChild(wrap);
   });
+  content.appendChild(makeDropZone(null));
 
   section.appendChild(content);
   container.appendChild(section);
@@ -3075,6 +3216,15 @@ function hideCurrentTooltip() {
   }
 }
 
+// Hide tooltip on any scroll or click outside
+if (!document.body.dataset.tooltipsafetybound) {
+  document.addEventListener('scroll', hideCurrentTooltip, { capture: true, passive: true });
+  document.addEventListener('click', () => {
+    if (currentTooltip) hideCurrentTooltip();
+  }, { capture: false, passive: true });
+  document.body.dataset.tooltipsafetybound = '1';
+}
+
 function createTooltip(content, x, y) {
   hideCurrentTooltip();
   
@@ -3125,7 +3275,7 @@ function generateMiniboardHtml(fen, move) {
     const lightSquare = state.boardTheme?.light ?? '#ebefd6';
     const darkSquare = state.boardTheme?.dark ?? '#556173';
     
-    let html = '<div style="display:grid; grid-template-columns:repeat(8,24px); gap:0; background:#000; padding:1px; margin:4px 0;">';
+    let html = '<div style="display:grid; grid-template-columns:repeat(8,24px); grid-template-rows:repeat(8,24px); gap:0; background:#000; padding:1px; margin:4px 0; overflow:hidden; width:194px; height:194px;">';
     
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
