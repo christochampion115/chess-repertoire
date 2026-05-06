@@ -121,6 +121,60 @@ let pendingTrainingInterruptAction = null;
 let trainingAutoPlayTimer = null;
 
 const SURVIVAL_LIVES = 3;
+const SURVIVAL_LIFE_BONUS_INTERVAL = 20; // coups corrects avant chaque vie bonus
+
+/**
+ * Vérifie si le joueur doit recevoir une vie bonus (tous les 20 coups corrects).
+ * Si les 3 cœurs normaux sont pleins, accorde un cœur doré bonus.
+ * Déclenche une animation visuelle sur le panneau monitor.
+ */
+function checkSurvivalLifeBonus() {
+  if (!state.trainingActive || state.trainingMode !== 'survival') return;
+  const correct = state.trainingAnswered?.size || 0;
+  const expectedMilestone = (state.trainingSurvivalMilestones + 1) * SURVIVAL_LIFE_BONUS_INTERVAL;
+  if (correct < expectedMilestone) return;
+
+  state.trainingSurvivalMilestones += 1;
+
+  if (state.trainingSurvivalLives < SURVIVAL_LIVES) {
+    // Récupère un cœur normal
+    state.trainingSurvivalLives += 1;
+    scheduleSurvivalHeartBonusAnimation('normal');
+  } else if (!state.trainingSurvivalGoldenHeart) {
+    // Octroie le cœur doré bonus
+    state.trainingSurvivalGoldenHeart = true;
+    scheduleSurvivalHeartBonusAnimation('golden');
+  }
+  // Si déjà à 3 vies + cœur doré, on ignore silencieusement
+}
+
+function scheduleSurvivalHeartBonusAnimation(type) {
+  // On re-rend le moniteur pour afficher les cœurs mis à jour, puis on ajoute la classe
+  // d'animation sur le dernier cœur ajouté.
+  render();
+  requestAnimationFrame(() => {
+    const container = document.querySelector('.survival-monitor-hearts');
+    if (!container) return;
+    // Le nouveau cœur est le dernier span enfant
+    const spans = container.querySelectorAll('.survival-heart');
+    // Trouver le dernier cœur plein (ou doré)
+    let targetSpan = null;
+    if (type === 'golden') {
+      targetSpan = container.querySelector('.survival-heart.is-golden');
+    } else {
+      // Dernier cœur plein (rouge)
+      const filled = [...spans].filter(s => !s.classList.contains('is-empty') && !s.classList.contains('is-golden'));
+      targetSpan = filled[filled.length - 1] || null;
+    }
+    if (targetSpan) {
+      targetSpan.classList.remove('arriving');
+      // Force reflow
+      void targetSpan.offsetWidth;
+      targetSpan.classList.add('arriving');
+      targetSpan.addEventListener('animationend', () => targetSpan.classList.remove('arriving'), { once: true });
+    }
+  });
+}
 
 const MEDAL_RANK = {
   none: 0,
@@ -156,6 +210,7 @@ const TRAINING_MODES = {
 };
 
 eventBus.on('trainingPlayerMoved', () => {
+  if (state.trainingMode === 'survival') checkSurvivalLifeBonus();
   advanceAutoPlay(50); // réponse immédiate après coup validé
 });
 
@@ -174,6 +229,9 @@ eventBus.on('openMoveContextMenu', ({ event, source, move }) => {
 
 export function render() {
   hideCurrentTooltip();
+  // Supprimer les tooltips orphelins de l'analyse (ex: quand le panneau est
+  // re-rendu sans que mouseleave ait été déclenché)
+  document.querySelectorAll('.move-hover-tooltip').forEach(el => el.remove());
   updateAccountUI();
   updateMonitor();
   renderBoard(handleSquareClick);
@@ -1095,8 +1153,65 @@ function openNewRepModalUnsafe() {
   if (pgnText) pgnText.value = '';
   document.getElementById('btn-rep-confirm').textContent = 'Créer';
   document.getElementById('btn-rep-confirm').onclick = () => confirmRepertoireCreation();
+  state.pendingNewRepFolderId = null;
+  state.pendingNewRepFolderName = null;
   setRepCreationMode('start');
   selectCol('w');
+  // Afficher le sélecteur de dossier (peut être masqué après un renommage)
+  const folderContainer = document.getElementById('rep-folder-container');
+  if (folderContainer) folderContainer.style.display = 'block';
+  // Wire folder select (once) and populate
+  const folderSel = document.getElementById('rep-folder-select');
+  const folderNewInput = document.getElementById('rep-folder-new-name');
+  if (folderSel && !folderSel.dataset.folderbound) {
+    folderSel.addEventListener('change', () => {
+      const val = folderSel.value;
+      if (folderNewInput) folderNewInput.style.display = val === '__new__' ? 'block' : 'none';
+      state.pendingNewRepFolderId = val || null;
+    });
+    if (folderNewInput) {
+      folderNewInput.addEventListener('input', () => {
+        state.pendingNewRepFolderName = folderNewInput.value.trim() || null;
+      });
+    }
+    folderSel.dataset.folderbound = '1';
+  }
+  populateRepFolderSelect('w');
+}
+
+/**
+ * Peuple le select de dossier dans la modale de création de répertoire.
+ * Affiche uniquement les dossiers qui contiennent au moins un répertoire
+ * de la couleur demandée, plus une option "Nouveau dossier".
+ */
+function populateRepFolderSelect(color) {
+  const sel = document.getElementById('rep-folder-select');
+  if (!sel) return;
+  const newNameInput = document.getElementById('rep-folder-new-name');
+
+  const folders = loadFolders();
+  const colorFolderIds = new Set(
+    state.repertoires
+      .filter(r => r.color === color && r.folderId && folders[r.folderId])
+      .map(r => r.folderId)
+  );
+
+  sel.innerHTML = '<option value="">Aucun dossier</option>';
+  colorFolderIds.forEach(fid => {
+    const opt = document.createElement('option');
+    opt.value = fid;
+    opt.textContent = folders[fid];
+    sel.appendChild(opt);
+  });
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__';
+  newOpt.textContent = '+ Nouveau dossier…';
+  sel.appendChild(newOpt);
+
+  sel.value = '';
+  if (newNameInput) { newNameInput.style.display = 'none'; newNameInput.value = ''; }
+  state.pendingNewRepFolderId = null;
+  state.pendingNewRepFolderName = null;
 }
 
 export function selectRepCreationMode(mode) {
@@ -1241,6 +1356,9 @@ export function openRenameRepModal() {
   document.getElementById('rep-name-input').value = rep.name;
   document.getElementById('btn-rep-confirm').textContent = 'Enregistrer';
   document.getElementById('btn-rep-confirm').onclick = () => confirmRenameRep();
+  // Masquer le sélecteur de dossier en mode renommage
+  const folderContainer = document.getElementById('rep-folder-container');
+  if (folderContainer) folderContainer.style.display = 'none';
 }
 
 export function openNameVarModal() {
@@ -1302,6 +1420,399 @@ export function openDeleteClick() {
   }
 }
 
+// ─── DOSSIERS ─────────────────────────────────────────────────────────────────
+
+const FOLDERS_KEY = 'alphaChess.repFolders';
+
+function loadFolders() {
+  return loadState(FOLDERS_KEY) || {};
+}
+
+function saveFolders(folders) {
+  saveState(FOLDERS_KEY, folders);
+  state.repFolders = folders;
+}
+
+/**
+ * Collecte toutes les variantes nommées d'un répertoire (y compris sous-variantes).
+ */
+function collectNamedVariants(rep) {
+  const result = [];
+  function walk(node) {
+    if (node !== rep && node.varName) result.push(node);
+    node.children.forEach(walk);
+  }
+  walk(rep);
+  return result;
+}
+
+// ────────────────────────────────────────────────────────────────────
+//  Folder right-click context menu
+// ────────────────────────────────────────────────────────────────────
+
+let _folderCtxMenuCloseHandler = null;
+
+export function openFolderCtxMenu(event, fid, isRepFolder) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const menu = document.getElementById('folder-ctx-menu');
+  if (!menu) return;
+
+  menu.dataset.fid = fid;
+  menu.dataset.isRepFolder = isRepFolder ? '1' : '0';
+
+  // Positionner le menu au curseur
+  const x = event.clientX;
+  const y = event.clientY;
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.style.display = 'block';
+
+  // Fermer si clic en dehors
+  if (_folderCtxMenuCloseHandler) {
+    document.removeEventListener('click', _folderCtxMenuCloseHandler, true);
+  }
+  _folderCtxMenuCloseHandler = function(e) {
+    if (!menu.contains(e.target)) {
+      menu.style.display = 'none';
+      document.removeEventListener('click', _folderCtxMenuCloseHandler, true);
+      _folderCtxMenuCloseHandler = null;
+    }
+  };
+  // Slight delay so the current click doesn't immediately close
+  setTimeout(() => document.addEventListener('click', _folderCtxMenuCloseHandler, true), 50);
+
+  // Wire buttons (re-bind each time to avoid stale closures)
+  const renameBtn = document.getElementById('folder-ctx-rename');
+  const ungroupBtn = document.getElementById('folder-ctx-ungroup');
+  const deleteBtn = document.getElementById('folder-ctx-delete');
+
+  if (renameBtn) {
+    renameBtn.onclick = () => {
+      menu.style.display = 'none';
+      openRenameFolderModal(fid, isRepFolder);
+    };
+  }
+  if (ungroupBtn) {
+    ungroupBtn.onclick = () => {
+      menu.style.display = 'none';
+      ungroupFolder(fid, isRepFolder);
+    };
+  }
+  if (deleteBtn) {
+    deleteBtn.onclick = () => {
+      menu.style.display = 'none';
+      deleteFolderAndContents(fid, isRepFolder);
+    };
+  }
+}
+
+function openRenameFolderModal(fid) {
+  const folders = loadFolders();
+  const current = folders[fid];
+  if (current === undefined) return;
+  const currentName = typeof current === 'string' ? current : (current?.name || '');
+
+  const input = document.getElementById('rename-folder-input');
+  const modal = document.getElementById('modal-rename-folder');
+  if (!input || !modal) return;
+
+  input.value = currentName;
+  state.modalOverlayEl.style.display = 'flex';
+  modal.style.display = 'block';
+  requestAnimationFrame(() => { input.focus(); input.select(); });
+
+  // Replace buttons to clear any stale listeners from previous opens
+  const saveBtn = document.getElementById('btn-rename-folder-save');
+  const cancelBtn = document.getElementById('btn-rename-folder-cancel');
+  const newSave = saveBtn.cloneNode(true);
+  const newCancel = cancelBtn.cloneNode(true);
+  saveBtn.replaceWith(newSave);
+  cancelBtn.replaceWith(newCancel);
+
+  function doSave() {
+    const trimmed = input.value.trim();
+    if (!trimmed) { input.focus(); return; }
+    const f = loadFolders();
+    f[fid] = trimmed;
+    saveFolders(f);
+    input.removeEventListener('keydown', onKey);
+    closeModals();
+    render();
+  }
+
+  function doCancel() {
+    input.removeEventListener('keydown', onKey);
+    closeModals();
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter') doSave();
+    if (e.key === 'Escape') doCancel();
+  }
+
+  newSave.addEventListener('click', doSave);
+  newCancel.addEventListener('click', doCancel);
+  input.addEventListener('keydown', onKey);
+}
+
+function ungroupFolder(fid, isRepFolder) {
+  if (isRepFolder) {
+    // Retirer le folderId de tous les répertoires du dossier
+    state.repertoires.forEach(rep => {
+      if (rep.folderId === fid) {
+        delete rep.folderId;
+        scheduleRepertoireSync(rep.id);
+      }
+    });
+  } else {
+    // Retirer le folderId de toutes les variantes du dossier
+    state.repertoires.forEach(rep => {
+      collectNamedVariants(rep).forEach(v => {
+        if (v.folderId === fid) delete v.folderId;
+      });
+      scheduleRepertoireSync(rep.id);
+    });
+  }
+
+  // Supprimer le dossier
+  const folders = loadFolders();
+  delete folders[fid];
+  saveFolders(folders);
+  render();
+}
+
+function deleteFolderAndContents(fid, isRepFolder) {
+  const folders = loadFolders();
+  const folder = folders[fid];
+  const folderName = (typeof folder === 'string' ? folder : null) || fid;
+
+  if (!window.confirm(`Supprimer le dossier "${folderName}" et tout son contenu ?`)) return;
+
+  if (isRepFolder) {
+    // Supprimer tous les répertoires dans ce dossier
+    const toDelete = state.repertoires.filter(r => r.folderId === fid).map(r => r.id);
+    toDelete.forEach(id => {
+      const idx = state.repertoires.findIndex(r => r.id === id);
+      if (idx !== -1) state.repertoires.splice(idx, 1);
+      // Suppression backend
+      if (state.auth?.token) {
+        apiRequest(`/repertoire/${id}`, { method: 'DELETE', token: state.auth.token }).catch(() => {});
+      }
+    });
+  } else {
+    // Supprimer toutes les variantes nommées dans ce dossier
+    state.repertoires.forEach(rep => {
+      const varsToRemove = collectNamedVariants(rep).filter(v => v.folderId === fid);
+      varsToRemove.forEach(v => {
+        // Retirer le nœud de son parent
+        if (v.parent) {
+          const idx = v.parent.children.indexOf(v);
+          if (idx !== -1) v.parent.children.splice(idx, 1);
+        }
+      });
+      if (varsToRemove.length > 0) scheduleRepertoireSync(rep.id);
+    });
+  }
+
+  delete folders[fid];
+  saveFolders(folders);
+  render();
+}
+
+/**
+ * Ouvre la modale de groupement en dossier.
+ * Pour `repertoire_item` : affiche tous les répertoires de même couleur.
+ * Pour `repertoire_subitem` : affiche toutes les variantes nommées du répertoire parent.
+ */
+export function openFolderGroupModal() {
+  hideMenus();
+  const target = state.menuTarget;
+  if (!target) return;
+
+  const isRepRoot = state.contextMenuSource === 'repertoire_item';
+  const folders = loadFolders();
+
+  // Déterminer le dossier existant du nœud cible
+  const existingFolderId = target.folderId || null;
+  const existingFolderName = existingFolderId ? (folders[existingFolderId] || '') : '';
+
+  // Peupler la liste d'éléments
+  let items = [];
+  if (isRepRoot) {
+    // Tous les répertoires de même couleur
+    items = state.repertoires.filter(r => r.color === target.color);
+  } else {
+    // Toutes les variantes nommées du répertoire parent
+    let root = target;
+    while (root.parent) root = root.parent;
+    items = collectNamedVariants(root);
+  }
+
+  const titleEl = document.getElementById('modal-folder-title');
+  if (titleEl) titleEl.textContent = isRepRoot ? '📁 Grouper des répertoires en dossier' : '📁 Grouper des variantes en dossier';
+
+  const nameInput = document.getElementById('folder-name-input');
+  if (nameInput) nameInput.value = existingFolderName;
+
+  const listEl = document.getElementById('folder-items-list');
+  if (listEl) {
+    listEl.innerHTML = '';
+    items.forEach(item => {
+      const label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:5px;cursor:pointer;';
+      label.onmouseenter = () => { label.style.background = 'var(--hover-bg,#2a2a2a)'; };
+      label.onmouseleave = () => { label.style.background = 'transparent'; };
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = item.id;
+      // Pré-cocher si même dossier que la cible ou si c'est la cible elle-même
+      const itemFolderId = item.folderId || null;
+      cb.checked = item === target || (existingFolderId && itemFolderId === existingFolderId);
+      const span = document.createElement('span');
+      span.style.fontSize = '0.9em';
+      span.textContent = isRepRoot ? (item.name || item.id) : (item.varName || item.san);
+      label.appendChild(cb);
+      label.appendChild(span);
+      listEl.appendChild(label);
+    });
+  }
+
+  const removeBtn = document.getElementById('btn-folder-remove');
+  if (removeBtn) removeBtn.style.display = existingFolderId ? 'inline-block' : 'none';
+
+  // Stocker le contexte pour les boutons
+  const overlay = document.getElementById('modal-overlay-folder');
+  if (overlay) {
+    overlay.dataset.folderMode = isRepRoot ? 'rep' : 'var';
+    overlay.dataset.existingFolderId = existingFolderId || '';
+    overlay.style.display = 'flex';
+  }
+
+  const saveBtn = document.getElementById('btn-folder-save');
+  if (saveBtn && !saveBtn.dataset.folderbound) {
+    saveBtn.addEventListener('click', saveFolderGroupModal);
+    saveBtn.dataset.folderbound = '1';
+  }
+  if (removeBtn && !removeBtn.dataset.folderbound) {
+    removeBtn.addEventListener('click', removeFolderFromModal);
+    removeBtn.dataset.folderbound = '1';
+  }
+  const cancelBtn = document.getElementById('btn-folder-cancel');
+  if (cancelBtn && !cancelBtn.dataset.folderbound) {
+    cancelBtn.addEventListener('click', closeFolderModal);
+    cancelBtn.dataset.folderbound = '1';
+  }
+}
+
+function closeFolderModal() {
+  const overlay = document.getElementById('modal-overlay-folder');
+  if (overlay) overlay.style.display = 'none';
+}
+
+export function saveFolderGroupModal() {
+  const overlay = document.getElementById('modal-overlay-folder');
+  if (!overlay) return;
+
+  const nameInput = document.getElementById('folder-name-input');
+  const folderName = nameInput ? nameInput.value.trim() : '';
+  if (!folderName) {
+    if (nameInput) { nameInput.style.borderColor = '#f87171'; nameInput.focus(); }
+    return;
+  }
+  if (nameInput) nameInput.style.borderColor = '';
+
+  const existingFolderId = overlay.dataset.existingFolderId || '';
+  const folderId = existingFolderId || ('folder_' + Math.random().toString(36).substr(2, 9));
+
+  const folders = loadFolders();
+  folders[folderId] = folderName;
+  saveFolders(folders);
+
+  // Récupérer les IDs sélectionnés
+  const listEl = document.getElementById('folder-items-list');
+  const selectedIds = new Set(
+    Array.from(listEl ? listEl.querySelectorAll('input[type=checkbox]:checked') : [])
+      .map(cb => cb.value)
+  );
+  const allIds = new Set(
+    Array.from(listEl ? listEl.querySelectorAll('input[type=checkbox]') : [])
+      .map(cb => cb.value)
+  );
+
+  // Mettre à jour folderId sur les nœuds concernés
+  const isRepMode = overlay.dataset.folderMode === 'rep';
+  if (isRepMode) {
+    state.repertoires.forEach(r => {
+      if (allIds.has(r.id)) {
+        if (selectedIds.has(r.id)) {
+          r.folderId = folderId;
+        } else if (r.folderId === folderId) {
+          delete r.folderId;
+        }
+      }
+    });
+  } else {
+    // Mode variantes : parcourir toutes les variantes de tous les répertoires
+    state.repertoires.forEach(rep => {
+      collectNamedVariants(rep).forEach(v => {
+        if (allIds.has(v.id)) {
+          if (selectedIds.has(v.id)) {
+            v.folderId = folderId;
+          } else if (v.folderId === folderId) {
+            delete v.folderId;
+          }
+        }
+      });
+    });
+  }
+
+  // Déclencher la synchronisation pour chaque répertoire modifié
+  if (isRepMode) {
+    state.repertoires.forEach(r => {
+      if (allIds.has(r.id)) scheduleRepertoireSync(r.id);
+    });
+  } else {
+    state.repertoires.forEach(rep => {
+      const varIds = new Set(collectNamedVariants(rep).map(v => v.id));
+      if ([...allIds].some(id => varIds.has(id))) scheduleRepertoireSync(rep.id);
+    });
+  }
+
+  closeFolderModal();
+  render();
+}
+
+function removeFolderFromModal() {
+  const overlay = document.getElementById('modal-overlay-folder');
+  if (!overlay) return;
+
+  const existingFolderId = overlay.dataset.existingFolderId || '';
+  if (!existingFolderId) { closeFolderModal(); return; }
+
+  // Retirer le folderId de tous les nœuds qui l'utilisent
+  state.repertoires.forEach(r => {
+    if (r.folderId === existingFolderId) {
+      delete r.folderId;
+      scheduleRepertoireSync(r.id);
+    }
+    collectNamedVariants(r).forEach(v => {
+      if (v.folderId === existingFolderId) delete v.folderId;
+    });
+    scheduleRepertoireSync(r.id);
+  });
+
+  // Supprimer le dossier de la liste
+  const folders = loadFolders();
+  delete folders[existingFolderId];
+  // Ne conserver que les dossiers encore référencés
+  saveFolders(folders);
+
+  closeFolderModal();
+  render();
+}
+
 export function handleRightClick(event, type, target = null, index = -1) {
   if (state.trainingActive) return;
   event.preventDefault();
@@ -1339,12 +1850,14 @@ export function handleRightClick(event, type, target = null, index = -1) {
   const nameVarEl = menu.querySelector('.opt-name-var');
   const addTreeEl = menu.querySelector('.opt-add-tree');
   const openInTreeEl = menu.querySelector('.opt-open-in-tree');
+  const groupFolderEl = menu.querySelector('.opt-group-folder');
   const commentEl = menu.querySelector('.opt-comment');
   const deleteEl = menu.querySelector('.opt-delete');
 
   if (flipEl) flipEl.style.display = isMoveContext ? 'none' : 'block';
   if (renameEl) renameEl.style.display = isRepRoot ? 'block' : 'none';
   if (openInTreeEl) openInTreeEl.style.display = (isRepRoot || isRepSub) ? 'block' : 'none';
+  if (groupFolderEl) groupFolderEl.style.display = (isRepRoot || isRepSub) ? 'block' : 'none';
   if (deleteEl) {
     deleteEl.textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
     deleteEl.style.display = isMoveContext ? 'none' : (isRepRoot || (isNode && isNotRoot) ? 'block' : 'none');
@@ -1361,6 +1874,9 @@ export function selectCol(color) {
   state.selectedColor = color;
   document.getElementById('opt-white').classList.toggle('active', color === 'w');
   document.getElementById('opt-black').classList.toggle('active', color === 'b');
+  // Rafraîchir le select de dossier si la modale de création est ouverte
+  const repModal = document.getElementById('modal-new-rep');
+  if (repModal && repModal.style.display !== 'none') populateRepFolderSelect(color);
 }
 
 export function resetPosition() {
@@ -1568,7 +2084,13 @@ function tryUpgradeRepertoireMedal(trainingNode, progressPercent, trainingColor)
   trainingNode.trainingMedalTier = medal.tier;
   trainingNode.trainingMedalShineLevel = medal.shineLevel;
   trainingNode.trainingMedalUpdatedAt = Date.now();
-  scheduleRepertoireSync();
+
+  // Trouver le répertoire racine qui contient ce nœud et le synchroniser explicitement
+  // (state.currentNode peut pointer ailleurs en fin de session d'entraînement)
+  let root = trainingNode;
+  while (root.parent) root = root.parent;
+  const repId = root.id;
+  scheduleRepertoireSync(repId);
 }
 
 function getMedalDisplayMeta(rep) {
@@ -1681,16 +2203,32 @@ function appendTrainingMissingLines(container, repColor, missingNodes) {
   missingLabel.innerHTML = `<b>⚠️ Il manque une réponse ${repColor === 'w' ? 'blanche' : 'noire'} sur ${missingNodes.length} ligne(s) :</b>`;
   container.appendChild(missingLabel);
 
-  const sample = missingNodes.slice(0, 3)
-    .map(n => `• ${getPathString(n) || n.san}`)
-    .join('<br>');
+  const listDiv = document.createElement('div');
+  listDiv.style.marginTop = '4px';
 
-  const sampleDiv = document.createElement('div');
-  sampleDiv.style.fontSize = '0.85em';
-  sampleDiv.style.color = '#888';
-  sampleDiv.style.marginTop = '4px';
-  sampleDiv.innerHTML = sample;
-  container.appendChild(sampleDiv);
+  missingNodes.forEach((n, idx) => {
+    if (idx >= 3) return; // max 3 displayed
+    const lineEl = document.createElement('div');
+    lineEl.style.cssText = 'font-size:0.85em;color:#4a9eff;cursor:pointer;text-decoration:underline;padding:1px 0;';
+    lineEl.title = 'Cliquer pour accéder à cette ligne dans l\'arbre';
+    lineEl.textContent = `• ${getPathString(n) || n.san}`;
+    lineEl.addEventListener('click', () => {
+      // Trouver l'index du répertoire racine contenant ce nœud
+      const repIdx = state.repertoires.findIndex(r => isDescendantOf(r, n) || r === n);
+      if (repIdx !== -1) {
+        state.activeRepIndex = repIdx;
+      }
+      state.currentNode = n;
+      state.chess.load(n.fen);
+      Object.keys(state.openPanels).forEach(k => { state.openPanels[k] = false; });
+      state.openPanels.arbre = true;
+      closeModals();
+      render();
+    });
+    listDiv.appendChild(lineEl);
+  });
+
+  container.appendChild(listDiv);
 
   if (missingNodes.length > 3) {
     const tail = document.createElement('div');
@@ -2109,6 +2647,8 @@ function _doStartTraining() {
   state.trainingTotalTargets = collectTrainableTargetsCount(startNode);
   state.trainingSurvivalMaxLives = SURVIVAL_LIVES;
   state.trainingSurvivalLives = SURVIVAL_LIVES;
+  state.trainingSurvivalGoldenHeart = false;
+  state.trainingSurvivalMilestones = 0;
   state.trainingSurvivalMistakes = [];
   state.trainingLastSurvivalReport = null;
   const repIdx = findRepIndexForNode(startNode);
@@ -2142,6 +2682,8 @@ function stopTraining() {
   state.trainingExpectedChildId = null;
   state.trainingTotalTargets = 0;
   state.trainingSurvivalLives = SURVIVAL_LIVES;
+  state.trainingSurvivalGoldenHeart = false;
+  state.trainingSurvivalMilestones = 0;
   state.trainingSurvivalMistakes = [];
   render();
 }
@@ -2210,24 +2752,82 @@ function renderTrainingConfirmModal() {
 
 function showTrainingDoneModal() {
   if (state.trainingMode === 'survival') {
-    const snapshot = getSurvivalProgressSnapshot();
-    const trainingRootBeforeStop = state.trainingRoot;
-    const trainingColorBeforeStop = state.trainingRepColor;
-    tryUpgradeRepertoireMedal(trainingRootBeforeStop, snapshot.progressPercent, trainingColorBeforeStop);
-    if (state.auth?.token && trainingRootBeforeStop?.id) {
-      apiRequest('/training-stats', {
-        method: 'POST',
-        token: state.auth.token,
-        body: { variantKey: String(trainingRootBeforeStop.id), score: snapshot.completed }
-      }).catch(() => {});
-    }
+    showTrainingSurvivalVictoryModal();
+    return;
   }
 
-  // Fin d'entrainement effective : on repasse en mode normal avant d'afficher la modale.
-  // Cela garantit que la bannière "mode entrainement" disparaît toujours.
   stopTraining();
-  document.getElementById('modal-overlay').style.display = 'flex';
+  state.modalOverlayEl.style.display = 'flex';
   document.getElementById('modal-training-done').style.display = 'block';
+}
+
+function showTrainingSurvivalVictoryModal() {
+  const snapshot = getSurvivalProgressSnapshot();
+  const trainingRootBeforeStop = state.trainingRoot;
+  const trainingColorBeforeStop = state.trainingRepColor;
+  tryUpgradeRepertoireMedal(trainingRootBeforeStop, snapshot.progressPercent, trainingColorBeforeStop);
+  if (state.auth?.token && trainingRootBeforeStop?.id) {
+    apiRequest('/training-stats', {
+      method: 'POST',
+      token: state.auth.token,
+      body: { variantKey: String(trainingRootBeforeStop.id), score: snapshot.completed }
+    }).catch(() => {});
+  }
+
+  const report = {
+    livesLeft: state.trainingSurvivalLives,
+    goldenHeart: state.trainingSurvivalGoldenHeart,
+    ...snapshot,
+    mistakes: (state.trainingSurvivalMistakes || []).slice(),
+    startNode: trainingRootBeforeStop,
+    repColor: trainingColorBeforeStop,
+  };
+  state.trainingLastVictoryReport = report;
+  state.trainingLastSurvivalReport = report; // pour le bouton "réessayer"
+
+  const earnedMeta = getMedalDisplayMeta(report.startNode);
+  const moveCount = countMoves(report.startNode, report.repColor);
+
+  const modalBody = document.getElementById('modal-training-victory-body');
+  if (modalBody) {
+    const scoreLine = `${report.completed}/${report.total}`;
+    const livesHtml = (() => {
+      let h = '';
+      for (let i = 0; i < SURVIVAL_LIVES; i++) {
+        h += i < report.livesLeft ? '♥' : '♡';
+      }
+      if (report.goldenHeart) h += ' <span style="color:#fbbf24;">♥</span>';
+      return h;
+    })();
+
+    const earnedMedalHtml = earnedMeta
+      ? `<div class="survival-earned-medal">
+          <div class="rep-medal-badge tier-${earnedMeta.tier}" data-shine="${earnedMeta.shine}">${earnedMeta.icon}</div>
+          <span class="survival-earned-medal-label">${earnedMeta.label}</span>
+        </div>`
+      : `<div class="survival-earned-medal">
+          <div class="rep-medal-badge">${getMedalIcon('none')}</div>
+          <span class="survival-earned-medal-label">${getMedalLabel('none')}</span>
+        </div>`;
+
+    const mistakesSummary = report.mistakes.length === 0
+      ? '<div class="survival-defeat-empty">Aucune erreur — performance parfaite ! 🎯</div>'
+      : `<div class="survival-defeat-empty">${report.mistakes.length} erreur${report.mistakes.length > 1 ? 's' : ''} commise${report.mistakes.length > 1 ? 's' : ''} en route.</div>`;
+
+    modalBody.innerHTML = `
+      <div class="survival-defeat-summary">
+        <div class="survival-defeat-score" style="font-size:1.1em;">Score final: <b>${scoreLine}</b></div>
+        <div style="font-size:1.4rem;letter-spacing:.12em;color:#fb7185;margin:4px 0;">${livesHtml}</div>
+        ${earnedMedalHtml}
+      </div>
+      ${mistakesSummary}
+    `;
+  }
+
+  stopTraining();
+  state.modalOverlayEl.style.display = 'flex';
+  const modal = document.getElementById('modal-training-victory');
+  if (modal) modal.style.display = 'block';
 }
 
 function renderMiniBoardFromFen(fen) {
@@ -2338,7 +2938,7 @@ function showTrainingDefeatModal() {
   }
 
   stopTraining();
-  document.getElementById('modal-overlay').style.display = 'flex';
+  state.modalOverlayEl.style.display = 'flex';
   const modal = document.getElementById('modal-training-defeat');
   if (modal) modal.style.display = 'block';
 }
@@ -2376,6 +2976,17 @@ export function retrySurvivalTraining() {
   _doStartTraining();
 }
 export function abandonSurvivalTraining() { closeModals(); }
+export function abandonSurvivalVictory() { closeModals(); }
+export function retrySurvivalVictory() {
+  const report = state.trainingLastVictoryReport;
+  if (!report?.startNode) { closeModals(); return; }
+  pendingTrainingNode = report.startNode;
+  pendingTrainingColor = report.repColor;
+  pendingTrainingMode = 'survival';
+  pendingTrainingMissingNodes = collectMissingReplyNodes(report.startNode, report.repColor);
+  closeModals();
+  _doStartTraining();
+}
 export function confirmTrainingInterrupt() {
   const action = pendingTrainingInterruptAction;
   pendingTrainingInterruptAction = null;
@@ -2478,7 +3089,9 @@ function createSection(label, items, key, container) {
     return dz;
   }
 
-  items.forEach(({ rep, index }) => {
+  // ── Construction des éléments répertoire ──────────────────────────────
+  // On construit d'abord les wraps, puis on les regroupe par dossier.
+  const builtItems = items.map(({ rep, index }) => {
     const wrap = document.createElement('div');
     wrap.className = 'rep-item-wrapper';
     const repHeader = document.createElement('div');
@@ -2532,55 +3145,128 @@ function createSection(label, items, key, container) {
     const subContainer = document.createElement('div');
     subContainer.className = 'sub-variants-container';
 
-    function buildSubVarTree(node, depth = 0) {
+    // ── Render one named variant item ─────────────────────────────────
+    function renderVariantItem(child, d) {
+      const item = document.createElement('div');
+      item.className = `sub-var-item ${state.currentNode.id === child.id ? 'active' : ''}`;
+      item.style.marginLeft = d * 15 + 'px';
+      const subVarMain = document.createElement('div');
+      subVarMain.className = 'sub-var-main';
+      if (hasNamedDescendants(child)) {
+        subVarMain.appendChild(makeRepToggle(child.id));
+      }
+      const nameSpan = document.createElement('span');
+      nameSpan.style.cssText = 'flex:1;min-width:0;';
+      const childAnnotStyle = ANNOTATION_STYLE[child.varAnnotation] || null;
+      nameSpan.innerHTML = `${child.varName}${child.varAnnotation ? ` <span class="annotation-tag"${childAnnotStyle ? ` style="color:${childAnnotStyle.color}"` : ''}>${child.varAnnotation}</span>` : ''}`;
+      subVarMain.appendChild(nameSpan);
+      const childMedalMeta = getMedalDisplayMeta(child);
+      if (childMedalMeta) {
+        const childMedalEl = document.createElement('div');
+        childMedalEl.className = `rep-medal-badge tier-${childMedalMeta.tier}`;
+        childMedalEl.dataset.shine = String(childMedalMeta.shine);
+        childMedalEl.title = `${childMedalMeta.label} · niveau ${childMedalMeta.shine + 1}`;
+        childMedalEl.textContent = childMedalMeta.icon;
+        subVarMain.appendChild(childMedalEl);
+      }
+      item.appendChild(subVarMain);
+      const moveCount = countMoves(child, rep.color);
+      const trainBtn = document.createElement('button');
+      trainBtn.className = 'train-btn';
+      trainBtn.textContent = `S'entraîner (${moveCount} coups)`;
+      trainBtn.onclick = e => { e.stopPropagation(); showTrainingConfirmModal(child, rep.color); };
+      item.appendChild(trainBtn);
+      item.onclick = e => {
+        e.stopPropagation();
+        if (state.trainingActive) return;
+        state.activeRepIndex = index;
+        state.currentNode = child;
+        expandPathToCurrentNode();
+        state.chess.load(state.currentNode.fen);
+        state.boardFlipped = rep.color === 'b';
+        render();
+      };
+      item.oncontextmenu = e => handleRightClick(e, 'repertoire_subitem', child);
+      subContainer.appendChild(item);
+      if (state.repExpanded.has(child.id)) {
+        buildSubVarTree(child, d + 1, new Set());
+      }
+    }
+
+    // ── Walk sub-variant tree, grouping by folderId ───────────────────
+    function buildSubVarTree(node, depth = 0, processedFolderIds = new Set()) {
+      const folders = loadFolders();
       node.children.forEach(child => {
-        if (child.varName) {
-          const item = document.createElement('div');
-          item.className = `sub-var-item ${state.currentNode.id === child.id ? 'active' : ''}`;
-          item.style.marginLeft = depth * 15 + 'px';
-          const subVarMain = document.createElement('div');
-          subVarMain.className = 'sub-var-main';
-          if (hasNamedDescendants(child)) {
-            subVarMain.appendChild(makeRepToggle(child.id));
+        if (!child.varName) {
+          buildSubVarTree(child, depth, processedFolderIds);
+          return;
+        }
+
+        const fid = child.folderId || null;
+        const hasFolderDef = fid && folders[fid];
+
+        if (!hasFolderDef) {
+          renderVariantItem(child, depth);
+          return;
+        }
+
+        // Folder: render once on first encounter
+        if (processedFolderIds.has(fid)) return;
+        processedFolderIds.add(fid);
+
+        // All direct siblings belonging to this folder
+        const members = node.children.filter(c => c.varName && c.folderId === fid);
+        const folderKey = '__var_folder__' + fid;
+        const folderOpen = state.repExpanded.has(folderKey + '__open')
+          || !state.repExpanded.has(folderKey + '__closed');
+
+        // Folder header — styled exactly like a sub-var-item
+        const folderItem = document.createElement('div');
+        folderItem.className = 'sub-var-item';
+        folderItem.style.marginLeft = depth * 15 + 'px';
+        folderItem.style.cursor = 'default';
+
+        const folderMain = document.createElement('div');
+        folderMain.className = 'sub-var-main';
+
+        const toggle = document.createElement('div');
+        toggle.className = 'tree-toggle';
+        toggle.textContent = folderOpen ? '−' : '+';
+        toggle.onclick = e => {
+          e.stopPropagation();
+          if (folderOpen) {
+            state.repExpanded.add(folderKey + '__closed');
+            state.repExpanded.delete(folderKey + '__open');
+          } else {
+            state.repExpanded.delete(folderKey + '__closed');
+            state.repExpanded.add(folderKey + '__open');
           }
-          const nameSpan = document.createElement('span');
-          nameSpan.style.cssText = 'flex:1;min-width:0;';
-          const childAnnotStyle = ANNOTATION_STYLE[child.varAnnotation] || null;
-          nameSpan.innerHTML = `${child.varName}${child.varAnnotation ? ` <span class="annotation-tag"${childAnnotStyle ? ` style="color:${childAnnotStyle.color}"` : ''}>${child.varAnnotation}</span>` : ''}`;  
-          subVarMain.appendChild(nameSpan);
-          const childMedalMeta = getMedalDisplayMeta(child);
-          if (childMedalMeta) {
-            const childMedalEl = document.createElement('div');
-            childMedalEl.className = `rep-medal-badge tier-${childMedalMeta.tier}`;
-            childMedalEl.dataset.shine = String(childMedalMeta.shine);
-            childMedalEl.title = `${childMedalMeta.label} · niveau ${childMedalMeta.shine + 1}`;
-            childMedalEl.textContent = childMedalMeta.icon;
-            subVarMain.appendChild(childMedalEl);
+          render();
+        };
+        folderMain.appendChild(toggle);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.style.cssText = 'flex:1;min-width:0;';
+        nameSpan.textContent = '📁 ' + folders[fid];
+        folderMain.appendChild(nameSpan);
+
+        folderItem.appendChild(folderMain);
+        subContainer.appendChild(folderItem);
+        folderItem.onclick = e => {
+          e.stopPropagation();
+          if (folderOpen) {
+            state.repExpanded.add(folderKey + '__closed');
+            state.repExpanded.delete(folderKey + '__open');
+          } else {
+            state.repExpanded.delete(folderKey + '__closed');
+            state.repExpanded.add(folderKey + '__open');
           }
-          item.appendChild(subVarMain);
-          const moveCount = countMoves(child, rep.color);
-          const trainBtn = document.createElement('button');
-          trainBtn.className = 'train-btn';
-          trainBtn.textContent = `S'entraîner (${moveCount} coups)`;
-          trainBtn.onclick = e => { e.stopPropagation(); showTrainingConfirmModal(child, rep.color); };
-          item.appendChild(trainBtn);
-          item.onclick = e => {
-            e.stopPropagation();
-            if (state.trainingActive) return;
-            state.activeRepIndex = index;
-            state.currentNode = child;
-            expandPathToCurrentNode();
-            state.chess.load(state.currentNode.fen);
-            state.boardFlipped = rep.color === 'b';
-            render();
-          };
-          item.oncontextmenu = e => handleRightClick(e, 'repertoire_subitem', child);
-          subContainer.appendChild(item);
-          if (state.repExpanded.has(child.id)) {
-            buildSubVarTree(child, depth + 1);
-          }
-        } else {
-          buildSubVarTree(child, depth);
+          render();
+        };
+        folderItem.oncontextmenu = e => openFolderCtxMenu(e, fid, false);
+
+        if (folderOpen) {
+          members.forEach(m => renderVariantItem(m, depth + 1));
         }
       });
     }
@@ -2610,9 +3296,92 @@ function createSection(label, items, key, container) {
       content.querySelectorAll('.rep-drop-zone').forEach(el => el.classList.remove('active'));
     });
 
-    content.appendChild(makeDropZone(rep.id));
-    content.appendChild(wrap);
+    return { rep, index, wrap };
   });
+
+  // ── Groupement par dossier et insertion dans content ──────────────────
+  const folders = loadFolders();
+  const renderedFolderIds = new Set();
+
+  builtItems.forEach(({ rep, index, wrap }) => {
+    const fid = rep.folderId || null;
+
+    if (!fid || !folders[fid]) {
+      // Pas de dossier : insertion directe
+      content.appendChild(makeDropZone(rep.id));
+      content.appendChild(wrap);
+      return;
+    }
+
+    // Dossier : créer le conteneur la première fois qu'on rencontre ce folderId
+    if (!renderedFolderIds.has(fid)) {
+      renderedFolderIds.add(fid);
+
+      // Tous les wraps appartenant à ce dossier (dans l'ordre de builtItems)
+      const folderWraps = builtItems.filter(b => b.rep.folderId === fid);
+      const folderEl = document.createElement('div');
+      folderEl.className = 'rep-folder';
+
+      const folderHeader = document.createElement('div');
+      folderHeader.className = 'rep-folder-header';
+      const isExpanded = !state.repExpanded.has('__folder__' + fid) === false
+        || state.repExpanded.has('__folder__' + fid);
+      // Par défaut, les dossiers sont ouverts
+      const folderOpen = state.repExpanded.has('__folder__' + fid + '__open')
+        || !state.repExpanded.has('__folder__' + fid + '__closed');
+
+      const folderToggle = document.createElement('span');
+      folderToggle.className = 'folder-toggle';
+      folderToggle.textContent = folderOpen ? '▼' : '▶';
+      folderToggle.style.cssText = 'margin-right:6px;font-size:.75em;';
+
+      const folderIcon = document.createElement('span');
+      folderIcon.textContent = '📁 ';
+
+      const folderName = document.createElement('span');
+      folderName.textContent = folders[fid];
+      folderName.style.fontWeight = '600';
+
+      const folderCount = document.createElement('span');
+      folderCount.style.cssText = 'margin-left:6px;font-size:.8em;color:var(--text-muted,#aaa);';
+      folderCount.textContent = `(${folderWraps.length})`;
+
+      folderHeader.appendChild(folderToggle);
+      folderHeader.appendChild(folderIcon);
+      folderHeader.appendChild(folderName);
+      folderHeader.appendChild(folderCount);
+      folderHeader.style.cssText = 'display:flex;align-items:center;padding:6px 8px;cursor:pointer;border-radius:6px;';
+      folderHeader.onmouseenter = () => { folderHeader.style.background = 'var(--hover-bg,#2a2a2a)'; };
+      folderHeader.onmouseleave = () => { folderHeader.style.background = 'transparent'; };
+      folderHeader.onclick = () => {
+        if (folderOpen) {
+          state.repExpanded.add('__folder__' + fid + '__closed');
+          state.repExpanded.delete('__folder__' + fid + '__open');
+        } else {
+          state.repExpanded.delete('__folder__' + fid + '__closed');
+          state.repExpanded.add('__folder__' + fid + '__open');
+        }
+        render();
+      };
+      folderHeader.oncontextmenu = (e) => openFolderCtxMenu(e, fid, true);
+
+      const folderBody = document.createElement('div');
+      folderBody.style.display = folderOpen ? 'block' : 'none';
+      folderBody.className = 'rep-folder-body';
+
+      folderWraps.forEach(b => {
+        folderBody.appendChild(makeDropZone(b.rep.id));
+        folderBody.appendChild(b.wrap);
+      });
+      folderBody.appendChild(makeDropZone(null));
+
+      folderEl.appendChild(folderHeader);
+      folderEl.appendChild(folderBody);
+      content.appendChild(folderEl);
+    }
+    // Si déjà rendu dans un dossier, ne rien faire (déjà ajouté)
+  });
+
   content.appendChild(makeDropZone(null));
 
   section.appendChild(content);
@@ -2641,14 +3410,35 @@ function findLastUniquePosition(node) {
 function renderSurvivalMonitorPanel(container) {
   const snapshot = getSurvivalProgressSnapshot();
   const lives = Math.max(0, state.trainingSurvivalLives || 0);
-  const maxLives = Math.max(1, state.trainingSurvivalMaxLives || SURVIVAL_LIVES);
-  const hearts = Array.from({ length: maxLives }, (_, idx) => idx < lives ? '♥' : '♡').join(' ');
+  const hasGolden = !!state.trainingSurvivalGoldenHeart;
   const progressValue = Math.min(100, Math.max(0, snapshot.progressPercent));
   const progressText = `${Math.round(snapshot.progressPercent)}%`;
 
+  // Construire les spans de cœurs individuels
+  let heartsHtml = '';
+  for (let i = 0; i < SURVIVAL_LIVES; i++) {
+    if (i < lives) {
+      heartsHtml += '<span class="survival-heart">♥</span>';
+    } else {
+      heartsHtml += '<span class="survival-heart is-empty">♡</span>';
+    }
+  }
+  if (hasGolden) {
+    heartsHtml += ' <span class="survival-heart is-golden">♥</span>';
+  }
+
+  // Indice de progression vers la prochaine vie bonus
+  const correct = snapshot.correct || 0;
+  const nextMilestone = (state.trainingSurvivalMilestones + 1) * SURVIVAL_LIFE_BONUS_INTERVAL;
+  const untilBonus = nextMilestone - correct;
+  const bonusHint = (lives < SURVIVAL_LIVES || !hasGolden)
+    ? `<div class="survival-monitor-row" style="font-size:.7rem;color:var(--text-muted,#aaa);">Prochain ♥ dans <b>${untilBonus}</b> coup${untilBonus > 1 ? 's' : ''}</div>`
+    : '';
+
   container.innerHTML = `
     <div class="survival-monitor-card">
-      <div class="survival-monitor-lives">Vies: <span class="survival-monitor-hearts">${hearts}</span></div>
+      <div class="survival-monitor-lives">Vies: <span class="survival-monitor-hearts">${heartsHtml}</span></div>
+      ${bonusHint}
       <div class="survival-monitor-row">
         <span>Progression</span>
         <strong>${progressText}</strong>
@@ -3065,12 +3855,13 @@ export function confirmAuthGuest() {
   render();
 }
 
-export function logoutAccount() {
-  logoutSession();
-  closeModals();
-  // Masquer toutes les vues et retourner à la page d'accueil (mode invité)
-  showHomeView();
-  render();
+export async function logoutAccount() {
+  await logoutSession();
+  // Rediriger vers l'accueil seulement si la déconnexion a réussi (état effacé)
+  if (!state.auth.user) {
+    closeModals();
+    showHomeView();
+  }
 }
 
 /* ========== MODALE PROFIL / PARAMÈTRES ========== */

@@ -54,8 +54,11 @@ export const state = {
   trainingTotalTargets: 0,
   trainingSurvivalLives: 3,
   trainingSurvivalMaxLives: 3,
+  trainingSurvivalGoldenHeart: false, // vie bonus dorée (au-delà de 3)
+  trainingSurvivalMilestones: 0,      // nb de fois où on a gagné une vie (+1 par tranche de 20 coups)
   trainingSurvivalMistakes: [], // [{ nodeId, fen, path, expectedSan, playedSan, nodeTurn }]
   trainingLastSurvivalReport: null,
+  trainingLastVictoryReport: null,
   trainingFeedback: null,   // { type: 'correct'|'wrong'|'retry', from: sq, to: sq }
   boardEl: null,
   ctxMenuEl: null,
@@ -101,6 +104,13 @@ export const state = {
   isGuestMode: false,
   userData: null,
   authMode: 'login',
+
+  // ── Dossiers de répertoires/variantes ────────────────────────────────
+  // { [folderId: string]: folderName: string }
+  repFolders: {},
+  // Sélection temporaire lors de la création d'un répertoire
+  pendingNewRepFolderId: null,   // string folderId | '__new__' | null
+  pendingNewRepFolderName: null, // nom du nouveau dossier si '__new__'
 
   // ── DOM references (assignées au démarrage dans main.js) ─────────────
   dynamicModals: null

@@ -6,6 +6,7 @@ import { initDomBindings } from './domBindings.js';
 import { loadState } from './storage.js';
 
 const BOARD_THEME_KEY = 'alphaChess.boardTheme';
+const FOLDERS_KEY = 'alphaChess.repFolders';
 
 function assignDomReferences() {
   state.boardEl = document.getElementById('board');
@@ -21,6 +22,12 @@ async function initializeApp() {
   const savedTheme = loadState(BOARD_THEME_KEY);
   if (savedTheme?.light && savedTheme?.dark) {
     state.boardTheme = savedTheme;
+  }
+
+  // Restaurer les dossiers de répertoires depuis le localStorage
+  const savedFolders = loadState(FOLDERS_KEY);
+  if (savedFolders && typeof savedFolders === 'object') {
+    state.repFolders = savedFolders;
   }
 
   assignDomReferences();

@@ -526,6 +526,28 @@ body {
   line-height: 1;
 }
 
+/* Coeur individuel dans le moniteur de survie */
+.survival-heart {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.survival-heart.is-golden {
+  color: #fbbf24;
+  text-shadow: 0 0 6px rgba(251,191,36,0.7);
+}
+.survival-heart.is-empty {
+  color: rgba(148,163,184,0.4);
+}
+/* Animation d'arrivée d'un nouveau coeur */
+@keyframes heartArrival {
+  0%   { transform: scale(0) translateY(-12px); opacity: 0; }
+  60%  { transform: scale(1.35) translateY(0);  opacity: 1; }
+  100% { transform: scale(1)    translateY(0);  opacity: 1; }
+}
+.survival-heart.arriving {
+  animation: heartArrival 0.45s cubic-bezier(.17,.67,.51,1.4) forwards;
+}
+
 .survival-monitor-row {
   display: flex;
   align-items: center;
@@ -3737,6 +3759,7 @@ body {
   <div class="menu-item opt-name-var" style="display:none" data-menu-action="name-variation">Nommer la variante</div>
   <div class="menu-item opt-add-tree" style="display:none" data-menu-action="add-to-tree">Ajouter à l'arbre</div>
   <div class="menu-item opt-open-in-tree" style="display:none" data-menu-action="open-in-tree">Ouvrir dans l'arbre</div>
+  <div class="menu-item opt-group-folder" style="display:none" data-menu-action="group-folder">📁 Grouper en dossier</div>
   <div class="menu-item opt-comment" data-menu-action="comment">Commenter</div>
   <div class="menu-item opt-delete" style="color:#f87171" data-menu-action="delete">Supprimer</div>
   <div class="ctx-annot-section">
@@ -3757,7 +3780,36 @@ body {
 </div><!-- /#view-app -->
 
 
-<!-- SPLASH SCREEN -->
+<!-- MODAL DOSSIER (grouper répertoires/variantes) -->
+<div id="modal-overlay-folder" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10100;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-color,#1e1e1e);border:1px solid var(--border-color,#444);border-radius:10px;padding:24px 28px;min-width:340px;max-width:480px;width:92%;max-height:80vh;display:flex;flex-direction:column;gap:14px;">
+    <h3 id="modal-folder-title" style="margin:0;font-size:1.05em;">📁 Grouper en dossier</h3>
+    <div>
+      <label style="font-size:.85em;color:var(--text-muted,#aaa);">Nom du dossier</label>
+      <input id="folder-name-input" type="text" placeholder="Ex: Défense française" maxlength="60"
+        style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--border-color,#555);border-radius:6px;background:var(--input-bg,#2a2a2a);color:var(--text-color,#eee);font-size:.9em;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="font-size:.85em;color:var(--text-muted,#aaa);">Éléments à inclure</label>
+      <div id="folder-items-list" style="margin-top:6px;max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap;">
+      <button id="btn-folder-remove" style="display:none;padding:7px 14px;border:1px solid #f87171;border-radius:6px;background:transparent;color:#f87171;cursor:pointer;font-size:.85em;">Retirer du dossier</button>
+      <button id="btn-folder-cancel" style="padding:7px 14px;border:1px solid var(--border-color,#555);border-radius:6px;background:transparent;color:var(--text-muted,#aaa);cursor:pointer;font-size:.85em;">Annuler</button>
+      <button id="btn-folder-save" style="padding:7px 16px;border:none;border-radius:6px;background:#4a9eff;color:#fff;cursor:pointer;font-size:.85em;font-weight:600;">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- FOLDER CONTEXT MENU -->
+<div id="folder-ctx-menu" style="display:none;position:fixed;z-index:10200;background:var(--bg-color,#1e1e1e);border:1px solid var(--border-color,#444);border-radius:8px;padding:6px 0;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);">
+  <div class="menu-item" id="folder-ctx-rename">Renommer le dossier</div>
+  <div class="menu-item" id="folder-ctx-ungroup">Dégrouper (garder le contenu)</div>
+  <div class="menu-item" id="folder-ctx-delete" style="color:#f87171;">Supprimer le dossier et son contenu</div>
+</div>
+
+
 <div id="splash-screen" class="hidden">
   <div class="splash-content">
     <!-- Section bienvenue (accueil) -->
@@ -3828,6 +3880,19 @@ body {
 
 <div id="modal-overlay">
 
+<!-- MODAL RENOMMER DOSSIER -->
+<div class="modal-box" id="modal-rename-folder" style="display:none">
+  <h3>Renommer le dossier</h3>
+  <div style="margin-bottom:16px;">
+    <input id="rename-folder-input" type="text" maxlength="60" autocomplete="off" placeholder="Nom du dossier"
+      style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius:5px; box-sizing:border-box; font-size:0.95rem;">
+  </div>
+  <div class="modal-actions">
+    <button class="ctrl-btn" id="btn-rename-folder-cancel">Annuler</button>
+    <button class="ctrl-btn" id="btn-rename-folder-save">Enregistrer</button>
+  </div>
+</div>
+
 <!-- MODAL GESTION DE COMPTE -->
 <div class="modal-box" id="modal-account" style="display:none">
   <h3 id="account-modal-title">Se connecter</h3>
@@ -3875,6 +3940,14 @@ body {
 </div>
 
 <input type="text" id="rep-name-input" placeholder="Ex: Gambit Dame" style="width:100%; padding:12px; background:#111; color:white; border:1px solid #333; border-radius: 5px; box-sizing:border-box;">
+
+<div id="rep-folder-container" style="margin-top:12px;">
+  <label for="rep-folder-select" style="font-size:0.82rem;color:var(--text-muted,#94a3b8);display:block;margin-bottom:5px;">Dossier</label>
+  <select id="rep-folder-select" style="width:100%;padding:10px;background:#111;color:white;border:1px solid #333;border-radius:5px;cursor:pointer;">
+    <option value="">Aucun dossier</option>
+  </select>
+  <input type="text" id="rep-folder-new-name" placeholder="Nom du nouveau dossier" style="display:none;width:100%;margin-top:8px;padding:10px;background:#111;color:white;border:1px solid #333;border-radius:5px;box-sizing:border-box;">
+</div>
 
 <div id="rep-current-info" style="display:none; margin-top:12px; color:#cfcfcf; font-size:14px;">La ligne actuellement affichée dans le moniteur sera intégrée au nouveau répertoire.</div>
 
@@ -3964,6 +4037,15 @@ body {
   <div class="modal-body">Vous avez parcouru toutes les variantes de cet entraînement.</div>
   <div class="modal-actions">
     <button class="ctrl-btn" id="btn-training-done-close">Retour</button>
+  </div>
+</div>
+
+<div class="modal-box" id="modal-training-victory" style="display:none">
+  <h3>🏆 Victoire !</h3>
+  <div class="modal-body" id="modal-training-victory-body"></div>
+  <div class="modal-actions">
+    <button class="ctrl-btn" id="btn-training-victory-abandon">Retour</button>
+    <button class="ctrl-btn" id="btn-training-victory-retry">Réessayer</button>
   </div>
 </div>
 
