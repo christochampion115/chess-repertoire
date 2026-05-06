@@ -73,6 +73,8 @@ const BUTTON_BINDINGS = [
   ['btn-training-done-close',          () => ui.closeTrainingDone()],
   ['btn-training-defeat-retry',        () => ui.retrySurvivalTraining()],
   ['btn-training-defeat-abandon',      () => ui.abandonSurvivalTraining()],
+  ['btn-training-victory-retry',       () => ui.retrySurvivalVictory()],
+  ['btn-training-victory-abandon',     () => ui.abandonSurvivalVictory()],
 
   // ── Médailles ──
   ['btn-medals-close',           () => ui.closeModals()],
@@ -133,6 +135,14 @@ function initCoreUiBindings() {
     modalOverlay.dataset.overlaybound = '1';
   }
 
+  const folderOverlay = document.getElementById('modal-overlay-folder');
+  if (folderOverlay && !folderOverlay.dataset.overlaybound) {
+    folderOverlay.addEventListener('click', (event) => {
+      if (event.target === folderOverlay) folderOverlay.style.display = 'none';
+    });
+    folderOverlay.dataset.overlaybound = '1';
+  }
+
   const board = document.getElementById('board');
   if (board && !board.dataset.ctxbound) {
     board.addEventListener('contextmenu', (event) => ui.handleRightClick(event, 'board'));
@@ -185,6 +195,7 @@ function initCoreUiBindings() {
         if (action === 'name-variation') ui.openNameVarModal();
         if (action === 'add-to-tree') ui.addSelectedMoveToTree();
         if (action === 'open-in-tree') ui.openCurrentNodeInTree();
+        if (action === 'group-folder') ui.openFolderGroupModal();
         if (action === 'comment') ui.openCommentModal();
         if (action === 'delete') ui.openDeleteClick();
         return;

@@ -2,6 +2,9 @@ import { state } from './state.js';
 import { eventBus } from './events.js';
 import { isDescendant, getPathString } from './arbre.js';
 import { scheduleRepertoireSync, registerCreatedRepertoire, deleteRepertoireFromBackend } from './auth.js';
+import { loadState, saveState } from './storage.js';
+
+const FOLDERS_KEY = 'alphaChess.repFolders';
 
 export function normalizeFen(fen) {
   return fen.split(' ')[0];
@@ -43,6 +46,26 @@ export function createNewRepertoire(config = null) {
     varAnnotation: '',
     isExample: isExample
   };
+
+  // Appliquer le dossier sélectionné dans la modale (si applicable)
+  if (!config?.isExample && state.pendingNewRepFolderId) {
+    let folderId = state.pendingNewRepFolderId;
+    if (folderId === '__new__') {
+      const newName = state.pendingNewRepFolderName?.trim() || '';
+      if (newName) {
+        folderId = 'folder_' + Math.random().toString(36).substr(2, 9);
+        const folders = loadState(FOLDERS_KEY) || {};
+        folders[folderId] = newName;
+        saveState(FOLDERS_KEY, folders);
+        state.repFolders = { ...folders };
+      } else {
+        folderId = null;
+      }
+    }
+    if (folderId) newRep.folderId = folderId;
+    state.pendingNewRepFolderId = null;
+    state.pendingNewRepFolderName = null;
+  }
 
   state.repertoires.push(newRep);
   state.activeRepIndex = state.repertoires.length - 1;
@@ -609,7 +632,12 @@ export function handleSquareClick(sq) {
           // Coup incorrect : en survie, on consomme une vie puis on passe à la suite.
           state.trainingFeedback = { type: 'wrong', from: fromSq, to: sq };
           if (state.trainingMode === 'survival') {
-            state.trainingSurvivalLives = Math.max(0, (state.trainingSurvivalLives || 0) - 1);
+            // Le cœur doré est perdu en premier (et sans laisser de cadavre)
+            if (state.trainingSurvivalGoldenHeart) {
+              state.trainingSurvivalGoldenHeart = false;
+            } else {
+              state.trainingSurvivalLives = Math.max(0, (state.trainingSurvivalLives || 0) - 1);
+            }
             state.trainingSkippedByError.add(testedNodeId);
             state.trainingCompletedTargets.add(testedNodeId);
             state.trainingVisited.add(testedNodeId);
@@ -628,7 +656,7 @@ export function handleSquareClick(sq) {
             state.trainingFeedback = null;
             eventBus.emit('render');
             if (state.trainingMode === 'survival') {
-              if (state.trainingSurvivalLives <= 0) {
+              if (state.trainingSurvivalLives <= 0 && !state.trainingSurvivalGoldenHeart) {
                 eventBus.emit('trainingSurvivalDefeat');
               } else {
                 eventBus.emit('trainingPlayerMoved');

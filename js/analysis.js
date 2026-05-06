@@ -752,6 +752,8 @@ function attachAnalysisMoveHover(moveEl, moveUci, moveSan) {
 
 export function renderAnalysisPanel(panel) {
   if (!panel) return;
+  // Nettoyer les tooltips orphelins avant de reconstruire le panneau
+  document.querySelectorAll('.move-hover-tooltip').forEach(el => el.remove());
 
   if (!state.isAnalysisEnabled) {
     panel.innerHTML = '';

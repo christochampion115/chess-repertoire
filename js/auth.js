@@ -151,6 +151,14 @@ function shouldPreferLocalRepertoire(localRepertoire, remoteRepertoire) {
     return false;
   }
 
+  // Priorité à l'horodatage de modification explicite (mis à jour à chaque sync)
+  const localUpdatedAt = Number(localRepertoire.updatedAt) || 0;
+  const remoteUpdatedAt = Number(remoteRepertoire.updatedAt) || 0;
+  if (localUpdatedAt !== remoteUpdatedAt) {
+    return localUpdatedAt > remoteUpdatedAt;
+  }
+
+  // Fallback sur les métriques de l'arbre (nombre de nœuds puis date de création)
   const localMetrics = collectRepertoireMetrics(localRepertoire);
   const remoteMetrics = collectRepertoireMetrics(remoteRepertoire);
 
@@ -884,14 +892,23 @@ function getRepertoireForCurrentNode() {
   return state.repertoires.find(r => String(r.id) === String(temp.id)) || null;
 }
 
-export function scheduleRepertoireSync() {
+export function scheduleRepertoireSync(forceRepId = null) {
   const repForNode = getRepertoireForCurrentNode();
   const activeRep = getActiveRepertoire();
   window.DEBUG_MODE && console.log('[DEBUG]', { step: 'scheduleRepertoireSync', activeRepIndex: state.activeRepIndex, repForNodeId: repForNode?.id, repForNodeName: repForNode?.name, activeRepId: activeRep?.id, hasToken: !!state.auth.token, hasUser: !!state.auth.user });
-  persistLocalRepertoires();
 
   // Priorité au répertoire contenant currentNode ; fallback sur le répertoire actif
-  const activeRepertoire = getRepertoireForCurrentNode() || getActiveRepertoire();
+  const activeRepertoire = forceRepId
+    ? state.repertoires.find(r => String(r.id) === String(forceRepId)) || null
+    : (getRepertoireForCurrentNode() || getActiveRepertoire());
+
+  // Marquer la version locale comme plus récente que toute version distante
+  if (activeRepertoire) {
+    activeRepertoire.updatedAt = Date.now();
+  }
+
+  persistLocalRepertoires();
+
   if (activeRepertoire) {
     dirtyRepertoireIds.add(String(activeRepertoire.id));
   }
