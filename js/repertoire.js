@@ -67,6 +67,12 @@ export function createNewRepertoire(config = null) {
     state.pendingNewRepFolderName = null;
   }
 
+  // Index FEN → nœud pour la détection de transpositions en O(1).
+  // Clé : normalizeFen(fen), valeur : premier nœud créé avec cette position.
+  // Non sérialisé — reconstruit à la demande pour les répertoires chargés.
+  newRep._fenIndex = new Map();
+  newRep._fenIndex.set(normalizeFen(newRep.fen), newRep);
+
   state.repertoires.push(newRep);
   state.activeRepIndex = state.repertoires.length - 1;
   state.boardFlipped = color === 'b';
@@ -155,6 +161,16 @@ function buildRepertoireFromMoves(moves, fallbackName) {
   resetBoardToNewRepertoire(newRep);
 }
 
+// Table de conversion NAG → symbole d'annotation
+const NAG_ANNOTATION_MAP = {
+  '$1': '!',   // Bon coup
+  '$2': '?',   // Coup faible
+  '$3': '!!',  // Coup brillant
+  '$4': '??',  // Gaffe
+  '$5': '!?',  // Coup intéressant
+  '$6': '?!',  // Coup douteux
+};
+
 function importPgnVariationTree(moves, parent) {
   // ── Passe 1 : construire TOUTE la ligne principale en premier ──────────────
   // Cela garantit que les nœuds de la ligne principale ont un createdAt
@@ -165,15 +181,26 @@ function importPgnVariationTree(moves, parent) {
   let currentParent = parent;
 
   for (const move of moves) {
+    // Bug 1 – Ignorer les tokens de fin de partie ("1-0", "0-1", "1/2-1/2", "*")
+    // ainsi que tout objet qui n'est pas un demi-coup (ex. résultat inséré par le parseur)
     const san = move?.notation?.notation;
-    if (!san) {
-      throw new Error('PGN invalide');
-    }
+    if (!san) continue;
 
     const branchParent = currentParent;
     const nextNode = addMove(branchParent, san);
     if (!nextNode) {
-      throw new Error('Import impossible');
+      // Coup illégal dans le fichier PGN : on l'ignore plutôt que de tout abandonner
+      continue;
+    }
+
+    // Bug 2 – Importer le commentaire associé au coup
+    const rawComment = (move.commentAfter || move.commentMove || '').trim();
+    if (rawComment) nextNode.comment = rawComment;
+
+    // Bug 3 – Convertir le premier NAG pertinent en symbole d'annotation
+    if (Array.isArray(move.nag) && move.nag.length > 0 && !nextNode.annotation) {
+      const symbol = NAG_ANNOTATION_MAP[move.nag[0]];
+      if (symbol) nextNode.annotation = symbol;
     }
 
     mainLineEntries.push({ move, branchParent });
@@ -181,7 +208,14 @@ function importPgnVariationTree(moves, parent) {
   }
 
   // ── Passe 2 : traiter les variantes maintenant que la ligne principale existe ─
-  for (const { move, branchParent } of mainLineEntries) {
+  // On itère en sens INVERSE pour que les variantes des moves les plus profonds
+  // (fin de la ligne principale) soient créées EN PREMIER. Cela garantit que,
+  // lorsqu'une variante peu profonde atteint la même position qu'une continuation
+  // profonde, c'est la continuation profonde (visuellement plus haute dans l'arbre)
+  // qui devient la SOURCE de la transposition, et la variante peu profonde qui
+  // reçoit le symbole ↩ — jamais l'inverse.
+  for (let i = mainLineEntries.length - 1; i >= 0; i--) {
+    const { move, branchParent } = mainLineEntries[i];
     const variations = Array.isArray(move.variations)
       ? move.variations
       : (Array.isArray(move.ravs) ? move.ravs : []);
@@ -199,7 +233,15 @@ function buildRepertoireFromPgnMoves(moves, fallbackName) {
   const newRep = createNewRepertoire(getCreationConfig(fallbackName));
   if (!newRep) return;
 
-  importPgnVariationTree(moves, newRep);
+  // Bloquer la persistence à chaque nœud pendant l'import en masse.
+  // On persiste une seule fois à la fin, ce qui évite O(n) sérialisations.
+  state._suppressSync = true;
+  try {
+    importPgnVariationTree(moves, newRep);
+  } finally {
+    state._suppressSync = false;
+  }
+  scheduleRepertoireSync();
   resetBoardToNewRepertoire(newRep);
 }
 
@@ -233,6 +275,33 @@ function readSelectedPgnFile() {
   });
 }
 
+function showPgnImportLoader() {
+  const loader = document.getElementById('pgn-import-loading');
+  const btn = document.getElementById('btn-rep-confirm');
+  const bar = document.getElementById('pgn-import-progress-bar');
+  if (loader) loader.style.display = 'block';
+  if (btn) btn.disabled = true;
+  if (bar) {
+    bar.style.width = '0%';
+    // Animation indéterminée : monte à 85 % rapidement puis s'arrête
+    requestAnimationFrame(() => { bar.style.width = '30%'; });
+    setTimeout(() => { bar.style.width = '70%'; }, 300);
+    setTimeout(() => { bar.style.width = '85%'; }, 900);
+  }
+}
+
+function hidePgnImportLoader() {
+  const loader = document.getElementById('pgn-import-loading');
+  const btn = document.getElementById('btn-rep-confirm');
+  const bar = document.getElementById('pgn-import-progress-bar');
+  if (bar) bar.style.width = '100%';
+  setTimeout(() => {
+    if (loader) loader.style.display = 'none';
+    if (btn) btn.disabled = false;
+    if (bar) bar.style.width = '0%';
+  }, 300);
+}
+
 export async function confirmRepertoireCreation() {
   setRepCreateError('');
 
@@ -251,22 +320,30 @@ export async function confirmRepertoireCreation() {
 
     if (mode === 'pgn-file') {
       const file = document.getElementById('pgn-file-input')?.files?.[0];
+      showPgnImportLoader();
+      // Laisser le navigateur repeindre le DOM avant le traitement synchrone
+      await new Promise(resolve => setTimeout(resolve, 30));
       const pgn = await readSelectedPgnFile();
       const moves = importPGN(String(pgn).trim());
-      if (!moves.length) return;
+      if (!moves.length) { hidePgnImportLoader(); return; }
       const fallbackName = file?.name ? file.name.replace(/\.[^.]+$/, '') : 'Import PGN';
       buildRepertoireFromPgnMoves(moves, fallbackName || 'Import PGN');
+      hidePgnImportLoader();
       return;
     }
 
     if (mode === 'pgn-text') {
       const pgn = document.getElementById('pgn-import-input')?.value.trim() || '';
       if (!pgn) return;
+      showPgnImportLoader();
+      await new Promise(resolve => setTimeout(resolve, 30));
       const moves = importPGN(pgn);
-      if (!moves.length) return;
+      if (!moves.length) { hidePgnImportLoader(); return; }
       buildRepertoireFromPgnMoves(moves, 'Import PGN');
+      hidePgnImportLoader();
     }
   } catch (error) {
+    hidePgnImportLoader();
     setRepCreateError(error?.message === 'PGN invalide' ? 'PGN invalide.' : (error?.message || 'Import impossible.'));
   }
 }
@@ -523,7 +600,7 @@ export function addMove(parent, san) {
   }
 
   const now = nextCreatedAt();
-  const transpo = state.activeRepIndex !== -1 ? findTranspositionInActiveRep(targetFen, now) : null;
+  const transpo = state.activeRepIndex !== -1 ? findTranspositionFast(targetFen, now) : null;
   const node = {
     id: Math.random().toString(36).substr(2, 9),
     san: move.san,
@@ -542,8 +619,50 @@ export function addMove(parent, san) {
   };
   parent.children.push(node);
   state.treeExpanded.add(parent.id);
-  scheduleRepertoireSync();
+
+  // Enregistrer ce nœud dans l'index FEN (seulement s'il n'est pas une transposition)
+  if (!transpo && state.activeRepIndex !== -1) {
+    const rep = state.repertoires[state.activeRepIndex];
+    if (rep) {
+      if (!rep._fenIndex) buildFenIndex(rep);
+      const nf = normalizeFen(targetFen);
+      if (!rep._fenIndex.has(nf)) rep._fenIndex.set(nf, node);
+    }
+  }
+
+  if (!state._suppressSync) scheduleRepertoireSync();
   return node;
+}
+
+/**
+ * Construit (ou reconstruit) l'index FEN pour un répertoire chargé depuis le stockage,
+ * qui ne possède pas encore _fenIndex (champ non sérialisé).
+ * L'index mappe normalizeFen(fen) → nœud avec le createdAt le plus bas.
+ */
+function buildFenIndex(rep) {
+  const index = new Map();
+  function walk(node) {
+    const nf = normalizeFen(node.fen);
+    const existing = index.get(nf);
+    if (!existing || node.createdAt < existing.createdAt) index.set(nf, node);
+    for (const child of node.children) walk(child);
+  }
+  walk(rep);
+  rep._fenIndex = index;
+}
+
+/**
+ * Recherche de transposition en O(1) via l'index FEN.
+ * Remplace findTranspositionInActiveRep (DFS O(n)) pour les performances.
+ */
+function findTranspositionFast(fen, currentTime) {
+  if (state.activeRepIndex === -1) return null;
+  const rep = state.repertoires[state.activeRepIndex];
+  if (!rep) return null;
+  if (!rep._fenIndex) buildFenIndex(rep);
+  const nf = normalizeFen(fen);
+  const candidate = rep._fenIndex.get(nf);
+  return (candidate && candidate.createdAt < currentTime) ? candidate : null;
 }
 
 function findTranspositionInActiveRep(fen, currentTime) {

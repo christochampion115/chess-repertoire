@@ -55,6 +55,67 @@ async function initializeApp() {
 
 initializeApp();
 
+// ── Outil de debug console ────────────────────────────────────────────────────
+// Appel : window.debugRepertoire()  (optionnel : window.debugRepertoire(repIndex))
+window.debugRepertoire = function debugRepertoire(repIndex) {
+  const reps = state.repertoires;
+  if (!reps || reps.length === 0) {
+    console.warn('[debugRepertoire] Aucun répertoire chargé.');
+    return;
+  }
+
+  const targets = repIndex !== undefined ? [reps[repIndex]] : reps;
+
+  targets.forEach(rep => {
+    if (!rep) return;
+    const name = rep.name || '(sans nom)';
+    const transpoNodes = [];
+    const brokenTranspos = [];
+    let totalNodes = 0;
+
+    function getPath(node) {
+      const parts = [];
+      let cur = node;
+      while (cur && cur.parent) {
+        parts.unshift(cur.san);
+        cur = cur.parent;
+      }
+      return parts.join(' ');
+    }
+
+    function walk(node) {
+      totalNodes++;
+      if (node.isTransposition) {
+        if (!node.sourceNode) {
+          brokenTranspos.push({ node, path: getPath(node) });
+        } else {
+          transpoNodes.push({
+            path: getPath(node),
+            sourcePath: getPath(node.sourceNode),
+            sourceId: node.sourceNode.id,
+          });
+        }
+        return; // feuille de transposition, pas de récursion
+      }
+      node.children.forEach(walk);
+    }
+
+    walk(rep);
+
+    console.groupCollapsed(`[debugRepertoire] "${name}" — ${totalNodes} nœuds`);
+    console.log(`  Transpositions valides : ${transpoNodes.length}`);
+    transpoNodes.forEach(t => console.log(`    ↩ ${t.path}  →  ${t.sourcePath}`));
+
+    if (brokenTranspos.length > 0) {
+      console.warn(`  ⚠️  Transpositions CASSÉES (sourceNode null) : ${brokenTranspos.length}`);
+      brokenTranspos.forEach(t => console.warn(`    ✗ ${t.path}`));
+    } else {
+      console.log('  Aucune transposition cassée ✓');
+    }
+    console.groupEnd();
+  });
+};
+
 // Avertissement de quitter la page en mode invité si des répertoires ont été créés.
 window.addEventListener('beforeunload', (event) => {
   if (!state.auth.user && state.repertoires && state.repertoires.length > 0) {

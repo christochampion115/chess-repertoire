@@ -111,7 +111,11 @@ export function renderArbre(onNodeSelect, onNodeContext) {
             line.appendChild(createMoveEl(next, shouldHideNum));
             currentChain = next;
           }
-          if (currentChain.children.length > 1) {
+          // Bug 4 – Un nœud de transposition avec des enfants (même un seul) doit
+          // quand même afficher sa sous-arborescence. L'ancienne condition "&gt; 1"
+          // la rendait invisible lorsqu'il n'y avait qu'un seul enfant.
+          if (currentChain.children.length > 1 ||
+              (currentChain.isTransposition && currentChain.children.length > 0)) {
             const subUl = document.createElement('ul');
             subUl.className = 'tree-root';
             li.appendChild(subUl);
