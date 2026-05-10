@@ -1056,9 +1056,19 @@ function handleNodeSelect(node) {
     render();
     return;
   }
-  state.currentNode = node.isTransposition && node.sourceNode ? node.sourceNode : node;
+  const isTranspoRedirect = node.isTransposition && node.sourceNode;
+  state.currentNode = isTranspoRedirect ? node.sourceNode : node;
   state.chess.load(state.currentNode.fen);
+  if (isTranspoRedirect) {
+    expandPathToCurrentNode();
+  }
   render();
+  if (isTranspoRedirect) {
+    requestAnimationFrame(() => {
+      const activeEl = document.querySelector('#arbre-content .move-text.active');
+      if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 }
 
 function handleTreeContext(event, node) {
@@ -1151,6 +1161,10 @@ function openNewRepModalUnsafe() {
   if (fileInput) fileInput.value = '';
   const pgnText = document.getElementById('pgn-import-input');
   if (pgnText) pgnText.value = '';
+  const pgnLoader = document.getElementById('pgn-import-loading');
+  if (pgnLoader) pgnLoader.style.display = 'none';
+  const btnConfirm = document.getElementById('btn-rep-confirm');
+  if (btnConfirm) btnConfirm.disabled = false;
   document.getElementById('btn-rep-confirm').textContent = 'Créer';
   document.getElementById('btn-rep-confirm').onclick = () => confirmRepertoireCreation();
   state.pendingNewRepFolderId = null;

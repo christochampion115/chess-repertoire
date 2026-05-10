@@ -23,6 +23,7 @@
     "tar": "^7.5.13"
   },
   "devDependencies": {
+    "chess.js": "^0.10.3",
     "nodemon": "^2.0.22"
   }
 }

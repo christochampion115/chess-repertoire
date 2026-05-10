@@ -3961,6 +3961,16 @@ body {
 
 <div id="rep-create-error" style="min-height:20px; margin-top:10px; color:#ff7b7b;"></div>
 
+<div id="pgn-import-loading" style="display:none; margin-top:14px;">
+  <div style="display:flex; align-items:center; gap:10px; color:#94a3b8; font-size:0.85rem; margin-bottom:8px;">
+    <span class="analysis-spinner"></span>
+    <span>Import en cours… Cela peut prendre quelques secondes pour un gros fichier.</span>
+  </div>
+  <div style="height:4px; background:#1e2a3a; border-radius:2px; overflow:hidden;">
+    <div id="pgn-import-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#3b82f6,#60a5fa); border-radius:2px; transition:width 0.4s ease;"></div>
+  </div>
+</div>
+
 <button class="ctrl-btn" id="btn-rep-confirm" style="width:100%; margin-top:20px;">Créer</button>
 
 </div>
