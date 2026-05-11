@@ -7,6 +7,7 @@ import { loadState } from './storage.js';
 
 const BOARD_THEME_KEY = 'alphaChess.boardTheme';
 const FOLDERS_KEY = 'alphaChess.repFolders';
+const ANALYSIS_SETTINGS_KEY = 'alphaChess.analysisSettings';
 
 function assignDomReferences() {
   state.boardEl = document.getElementById('board');
@@ -28,6 +29,18 @@ async function initializeApp() {
   const savedFolders = loadState(FOLDERS_KEY);
   if (savedFolders && typeof savedFolders === 'object') {
     state.repFolders = savedFolders;
+  }
+
+  // Restaurer les paramètres d'analyse depuis le localStorage
+  const savedAnalysisSettings = loadState(ANALYSIS_SETTINGS_KEY);
+  if (savedAnalysisSettings && typeof savedAnalysisSettings === 'object') {
+    Object.assign(state.analysisSettings, savedAnalysisSettings);
+    // Clamp de sécurité
+    state.analysisSettings.multiPV = Math.min(5, Math.max(1, state.analysisSettings.multiPV ?? 3));
+    state.analysisSettings.arrowCount = Math.min(state.analysisSettings.multiPV, Math.max(1, state.analysisSettings.arrowCount ?? 3));
+  }
+  if (savedAnalysisSettings?.depth) {
+    state.analysisDepth = Math.min(20, Math.max(5, savedAnalysisSettings.depth));
   }
 
   assignDomReferences();

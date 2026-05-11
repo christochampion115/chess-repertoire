@@ -1,8 +1,11 @@
 import { state } from './state.js';
 import * as ui from './ui.js';
 import * as repertoire from './repertoire.js';
-import { toggleAnalysis, setAnalysisDepth } from './analysis.js';
+import { toggleAnalysis, setAnalysisDepth, setAnalysisSettings, renderEngineArrows } from './analysis.js';
 import { updateStatsSortBy } from './ui.js';
+import { saveState } from './storage.js';
+
+const ANALYSIS_SETTINGS_KEY = 'alphaChess.analysisSettings';
 
 const BUTTON_BINDINGS = [
   // ── Navigation entre vues ──
@@ -296,18 +299,145 @@ function initAnalysisSwitchToggle() {
 }
 
 function initAnalysisControls() {
-  const depthInput = document.getElementById('analysis-depth-input');
-  const depthValue = document.getElementById('analysis-depth-value');
+  // Le slider de profondeur inline a été supprimé ; la profondeur se règle
+  // exclusivement dans la modale paramètres (bouton rouage).
+}
 
-  if (depthInput) {
-    depthInput.addEventListener('input', (event) => {
-      const depth = parseInt(event.target.value, 10);
-      if (depthValue) {
-        depthValue.textContent = depth;
+/** Sauvegarde les paramètres d'analyse dans le localStorage */
+function _saveAnalysisSettings() {
+  saveState(ANALYSIS_SETTINGS_KEY, {
+    ...(state.analysisSettings ?? {}),
+    depth: state.analysisDepth ?? 10,
+  });
+}
+
+/** Initialise la modale Paramètres d'analyse (bouton rouage + modale) */
+function initAnalysisSettingsModal() {
+  if (document.body.dataset.analysissettingsbound) return;
+
+  const btn   = document.getElementById('analysis-settings-btn');
+  const panel = document.getElementById('analysis-settings-panel');
+  if (!panel) return;
+
+  document.body.dataset.analysissettingsbound = '1';
+
+  // Ouvrir / fermer le panneau déroulant
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (panel.hidden) {
+        _syncSettingsModal();
+        panel.hidden = false;
+      } else {
+        panel.hidden = true;
       }
-      state.analysisDepth = depth;
-      setAnalysisDepth(depth);
     });
+  }
+
+  // Fermer en cliquant en dehors du conteneur
+  document.addEventListener('click', (e) => {
+    if (!panel.hidden) {
+      const container = document.getElementById('analysis-depth-inline');
+      if (!container || !container.contains(e.target)) {
+        panel.hidden = true;
+      }
+    }
+  });
+
+  // Echap
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !panel.hidden) panel.hidden = true;
+  });
+
+  // ── Profondeur ──────────────────────────────────────────────────────────
+  const depthInput = document.getElementById('asettings-depth-input');
+  const depthVal   = document.getElementById('asettings-depth-val');
+  if (depthInput) {
+    depthInput.addEventListener('input', () => {
+      const d = parseInt(depthInput.value, 10);
+      if (depthVal) depthVal.textContent = d;
+      setAnalysisDepth(d);
+      _saveAnalysisSettings();
+    });
+  }
+
+  // ── MultiPV ─────────────────────────────────────────────────────────────
+  const multipvInput = document.getElementById('asettings-multipv-input');
+  const multipvVal   = document.getElementById('asettings-multipv-val');
+  if (multipvInput) {
+    multipvInput.addEventListener('input', () => {
+      const v = parseInt(multipvInput.value, 10);
+      if (multipvVal) multipvVal.textContent = v;
+      setAnalysisSettings({ multiPV: v });
+      _saveAnalysisSettings();
+      _syncArrowCountMax();
+    });
+  }
+
+  // ── Flèches on/off ──────────────────────────────────────────────────────
+  const arrowsInput    = document.getElementById('asettings-arrows-input');
+  const arrowCountRow  = document.getElementById('asettings-arrow-count-row');
+  if (arrowsInput) {
+    arrowsInput.addEventListener('change', () => {
+      setAnalysisSettings({ showArrows: arrowsInput.checked });
+      _saveAnalysisSettings();
+      if (arrowCountRow) arrowCountRow.hidden = !arrowsInput.checked;
+    });
+  }
+
+  // ── Nombre de flèches ───────────────────────────────────────────────────
+  const arrowCountInput = document.getElementById('asettings-arrow-count-input');
+  const arrowCountVal   = document.getElementById('asettings-arrow-count-val');
+  if (arrowCountInput) {
+    arrowCountInput.addEventListener('input', () => {
+      const v = parseInt(arrowCountInput.value, 10);
+      if (arrowCountVal) arrowCountVal.textContent = v;
+      setAnalysisSettings({ arrowCount: v });
+      _saveAnalysisSettings();
+    });
+  }
+}
+
+/** Synchronise les valeurs affichées dans la modale avec l'état courant */
+function _syncSettingsModal() {
+  const s = state.analysisSettings ?? {};
+  const depth = state.analysisDepth ?? 10;
+
+  const depthInput  = document.getElementById('asettings-depth-input');
+  const depthVal    = document.getElementById('asettings-depth-val');
+  if (depthInput) depthInput.value = depth;
+  if (depthVal)   depthVal.textContent = depth;
+
+  const multipvInput = document.getElementById('asettings-multipv-input');
+  const multipvVal   = document.getElementById('asettings-multipv-val');
+  if (multipvInput) multipvInput.value = s.multiPV ?? 3;
+  if (multipvVal)   multipvVal.textContent = s.multiPV ?? 3;
+
+  const arrowsInput   = document.getElementById('asettings-arrows-input');
+  const arrowCountRow = document.getElementById('asettings-arrow-count-row');
+  if (arrowsInput) arrowsInput.checked = s.showArrows !== false;
+  if (arrowCountRow) arrowCountRow.hidden = s.showArrows === false;
+
+  const arrowCountInput = document.getElementById('asettings-arrow-count-input');
+  const arrowCountVal   = document.getElementById('asettings-arrow-count-val');
+  _syncArrowCountMax();
+  if (arrowCountInput) arrowCountInput.value = s.arrowCount ?? 3;
+  if (arrowCountVal)   arrowCountVal.textContent = s.arrowCount ?? 3;
+}
+
+/** Adapte le max du slider arrowCount au multiPV courant */
+function _syncArrowCountMax() {
+  const s = state.analysisSettings ?? {};
+  const max = s.multiPV ?? 3;
+  const input = document.getElementById('asettings-arrow-count-input');
+  const val   = document.getElementById('asettings-arrow-count-val');
+  if (!input) return;
+  input.max = max;
+  if (parseInt(input.value, 10) > max) {
+    input.value = max;
+    if (val) val.textContent = max;
+    setAnalysisSettings({ arrowCount: max });
+    _saveAnalysisSettings();
   }
 }
 
@@ -318,6 +448,7 @@ export function initDomBindings() {
   initSortMenuToggle();
   initAnalysisSwitchToggle();
   initAnalysisControls();
+  initAnalysisSettingsModal();
   initProfileModalBindings();
 }
 

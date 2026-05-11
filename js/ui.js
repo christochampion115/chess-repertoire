@@ -38,16 +38,36 @@ let globalLoaderTimer = null;     // timer pour la durée minimale du loader glo
 let globalLoaderShownAt = 0;      // timestamp du moment où le loader global a été affiché
 
 function getEngineColorForMove(move) {
-  const value = state.moveAnnotationValues?.[move.uci];
-  if (!Number.isFinite(value)) return '#808080';
+  const afterWhiteCp = state.moveAnnotationValues?.[move.uci];
+  if (!Number.isFinite(afterWhiteCp)) return '#808080';
 
-  const clamped = Math.max(-250, Math.min(250, value));
+  // winPctLoss calculé RELATIVEMENT au meilleur coup évalué (même contexte de profondeur).
+  // Évite l'horizon effect qui comparait afterFen (depth D depuis afterFen)
+  // à baseFen (depth D depuis baseFen), rendant le meilleur coup parfois rouge.
+  const allCps = Object.values(state.moveAnnotationValues || {}).filter(v => Number.isFinite(v));
+  if (allCps.length === 0) return '#808080';
+  const fen = state.currentNode?.fen || '';
+  const sideToMove = fen.split(' ')[1] || 'w';
+  const bestCp = sideToMove === 'w' ? Math.max(...allCps) : Math.min(...allCps);
+  // Formule win% identique à cpToWhitePct dans analysis.js
+  const cpToWinPct = cp => Math.min(97, Math.max(3, 50 + 50 * (2 / (1 + Math.exp(-0.003 * cp)) - 1)));
+  const bestWinPct = cpToWinPct(bestCp);
+  const thisWinPct = cpToWinPct(afterWhiteCp);
+  // winPctLoss : 0 = meilleur coup, valeur croissante = moins bon
+  const value = Math.abs(bestWinPct - thisWinPct);
+
+  // Seuils sur winPctLoss (%) :
+  //  ~0-3%  : excellent (vert)       ≈ 0-40 cp d'écart avec le meilleur
+  //  ~3-7%  : bon coup (vert→jaune)  ≈ 40-95 cp
+  //  ~7-15% : erreur (orange)        ≈ 95-200 cp
+  //  >15%   : gaffe (rouge)          > 200 cp
+  const clamped = Math.max(0, Math.min(28, value));
   const stops = [
-    { cp: -250, color: [214, 40, 40] },
-    { cp: -35,  color: [238, 120, 48] },
-    { cp:   0,  color: [234, 179, 8] },
-    { cp:  35,  color: [110, 197, 58] },
-    { cp: 250,  color: [34, 166, 76] }
+    { cp: 0,  color: [34, 166, 76] },    // 0%  → meilleur coup (vert foncé)
+    { cp: 3,  color: [110, 197, 58] },   // 3%  → bon coup (vert clair)
+    { cp: 7,  color: [234, 179, 8] },    // 7%  → imprécision (jaune)
+    { cp: 15, color: [238, 120, 48] },   // 15% → erreur (orange)
+    { cp: 28, color: [214, 40, 40] }     // 28% → gaffe (rouge)
   ];
 
   let leftStop = stops[0];
@@ -268,13 +288,10 @@ export function render() {
   // Mettre à jour l'affichage du tri
   updateSortButtonStates();
   
-  // Mettre à jour l'état de l'interrupteur Analyse + slider inline
+  // Mettre à jour l'état de l'interrupteur Analyse + bouton paramètres
   const analysisSwitch = document.getElementById('analysis-toggle-switch');
-  const analysisDepthInline = document.getElementById('analysis-depth-inline');
+  const analysisDepthInline = document.getElementById('analysis-depth-inline'); // conteneur du bouton rouage
   const monitorAnalysisSection = document.getElementById('monitor-analysis-section');
-  const analysisDepthValue = document.getElementById('analysis-depth-value');
-  const analysisDepthInput = document.getElementById('analysis-depth-input');
-  const analysisDepthFill = document.getElementById('analysis-depth-fill');
   const analysisPanel = document.getElementById('analysis-panel');
   const analysisTitle = document.querySelector('.monitor-analysis-title');
   const analysisSwitchWrap = analysisSwitch?.closest('.analysis-switch');
@@ -294,6 +311,7 @@ export function render() {
   if (analysisControls) {
     analysisControls.style.display = isSurvivalTraining ? 'none' : '';
   }
+  // Le conteneur analysis-depth-inline est maintenant le bouton rouage (paramètres)
   if (analysisDepthInline) {
     analysisDepthInline.hidden = isTraining || !state.isAnalysisEnabled;
   }
@@ -305,16 +323,6 @@ export function render() {
     renderSurvivalMonitorPanel(analysisPanel);
   } else if (isTraining && analysisPanel) {
     analysisPanel.textContent = '';
-  }
-  if (analysisDepthValue) {
-    analysisDepthValue.textContent = String(depth);
-  }
-  if (analysisDepthInput) {
-    analysisDepthInput.value = String(depth);
-  }
-  if (analysisDepthFill) {
-    const pct = ((depth - 5) / 15) * 100;
-    analysisDepthFill.style.width = `${pct}%`;
   }
 
   document.querySelectorAll('.accordion-header').forEach(header => {
@@ -4351,7 +4359,19 @@ function buildEngineTooltipContent(move) {
     if (movePv && movePv.length > 0) {
       rows.push('<div class="move-hover-tooltip-separator"></div>');
       rows.push('<div class="move-hover-tooltip-section-title">Ligne Principale:</div>');
-      const sanMoves = convertPvUciToSan(movePv.slice(0, 5), state.currentNode?.fen);
+      // Le PV est stocké depuis afterFen (réponse adverse + suite).
+      // On reconstruit afterFen en appliquant le coup à currentNode.fen.
+      let pvStartFen = state.currentNode?.fen;
+      if (pvStartFen && move.uci && move.uci.length >= 4) {
+        try {
+          const t = new Chess();
+          if (t.load(pvStartFen)) {
+            const r = t.move({ from: move.uci.slice(0, 2), to: move.uci.slice(2, 4), ...(move.uci[4] ? { promotion: move.uci[4] } : {}) });
+            if (r) pvStartFen = t.fen();
+          }
+        } catch { /* fallback to baseFen */ }
+      }
+      const sanMoves = convertPvUciToSan(movePv.slice(0, 5), pvStartFen);
       rows.push(`<div class="move-hover-tooltip-pv">${sanMoves.join(' ')}</div>`);
     }
   }

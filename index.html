@@ -420,6 +420,233 @@ body {
   gap: 10px;
 }
 
+/* Bouton rouage paramètres — occupe la zone de contrôles */
+.analysis-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: 5px;
+  background: rgba(148,163,184,0.07);
+  color: rgba(148,163,184,0.75);
+  cursor: pointer;
+  padding: 5px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.analysis-settings-btn:hover {
+  color: #cbd5e1;
+  background: rgba(148,163,184,0.14);
+  border-color: rgba(148,163,184,0.4);
+}
+.analysis-settings-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.analysis-settings-btn[hidden] { display: none; }
+
+/* ── Panneau déroulant paramètres analyse (ancré au bouton) ─────────────── */
+.analysis-settings-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 500;
+  background: #1e293b;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: 7px;
+  width: 268px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+.analysis-settings-panel[hidden] { display: none; }
+.analysis-settings-panel-head {
+  padding: 7px 11px 6px;
+  border-bottom: 1px solid rgba(148,163,184,0.15);
+}
+.analysis-settings-panel-head .analysis-settings-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Modale paramètres analyse (kept for CSS reuse) ────────────────────── */
+.analysis-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(10,15,25,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.analysis-settings-overlay[hidden] { display: none !important; }
+
+.analysis-settings-dialog {
+  background: #1e293b;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: 10px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+.analysis-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(148,163,184,0.15);
+}
+
+.analysis-settings-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.04em;
+}
+
+.analysis-settings-close {
+  background: none;
+  border: none;
+  color: rgba(148,163,184,0.7);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.analysis-settings-close:hover { color: #e2e8f0; }
+
+.analysis-settings-body {
+  padding: 8px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analysis-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.analysis-settings-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  flex: 1;
+  min-width: 0;
+}
+
+.analysis-settings-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100px;
+}
+
+.analysis-settings-val {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #7aaecb;
+  min-width: 20px;
+  text-align: right;
+}
+
+.analysis-settings-range {
+  flex: 1;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(148,163,184,0.25);
+  outline: none;
+  cursor: pointer;
+}
+.analysis-settings-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7aaecb;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.analysis-settings-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7aaecb;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Toggle switch dans la modale */
+.analysis-settings-toggle {
+  position: relative;
+  display: inline-flex;
+  width: 38px;
+  height: 21px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.analysis-settings-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.analysis-settings-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(148,163,184,0.3);
+  border: 1px solid rgba(148,163,184,0.4);
+  transition: background 0.2s, border-color 0.2s;
+}
+.analysis-settings-toggle-track::before {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  left: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: #f8fafc;
+  transition: transform 0.2s;
+}
+.analysis-settings-toggle input:checked + .analysis-settings-toggle-track {
+  background: rgba(122,174,203,0.45);
+  border-color: rgba(122,174,203,0.8);
+}
+.analysis-settings-toggle input:checked + .analysis-settings-toggle-track::before {
+  transform: translateX(17px);
+}
+
+/* ── Flèches moteur sur l'échiquier ─────────────────────────────────────── */
+#engine-arrows-svg {
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: visible;
+}
+
 .analysis-switch {
   position: relative;
   display: inline-flex;
@@ -465,6 +692,8 @@ body {
 
 .monitor-analysis-controls {
   width: 220px;
+  position: relative;
+  z-index: 2;
 }
 
 .monitor-analysis-depth {
@@ -638,6 +867,8 @@ body {
   width: 100% !important;
   max-width: none !important;
   aspect-ratio: 1 / 1;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .eval-bar {
@@ -3628,8 +3859,9 @@ body {
     <button class="training-banner-stop" id="btn-training-stop">Terminer l’entraînement</button>
   </div>
   <div class="board-panel">
-    <div class="board-shell">
+    <div class="board-shell" style="position:relative;">
       <div id="board"></div>
+      <svg id="engine-arrows-svg" viewBox="0 0 8 8" preserveAspectRatio="none"></svg>
       <div id="eval-bar" class="eval-bar" hidden>
         <div id="eval-bar-fill" class="eval-bar-fill"></div>
         <div class="eval-bar-zero"></div>
@@ -3668,16 +3900,41 @@ body {
             <span class="analysis-switch-track" aria-hidden="true"></span>
           </label>
         </div>
-        <div class="monitor-analysis-controls">
-          <div class="monitor-analysis-depth" id="analysis-depth-inline" hidden>
-            <div class="monitor-analysis-depth-head">
-              <span class="monitor-analysis-depth-label">Profondeur</span>
-              <span class="monitor-analysis-depth-value" id="analysis-depth-value">10</span>
-            </div>
-            <div style="position: relative;">
-              <div style="position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 6px; border-radius: 5px; background: rgba(148,163,184,0.25);"></div>
-              <div id="analysis-depth-fill" style="position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 6px; border-radius: 5px; background: linear-gradient(90deg,#7aaecb 0%,#9fd4ef 100%); transition: width 0.2s ease; pointer-events: none;"></div>
-              <input type="range" id="analysis-depth-input" min="5" max="20" value="10" style="position: relative; z-index: 1; width: 100%; height: 8px; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; margin: 0;">
+        <div class="monitor-analysis-controls" id="analysis-depth-inline" hidden>
+          <button type="button" class="analysis-settings-btn" id="analysis-settings-btn" aria-label="Paramètres de l'analyse">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+            Paramètres
+          </button>
+          <div class="analysis-settings-panel" id="analysis-settings-panel" hidden>
+            <div class="analysis-settings-body">
+              <div class="analysis-settings-row">
+                <label class="analysis-settings-label" for="asettings-depth-input">Profondeur</label>
+                <div class="analysis-settings-ctrl">
+                  <span class="analysis-settings-val" id="asettings-depth-val">10</span>
+                  <input type="range" id="asettings-depth-input" class="analysis-settings-range" min="5" max="20" value="10">
+                </div>
+              </div>
+              <div class="analysis-settings-row">
+                <label class="analysis-settings-label" for="asettings-multipv-input">Lignes (MultiPV)</label>
+                <div class="analysis-settings-ctrl">
+                  <span class="analysis-settings-val" id="asettings-multipv-val">3</span>
+                  <input type="range" id="asettings-multipv-input" class="analysis-settings-range" min="1" max="5" value="3">
+                </div>
+              </div>
+              <div class="analysis-settings-row">
+                <label class="analysis-settings-label">Flèches</label>
+                <label class="analysis-settings-toggle" aria-label="Activer les flèches">
+                  <input type="checkbox" id="asettings-arrows-input">
+                  <span class="analysis-settings-toggle-track"></span>
+                </label>
+              </div>
+              <div class="analysis-settings-row" id="asettings-arrow-count-row">
+                <label class="analysis-settings-label" for="asettings-arrow-count-input">Nb flèches</label>
+                <div class="analysis-settings-ctrl">
+                  <span class="analysis-settings-val" id="asettings-arrow-count-val">3</span>
+                  <input type="range" id="asettings-arrow-count-input" class="analysis-settings-range" min="1" max="5" value="3">
+                </div>
+              </div>
             </div>
           </div>
         </div>
