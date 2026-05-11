@@ -2,11 +2,13 @@ import { state } from './state.js';
 import { eventBus } from './events.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 
-const SF_CDN = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js';
+const SF_JS_URL = new URL('../engine/stockfish-18-lite-single.js', import.meta.url).href;
+const SF_WASM_URL = new URL('../engine/stockfish.wasm', import.meta.url).href;
 const ANALYSIS_DEBOUNCE_MS = 200;
 const STATS_ELO_MIN = 0;
 const STATS_ELO_MAX = 3000;
 const DEFAULT_ANNOT_DEPTH = 8;
+const ANNOT_MAX_DEPTH = 12;
 const ANNOT_MAX_MOVES = 15;
 const ANNOT_DEFAULT_VISIBLE = 5;
 const ANNOT_DELAY_BASE_MS = 350;
@@ -33,6 +35,7 @@ let annotatingForVisibleKey = '';
 let annotationRenderQueued = false;
 const pendingReadyResolvers = [];
 let annotationRunToken = 0;
+const fenEvalCache = new Map();
 
 function queueAnnotationRender() {
   if (annotationRenderQueued) return;
@@ -70,7 +73,7 @@ function hasCurrentStatsLoaded(fen) {
 function getAnnotationDepth() {
   const depth = parseInt(state.analysisDepth, 10);
   if (!Number.isFinite(depth)) return DEFAULT_ANNOT_DEPTH;
-  return Math.min(20, Math.max(5, depth));
+  return Math.min(ANNOT_MAX_DEPTH, Math.max(5, depth));
 }
 
 function getAnnotationDisplayDelayMs(moveCount) {
@@ -138,38 +141,72 @@ export async function initAnalysis() {
   renderAnalysisPanelIfVisible();
 
   try {
-    const res = await fetch(SF_CDN);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const code = await res.text();
-    const blob = new Blob([code], { type: 'text/javascript' });
-    engine = new Worker(URL.createObjectURL(blob));
+    // Stockfish a un protocole hash natif : il lit self.location.hash.substr(1).split(',')[0]
+    // pour obtenir l'URL du WASM, ce qui contourne toute la construction d'URL relative
+    // depuis blob:// qui causait l'erreur "Failed to parse URL".
+    //
+    // En passant #encodedWasmUrl dans l'URL du Worker :
+    //   e[0] = decodeURIComponent(hash) → URL absolue HTTP correcte
+    //   fetch(e[0], {credentials:'same-origin'}) → fonctionne directement
+    //
+    // Aucun blob Worker, aucun preamble, aucun intercepteur.
+    const workerUrl = SF_JS_URL + '#' + encodeURIComponent(SF_WASM_URL);
+    engine = new Worker(workerUrl);
     engine.onmessage = onEngineMessage;
+    engine.onerror = (err) => {
+      console.error('[analysis] Worker error:', err);
+      // Débloquer toute annotation en attente avant de nullifier l'engine,
+      // sinon la boucle annotateStatsMoves reste bloquée indéfiniment.
+      annotAborted = true;
+      if (annotCurrentResolve) {
+        const resolve = annotCurrentResolve;
+        annotCurrentResolve = null;
+        annotLastInfoCp = null;
+        annotLastInfoPv = null;
+        resolve(null);
+      }
+      engine = null;
+      engineReady = false;
+      engineLoading = false;
+      state.analysisError = 'Moteur indisponible.';
+      renderAnalysisPanelIfVisible();
+      // Tentative de redémarrage automatique après 2 secondes
+      setTimeout(() => {
+        if (!engine && !engineLoading && state.isAnalysisEnabled) {
+          state.analysisError = null;
+          initAnalysis();
+        }
+      }, 2000);
+    };
     engine.postMessage('uci');
-    engine.postMessage('setoption name MultiPV value 3');
+    engine.postMessage('setoption name Hash value 64');
+    engine.postMessage(`setoption name MultiPV value ${state.analysisSettings?.multiPV ?? 3}`);
     engine.postMessage('isready');
   } catch (err) {
     console.error('[analysis] Stockfish load failed:', err);
     engine = null;
-    state.analysisError = 'Moteur indisponible (verifiez la connexion).';
-  } finally {
     engineLoading = false;
+    state.analysisError = 'Moteur indisponible.';
     renderAnalysisPanelIfVisible();
   }
 }
 
 function onEngineMessage(event) {
   const line = typeof event === 'string' ? event : event.data;
-  if (!line) return;
+  // Ignore non-string messages (e.g. the {__sf_wasm} transfer message)
+  if (!line || typeof line !== 'string') return;
 
   if (line === 'readyok') {
     engineReady = true;
+    engineLoading = false;
+    renderAnalysisPanelIfVisible();
     if (pendingReadyResolvers.length) {
       const resolvers = pendingReadyResolvers.splice(0, pendingReadyResolvers.length);
       resolvers.forEach(resolve => resolve());
       return;
     }
     if (state.isAnalysisEnabled) {
-      triggerAnalysisNow();
+      triggerAnalysis(); // debounce : évite de contaminer l'annotation avec une analyse live démarrée au même instant
       if (state.currentNode?.fen && hasCurrentStatsLoaded(state.currentNode.fen)) {
         const visibleMoves = getVisibleStatsMoves();
         if (visibleMoves.length) annotateStatsMoves(state.currentNode.fen, visibleMoves);
@@ -180,10 +217,19 @@ function onEngineMessage(event) {
 
   if (annotCurrentResolve !== null) {
     if (line.startsWith('info')) {
+      // Le moteur tourne en MultiPV 3 pour l'analyse live.
+      // Pour l'annotation, on ne veut que le score de la MEILLEURE ligne (multipv 1).
+      // Les lignes multipv 2 et 3 seraient des scores de la 2e/3e alternative,
+      // ce qui fausserait l'évaluation de position (signe inversé possible).
+      const mpvM = line.match(/\bmultipv (\d+)/);
+      const mpv = mpvM ? parseInt(mpvM[1], 10) : 1;
+      if (mpv !== 1) return; // Ignorer les lignes multipv 2+
+
       const cpM = line.match(/\bscore cp (-?\d+)/);
       const mateM = line.match(/\bscore mate (-?\d+)/);
       if (cpM) {
         annotLastInfoCp = parseInt(cpM[1], 10);
+
       } else if (mateM) {
         const mate = parseInt(mateM[1], 10);
         annotLastInfoCp = mate > 0 ? 99999 : -99999;
@@ -193,6 +239,7 @@ function onEngineMessage(event) {
     } else if (line.startsWith('bestmove')) {
       const cp = annotLastInfoCp;
       const pv = annotLastInfoPv;
+
       annotLastInfoCp = null;
       annotLastInfoPv = null;
       const resolve = annotCurrentResolve;
@@ -205,18 +252,6 @@ function onEngineMessage(event) {
   if (!state.isAnalysisEnabled) return;
 
   const currentFen = state.currentNode?.fen || '';
-
-  const isLegalBestMoveForFen = (fen, uciMove) => {
-    if (!fen || typeof uciMove !== 'string' || uciMove.length < 4) return false;
-    const tempChess = new Chess();
-    if (!tempChess.load(fen)) return false;
-
-    const from = uciMove.slice(0, 2);
-    const to = uciMove.slice(2, 4);
-    const promotion = uciMove[4] || undefined;
-    const played = tempChess.move({ from, to, ...(promotion ? { promotion } : {}) }, { sloppy: true });
-    return Boolean(played);
-  };
 
   if (line.startsWith('info') && line.includes(' pv ')) {
     const mpvM = line.match(/\bmultipv (\d+)/);
@@ -231,7 +266,8 @@ function onEngineMessage(event) {
     const pv = pvM[1].trim().split(/\s+/);
     const bestMove = pv[0];
     if (!bestMove) return;
-    if (!isLegalBestMoveForFen(currentFen, bestMove)) return;
+    if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(bestMove)) return;
+    if (currentFen !== lastAnalyzedFen) return;
 
     const sideToMove = lastAnalyzedFen ? lastAnalyzedFen.split(' ')[1] : 'w';
     const sign = sideToMove === 'w' ? 1 : -1;
@@ -269,7 +305,7 @@ export function toggleAnalysis() {
     if (!engine) {
       initAnalysis();
     } else if (engineReady) {
-      triggerAnalysisNow();
+      triggerAnalysis(); // debounce : évite de contaminer l'annotation avec une analyse live démarrée au même instant
       if (state.currentNode?.fen && hasCurrentStatsLoaded(state.currentNode.fen)) {
         const visibleMoves = getVisibleStatsMoves();
         if (visibleMoves.length) annotateStatsMoves(state.currentNode.fen, visibleMoves);
@@ -288,6 +324,7 @@ export function toggleAnalysis() {
     lastAnalyzedFen = '';
     Object.keys(pvMap).forEach(key => delete pvMap[key]);
     _abortAnnotation();
+    renderEngineArrows(); // effacer les flèches
   }
 }
 
@@ -295,7 +332,10 @@ export function setAnalysisDepth(d) {
   state.analysisDepth = Math.min(20, Math.max(5, parseInt(d, 10)));
   if (state.isAnalysisEnabled && engine && engineReady) {
     lastAnalyzedFen = '';
-    state.moveAnnotations = {};
+    // Vider le cache d'évaluation : les entrées à l'ancienne profondeur ne sont plus
+    // pertinentes ET certaines peuvent être corrompues (capturées en MultiPV 3).
+    fenEvalCache.clear();
+    state.moveAnnotations = {};;
     state.moveAnnotationScores = {};
     state.moveAnnotationValues = {};
     state.moveAnnotationsKey = state.currentNode?.fen || '';
@@ -324,6 +364,32 @@ export function triggerAnalysisIfNeeded() {
   state.analysisResults = [];
   renderAnalysisPanelIfVisible();
   triggerAnalysis();
+}
+
+/**
+ * Met à jour un ou plusieurs paramètres d'analyse (multiPV, showArrows, arrowCount).
+ * Redémarre le moteur si nécessaire.
+ */
+export function setAnalysisSettings(patch) {
+  const s = state.analysisSettings;
+  const prevMultiPV = s.multiPV;
+  Object.assign(s, patch);
+  // Clamp arrowCount <= multiPV
+  s.arrowCount = Math.min(s.arrowCount, s.multiPV);
+
+  if (state.isAnalysisEnabled && engine && engineReady) {
+    if (patch.multiPV !== undefined && patch.multiPV !== prevMultiPV) {
+      engine.postMessage('stop');
+      engine.postMessage(`setoption name MultiPV value ${s.multiPV}`);
+      lastAnalyzedFen = '';
+      Object.keys(pvMap).forEach(key => delete pvMap[key]);
+      state.analysisResults = [];
+      triggerAnalysis();
+    }
+    // Mettre à jour les flèches quelle que soit la modification
+    renderEngineArrows();
+    renderAnalysisPanelIfVisible();
+  }
 }
 
 function triggerAnalysis() {
@@ -359,6 +425,16 @@ function _abortAnnotation() {
 }
 
 function evalFenAnnotation(fen) {
+  const depth = getAnnotationDepth();
+  // La clé inclut '|1' pour distinguer les évaluations faites en MultiPV 1 (annotation)
+  // de celles qui auraient pu être capturées en MultiPV 3 (analyse live).
+  // Cela évite de servir une valeur corrompue depuis le cache.
+  const cacheKey = `${fen}|${depth}|1`;
+  const cached = fenEvalCache.get(cacheKey);
+  if (cached !== undefined) {
+    return Promise.resolve(cached);
+  }
+
   return new Promise(resolve => {
     if (!engine || !engineReady || annotAborted) {
       resolve(null);
@@ -366,9 +442,23 @@ function evalFenAnnotation(fen) {
     }
     annotLastInfoCp = null;
     annotLastInfoPv = null;
-    annotCurrentResolve = resolve;
+    annotCurrentResolve = (result) => {
+      if (result !== null) {
+        // Cap LRU léger : éviction des 100 plus anciennes entrées au-delà de 500.
+        // Map préserve l'ordre d'insertion, donc les premières clés sont les plus vieilles.
+        if (fenEvalCache.size >= 500) {
+          let evicted = 0;
+          for (const key of fenEvalCache.keys()) {
+            fenEvalCache.delete(key);
+            if (++evicted >= 100) break;
+          }
+        }
+        fenEvalCache.set(cacheKey, result);
+      }
+      resolve(result);
+    };
     engine.postMessage(`position fen ${fen}`);
-    engine.postMessage(`go depth ${getAnnotationDepth()}`);
+    engine.postMessage(`go depth ${depth}`);
   });
 }
 
@@ -388,7 +478,7 @@ function _resumeMainAnalysis() {
     analysisTimer = null;
   }
   if (!engine) return;
-  engine.postMessage('setoption name MultiPV value 3');
+  engine.postMessage(`setoption name MultiPV value ${state.analysisSettings?.multiPV ?? 3}`);
   if (state.isAnalysisEnabled && engineReady) {
     lastAnalyzedFen = '';
     triggerAnalysis();
@@ -447,6 +537,9 @@ export async function annotateStatsMoves(baseFen, lichessMoves) {
   });
 
   _abortAnnotation();
+  // Vider le cache avant chaque run d'annotation pour garantir des évaluations fraîches.
+  // Les entrées corrompues (capturées en MultiPV 3 ou avant le setoption) sont ainsi évincées.
+  fenEvalCache.clear();
   if (analysisTimer) {
     clearTimeout(analysisTimer);
     analysisTimer = null;
@@ -487,7 +580,6 @@ export async function annotateStatsMoves(baseFen, lichessMoves) {
 
   try {
     const chessTemp = new Chess();
-    const baseSideToMove = baseFen.split(' ')[1] || 'w';
 
     for (const move of movesToEvaluate) {
       if (runToken !== annotationRunToken || annotAborted || !state.isAnalysisEnabled) break;
@@ -505,17 +597,20 @@ export async function annotateStatsMoves(baseFen, lichessMoves) {
       if (runToken !== annotationRunToken || annotAborted || !state.isAnalysisEnabled) break;
 
       const afterSideToMove = afterFen.split(' ')[1] || 'w';
-      // result peut être null si l'éval a échoué — on stocke 0 (neutre) pour garantir une couleur
       const rawCp = result !== null ? (result.cp ?? 0) : 0;
       const afterWhiteCp = (afterSideToMove === 'w' ? 1 : -1) * rawCp;
-      const moverCp = baseSideToMove === 'w' ? afterWhiteCp : -afterWhiteCp;
 
-      nextAnnotations[uci] = formatAnnotationScore(moverCp);
-      nextAnnotationScores[uci] = formatAnnotationScore(moverCp);
-      nextAnnotationValues[uci] = moverCp;
-      // PV : le coup joué + la continuation depuis la position après
+      // Scores affichés en convention standard (positif = blancs avantagés)
+      nextAnnotations[uci] = formatAnnotationScore(afterWhiteCp);
+      nextAnnotationScores[uci] = formatAnnotationScore(afterWhiteCp);
+      // Stocker afterWhiteCp brut : le winPctLoss RELATIF (vs meilleur coup évalué)
+      // est calculé à l'affichage dans getEngineColorForMove (ui.js).
+      // Cela évite l'horizon effect qui faussait les couleurs quand on comparait
+      // afterFen (depth D depuis afterFen) à baseFen (depth D depuis baseFen).
+      nextAnnotationValues[uci] = afterWhiteCp;
+      // PV : continuation depuis afterFen (réponse adverse + suite) — sans le coup joué lui-même
       const continuation = result?.pv ?? [];
-      nextAnnotationPvs[uci] = [uci, ...continuation.slice(0, 4)];
+      nextAnnotationPvs[uci] = continuation.slice(0, 5);
     }
 
     await delayPromise;
@@ -613,6 +708,139 @@ function renderAnalysisPanelIfVisible() {
   renderEvalBar();
   const panel = document.getElementById('analysis-panel');
   if (panel) renderAnalysisPanel(panel);
+  renderEngineArrows();
+}
+
+/**
+ * Dessine les flèches des meilleures lignes du moteur sur le SVG overlay.
+ * Chaque flèche correspond au premier coup de la ligne, avec opacité décroissante.
+ */
+export function renderEngineArrows() {
+  const svg = document.getElementById('engine-arrows-svg');
+  if (!svg) return;
+  svg.innerHTML = '';
+
+  const settings = state.analysisSettings ?? {};
+  if (!state.isAnalysisEnabled || !settings.showArrows) return;
+
+  const results = state.analysisResults ?? [];
+  if (results.length === 0) return;
+
+  const flipped = Boolean(state.boardFlipped);
+  const arrowCount = Math.min(settings.arrowCount ?? 3, settings.multiPV ?? 3, results.length);
+
+  // Couleur = case sombre du thème, assombrie
+  const [Rr, Gg, Bb] = _parseHexColor(state.boardTheme?.dark ?? '#779556');
+  const R = Math.round(Rr * 0.60);
+  const G = Math.round(Gg * 0.60);
+  const B = Math.round(Bb * 0.60);
+
+  // Opacité décroissante, écarts très marqués
+  const OPACITIES = [1.0, 0.6, 0.4, 0.3, 0.2];
+
+  // Créer le bloc <defs> une seule fois
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  svg.appendChild(defs);
+
+  for (let i = 0; i < arrowCount; i++) {
+    const line = results[i];
+    const uci = line?.bestMove;
+    if (!uci || uci.length < 4) continue;
+    const fromSq = uci.slice(0, 2);
+    const toSq   = uci.slice(2, 4);
+
+    const fc = sqToCoord(fromSq, flipped);
+    const tc = sqToCoord(toSq, flipped);
+    if (!fc || !tc) continue;
+
+    const dx = tc.cx - fc.cx;
+    const dy = tc.cy - fc.cy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.01) continue;
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux; // perpendiculaire
+
+    const opacity = OPACITIES[i] ?? 0.12;
+
+    // Dimensions (unités SVG = cases)
+    const shaftW  = 0.13;  // demi-largeur fût
+    const headW   = 0.30;  // demi-largeur tête
+    const headLen = 0.40;  // longueur tête
+    const tailGap = 0.28;  // recul depuis centre case départ
+    const tipGap  = 0.12;  // recul depuis centre case arrivée
+
+    // Points clés
+    const ax = fc.cx + ux * tailGap; // base du fût (queue)
+    const ay = fc.cy + uy * tailGap;
+    const tx = tc.cx - ux * tipGap;  // pointe
+    const ty = tc.cy - uy * tipGap;
+    const hx = tx - ux * headLen;    // base de la tête
+    const hy = ty - uy * headLen;
+
+    // ── Dégradé : transparent à la queue → opaque à ~40% de la longueur ──
+    const gradId = `eag-${i}`;
+    const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    grad.setAttribute('id', gradId);
+    grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+    grad.setAttribute('x1', ax.toFixed(4)); grad.setAttribute('y1', ay.toFixed(4));
+    grad.setAttribute('x2', tx.toFixed(4)); grad.setAttribute('y2', ty.toFixed(4));
+    const mkStop = (offset, op) => {
+      const s = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      s.setAttribute('offset', String(offset));
+      s.setAttribute('stop-color', `rgb(${R},${G},${B})`);
+      s.setAttribute('stop-opacity', String(op));
+      return s;
+    };
+    grad.appendChild(mkStop(0,    0));       // queue : transparent
+    grad.appendChild(mkStop(0.38, opacity)); // ~40% : pleine opacité
+    grad.appendChild(mkStop(1,    opacity)); // pointe : pleine opacité
+    defs.appendChild(grad);
+
+    // ── Flèche en un seul polygone (7 pts) — aucune ligne interne ──
+    const arrowPts = [
+      [ax + nx * shaftW, ay + ny * shaftW],   // queue gauche
+      [hx + nx * shaftW, hy + ny * shaftW],   // fût gauche, base tête
+      [hx + nx * headW,  hy + ny * headW ],   // tête gauche
+      [tx, ty],                               // pointe
+      [hx - nx * headW,  hy - ny * headW ],   // tête droite
+      [hx - nx * shaftW, hy - ny * shaftW],   // fût droit, base tête
+      [ax - nx * shaftW, ay - ny * shaftW],   // queue droite
+    ].map(([px, py]) => `${px.toFixed(4)},${py.toFixed(4)}`).join(' ');
+
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    arrow.setAttribute('points', arrowPts);
+    arrow.setAttribute('fill', `url(#${gradId})`);
+    arrow.setAttribute('stroke', 'none'); // pas de contour : évite la barre noire sur la base transparente
+    svg.appendChild(arrow);
+  }
+}
+
+/** Parse une couleur hex (#rrggbb ou #rgb) → [R, G, B] */
+function _parseHexColor(hex) {
+  if (!hex || typeof hex !== 'string') return [100, 150, 80];
+  const c = hex.replace('#', '').trim();
+  if (c.length === 3) return [
+    parseInt(c[0] + c[0], 16),
+    parseInt(c[1] + c[1], 16),
+    parseInt(c[2] + c[2], 16),
+  ];
+  if (c.length === 6) return [
+    parseInt(c.slice(0, 2), 16),
+    parseInt(c.slice(2, 4), 16),
+    parseInt(c.slice(4, 6), 16),
+  ];
+  return [100, 150, 80];
+}
+
+/** Convertit une case algébrique (ex: 'e2') en coordonnées SVG 8×8 (centre de la case) */
+function sqToCoord(sq, flipped) {
+  if (!sq || sq.length < 2) return null;
+  const col = sq.charCodeAt(0) - 97; // a=0 … h=7
+  const row = 8 - parseInt(sq[1], 10); // '1'=row7 … '8'=row0
+  if (col < 0 || col > 7 || row < 0 || row > 7) return null;
+  const c = flipped ? 7 - col : col;
+  const r = flipped ? 7 - row : row;
+  return { cx: c + 0.5, cy: r + 0.5 };
 }
 
 function convertUciMovesToSan(uciMoves, startFen) {
@@ -816,45 +1044,8 @@ export function renderAnalysisPanel(panel) {
 }
 
 export function syncAnalysisControls() {
-  const btn = document.getElementById('analysis-toggle-btn');
-  const depthPanel = document.getElementById('analysis-depth-panel');
-  const depthVal = document.getElementById('analysis-depth-value');
-  const depthInput = document.getElementById('analysis-depth-input');
-  const depthFill = document.getElementById('analysis-depth-fill');
-
-  if (!btn) return;
-
-  const depth = state.analysisDepth ?? 10;
-  btn.classList.toggle('active', Boolean(state.isAnalysisEnabled));
-  if (depthPanel) depthPanel.hidden = !state.isAnalysisEnabled;
-  if (depthVal) depthVal.textContent = String(depth);
-  if (depthInput) depthInput.value = String(depth);
-  if (depthFill) {
-    const pct = ((depth - 5) / 15) * 100;
-    depthFill.style.width = `${pct}%`;
-  }
-
-  if (!btn.dataset.analysisbound) {
-    btn.addEventListener('click', () => {
-      toggleAnalysis();
-      syncAnalysisControls();
-      renderAnalysisPanelIfVisible();
-    });
-    btn.dataset.analysisbound = '1';
-  }
-
-  if (depthInput && !depthInput.dataset.analysisbound) {
-    depthInput.addEventListener('input', () => {
-      const d = parseInt(depthInput.value, 10);
-      if (depthVal) depthVal.textContent = String(d);
-      if (depthFill) {
-        const pct = ((d - 5) / 15) * 100;
-        depthFill.style.width = `${pct}%`;
-      }
-      setAnalysisDepth(d);
-    });
-    depthInput.dataset.analysisbound = '1';
-  }
+  // Conservé pour compatibilité ; les contrôles inline ont été supprimés.
+  // La profondeur et les paramètres se règlent via la modale (bouton rouage).
 }
 
 // Terminer proprement le Worker Stockfish à la fermeture de la page

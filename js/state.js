@@ -78,6 +78,11 @@ export const state = {
   analysisDepth: 10,
   analysisResults: [],
   analysisError: null,
+  analysisSettings: {
+    multiPV: 3,          // nombre de lignes affichées (1-5)
+    showArrows: true,    // afficher les flèches moteur sur l'échiquier
+    arrowCount: 3,       // combien de flèches (1-5, limité à multiPV)
+  },
   moveAnnotations: {},
   moveAnnotationScores: {},
   moveAnnotationValues: {},

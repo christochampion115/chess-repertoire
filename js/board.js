@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { attachDragToPiece } from './drag.js';
+import { renderEngineArrows } from './analysis.js';
 
 /** Mappe une annotation sur sa couleur et un symbole unicode lisible */
 export const ANNOTATION_STYLE = {
@@ -129,6 +130,9 @@ div.style.backgroundColor = isLight ? state.boardTheme.light : state.boardTheme.
     state.pendingAnimation = null;
     requestAnimationFrame(() => applyMoveAnimation(fromSq, toSq));
   }
+
+  // Redessiner les flèches moteur (position/retournement peuvent avoir changé)
+  renderEngineArrows();
 }
 
 /**

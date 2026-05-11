@@ -12,6 +12,12 @@ export function getMoveWinRate(move, fen) {
 }
 
 export function getMoveEnginePreference(move) {
-  const value = state.moveAnnotationValues?.[move.uci];
-  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+  const afterWhiteCp = state.moveAnnotationValues?.[move.uci];
+  if (!Number.isFinite(afterWhiteCp)) return Number.NEGATIVE_INFINITY;
+  // afterWhiteCp : positif = blancs avantagés. On renvoie la valeur du point de vue
+  // du joueur du trait, de sorte que le tri descendant (rightValue - leftValue) place
+  // le meilleur coup en premier quelle que soit la couleur.
+  const fen = state.currentNode?.fen || '';
+  const sideToMove = fen.split(' ')[1] || 'w';
+  return sideToMove === 'w' ? afterWhiteCp : -afterWhiteCp;
 }
