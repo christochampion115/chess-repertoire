@@ -851,7 +851,35 @@ export function confirmDelete() {
     }
   } else if (state.menuTarget && state.menuTarget.parent) {
     const parent = state.menuTarget.parent;
+
+    // Étape 1 : collecter les IDs de tous les nœuds du sous-arbre supprimé
+    function collectDeletedIds(node, set = new Set()) {
+      set.add(node.id);
+      node.children.forEach(c => collectDeletedIds(c, set));
+      return set;
+    }
+    const deletedIds = collectDeletedIds(state.menuTarget);
+
+    // Étape 2 : retirer le sous-arbre de son parent
     parent.children = parent.children.filter(child => child.id !== state.menuTarget.id);
+
+    // Étape 3 : trouver la racine du répertoire pour corriger les transpositions cassées
+    let repRoot = parent;
+    while (repRoot.parent) repRoot = repRoot.parent;
+
+    // Étape 4 : corriger les nœuds dont sourceNode pointe vers un nœud supprimé
+    function fixBrokenTranspositions(node) {
+      if (node.isTransposition && node.sourceNode && deletedIds.has(node.sourceNode.id)) {
+        node.isTransposition = false;
+        node.sourceNode = null;
+      }
+      node.children.forEach(fixBrokenTranspositions);
+    }
+    fixBrokenTranspositions(repRoot);
+
+    // Étape 5 : reconstruire l'index FEN depuis zéro (purge les entrées supprimées)
+    buildFenIndex(repRoot);
+
     if (state.currentNode.id === state.menuTarget.id || isDescendant(state.menuTarget, state.currentNode)) {
       state.currentNode = parent;
       state.chess.load(parent.fen);

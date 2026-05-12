@@ -18,6 +18,9 @@ import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './st
 import { saveState, loadState } from './storage.js';
 
 let currentDragColor = null;
+let currentDragIsFolder = false;
+let currentDragVarId = null;
+let currentDragVarParentId = null;
 
 function saveRepOrder() {
   saveState('rep-display-order', state.repertoires.map(r => r.id));
@@ -1675,6 +1678,47 @@ export function openFolderGroupModal() {
   const titleEl = document.getElementById('modal-folder-title');
   if (titleEl) titleEl.textContent = isRepRoot ? '📁 Grouper des répertoires en dossier' : '📁 Grouper des variantes en dossier';
 
+  // Peupler le select des dossiers existants
+  const folderSel = document.getElementById('folder-existing-select');
+  if (folderSel) {
+    // Identifier les dossiers compatibles avec ce contexte
+    const compatibleFolderIds = new Set();
+    if (isRepRoot) {
+      state.repertoires.filter(r => r.color === target.color && r.folderId).forEach(r => compatibleFolderIds.add(r.folderId));
+    } else {
+      items.filter(v => v.folderId).forEach(v => compatibleFolderIds.add(v.folderId));
+    }
+
+    folderSel.innerHTML = '<option value="__new__">+ Nouveau dossier…</option>';
+    compatibleFolderIds.forEach(fid => {
+      if (folders[fid]) {
+        const opt = document.createElement('option');
+        opt.value = fid;
+        opt.textContent = folders[fid];
+        folderSel.appendChild(opt);
+      }
+    });
+    folderSel.value = existingFolderId || '__new__';
+
+    // Quand on choisit un dossier existant, pré-remplir le nom et mettre à jour l'ID
+    if (!folderSel.dataset.folderSelBound) {
+      folderSel.addEventListener('change', () => {
+        const sel = folderSel.value;
+        const overlay = document.getElementById('modal-overlay-folder');
+        const nameInput = document.getElementById('folder-name-input');
+        if (sel === '__new__') {
+          if (nameInput) nameInput.value = '';
+          if (overlay) overlay.dataset.existingFolderId = '';
+        } else {
+          const foldersNow = loadFolders();
+          if (nameInput) nameInput.value = foldersNow[sel] || '';
+          if (overlay) overlay.dataset.existingFolderId = sel;
+        }
+      });
+      folderSel.dataset.folderSelBound = '1';
+    }
+  }
+
   const nameInput = document.getElementById('folder-name-input');
   if (nameInput) nameInput.value = existingFolderName;
 
@@ -1746,7 +1790,11 @@ export function saveFolderGroupModal() {
   if (nameInput) nameInput.style.borderColor = '';
 
   const existingFolderId = overlay.dataset.existingFolderId || '';
-  const folderId = existingFolderId || ('folder_' + Math.random().toString(36).substr(2, 9));
+  // Utiliser le dossier sélectionné dans le select (existant ou nouveau)
+  const folderSel = document.getElementById('folder-existing-select');
+  const selValue = folderSel ? folderSel.value : '__new__';
+  const existingFolderIdFinal = (selValue && selValue !== '__new__') ? selValue : (overlay.dataset.existingFolderId || '');
+  const folderId = existingFolderIdFinal || ('folder_' + Math.random().toString(36).substr(2, 9));
 
   const folders = loadFolders();
   folders[folderId] = folderName;
@@ -2879,8 +2927,10 @@ function renderMiniBoardFromFen(fen) {
   return `
     <div class="survival-mini-board">
       ${displaySquares.map((piece, idx) => {
-        const rank = Math.floor(idx / 8);
-        const file = idx % 8;
+        // Calculer la position réelle sur l'échiquier (pas l'index dans displaySquares)
+        const realIdx = state.boardFlipped ? 63 - idx : idx;
+        const rank = Math.floor(realIdx / 8);
+        const file = realIdx % 8;
         const dark = (rank + file) % 2 === 1;
         return `<div class="survival-mini-square ${dark ? 'is-dark' : 'is-light'}">${piece}</div>`;
       }).join('')}
@@ -3075,11 +3125,13 @@ function createSection(label, items, key, container) {
 
   // Drop zone at top of section so items can be moved to first position
   const sectionColor = key === 'white' ? 'w' : 'b';
-  function makeDropZone(insertBeforeId) {
+  // isInsideFolder=true → refuse les drags de dossier (pas de dossiers imbriqués)
+  function makeDropZone(insertBeforeId, isInsideFolder = false) {
     const dz = document.createElement('div');
     dz.className = 'rep-drop-zone';
     dz.addEventListener('dragover', e => {
       if (!currentDragColor || currentDragColor !== sectionColor) return;
+      if (isInsideFolder && currentDragIsFolder) return; // pas de dossier dans dossier
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       dz.classList.add('active');
@@ -3090,20 +3142,48 @@ function createSection(label, items, key, container) {
     dz.addEventListener('drop', e => {
       e.preventDefault();
       dz.classList.remove('active');
-      const fromId = e.dataTransfer.getData('text/plain');
-      if (!fromId || fromId === insertBeforeId) return;
-      const fromIdx = state.repertoires.findIndex(r => r.id === fromId);
-      if (fromIdx === -1 || state.repertoires[fromIdx].color !== sectionColor) return;
+      const rawId = e.dataTransfer.getData('text/plain');
+      if (!rawId) return;
       const activeRepId = state.repertoires[state.activeRepIndex]?.id ?? null;
-      const moved = state.repertoires.splice(fromIdx, 1)[0];
-      let insertAt;
-      if (insertBeforeId) {
-        insertAt = state.repertoires.findIndex(r => r.id === insertBeforeId);
-        if (insertAt === -1) insertAt = state.repertoires.length;
+
+      if (rawId.startsWith('folder:')) {
+        // ── Drag d'un dossier entier ───────────────────────────────────
+        if (isInsideFolder) return;
+        const fid = rawId.slice(7);
+        const folderReps = state.repertoires.filter(r => r.folderId === fid && r.color === sectionColor);
+        if (!folderReps.length) return;
+        // Retirer tous les reps du dossier (en partant de la fin pour ne pas décaler les indices)
+        for (let i = state.repertoires.length - 1; i >= 0; i--) {
+          if (state.repertoires[i].folderId === fid && state.repertoires[i].color === sectionColor) {
+            state.repertoires.splice(i, 1);
+          }
+        }
+        // Insérer à la position cible
+        let insertAt;
+        if (insertBeforeId) {
+          insertAt = state.repertoires.findIndex(r => r.id === insertBeforeId);
+          if (insertAt === -1) insertAt = state.repertoires.length;
+        } else {
+          insertAt = state.repertoires.reduce((acc, r, i) => r.color === sectionColor ? i + 1 : acc, 0);
+        }
+        folderReps.forEach((r, offset) => state.repertoires.splice(insertAt + offset, 0, r));
       } else {
-        insertAt = state.repertoires.reduce((acc, r, i) => r.color === sectionColor ? i + 1 : acc, 0);
+        // ── Drag d'un répertoire individuel ───────────────────────────
+        const fromId = rawId;
+        if (fromId === insertBeforeId) return;
+        const fromIdx = state.repertoires.findIndex(r => r.id === fromId);
+        if (fromIdx === -1 || state.repertoires[fromIdx].color !== sectionColor) return;
+        const moved = state.repertoires.splice(fromIdx, 1)[0];
+        let insertAt;
+        if (insertBeforeId) {
+          insertAt = state.repertoires.findIndex(r => r.id === insertBeforeId);
+          if (insertAt === -1) insertAt = state.repertoires.length;
+        } else {
+          insertAt = state.repertoires.reduce((acc, r, i) => r.color === sectionColor ? i + 1 : acc, 0);
+        }
+        state.repertoires.splice(insertAt, 0, moved);
       }
-      state.repertoires.splice(insertAt, 0, moved);
+
       if (activeRepId != null) state.activeRepIndex = state.repertoires.findIndex(r => r.id === activeRepId);
       saveRepOrder();
       render();
@@ -3167,8 +3247,109 @@ function createSection(label, items, key, container) {
     const subContainer = document.createElement('div');
     subContainer.className = 'sub-variants-container';
 
+    // ── Drop zone entre variantes (réordonnancement) ──────────────────
+    function makeVarDropZone(insertBeforeId, parentNode, d) {
+      const dz = document.createElement('div');
+      dz.className = 'rep-drop-zone';
+      dz.style.marginLeft = d * 15 + 'px';
+      dz.addEventListener('dragover', e => {
+        if (!currentDragVarId) return;
+        const dragParentId = currentDragVarParentId;
+        const nodeId = parentNode ? parentNode.id : null;
+        if (dragParentId !== nodeId) return;
+        e.preventDefault();
+        dz.classList.add('active');
+      });
+      dz.addEventListener('dragleave', e => {
+        if (!dz.contains(e.relatedTarget)) dz.classList.remove('active');
+      });
+      dz.addEventListener('drop', e => {
+        e.preventDefault();
+        dz.classList.remove('active');
+        if (!currentDragVarId || !parentNode) return;
+        if (currentDragVarParentId !== (parentNode.id || null)) return;
+
+        const isVarFolder = currentDragVarId.startsWith('varfolder:');
+        if (isVarFolder) {
+          // Réordonner les dossiers de variantes.
+          // Les membres d'un dossier se trouvent sous des nœuds unnamed dans parentNode.children.
+          // On réordonne ces nœuds unnamed (ou nœuds nommés directs) dans parentNode.children.
+          const fid = currentDragVarId.slice('varfolder:'.length);
+
+          // Trouver dans parentNode.children le "bloc" de nœuds associés au dossier dragué
+          // Un bloc = les nœuds unnamed dont les descendants incluent des membres de ce dossier,
+          // plus les membres directs.
+          function nodeContainsFolderId(n, folderId) {
+            if (n.varName && n.folderId === folderId) return true;
+            return n.children.some(c => nodeContainsFolderId(c, folderId));
+          }
+
+          // Indices dans parentNode.children des nœuds appartenant au dossier dragué
+          const draggedIndices = [];
+          parentNode.children.forEach((c, i) => {
+            if (nodeContainsFolderId(c, fid)) draggedIndices.push(i);
+          });
+          if (!draggedIndices.length) return;
+
+          // Nœud cible : le nœud dans parentNode.children qui contient insertBeforeId
+          // insertBeforeId = ID du premier membre du dossier destination
+          let targetIdx = -1;
+          if (insertBeforeId) {
+            parentNode.children.forEach((c, i) => {
+              function hasId(n, id) { return n.id === id || n.children.some(cc => hasId(cc, id)); }
+              if (hasId(c, insertBeforeId)) targetIdx = i;
+            });
+          }
+
+          // Extraire les nœuds du dossier dragué (en partant de la fin pour ne pas décaler)
+          const draggedNodes = draggedIndices.map(i => parentNode.children[i]);
+          for (let i = draggedIndices.length - 1; i >= 0; i--) {
+            parentNode.children.splice(draggedIndices[i], 1);
+          }
+
+          // Recalculer la position cible après suppression
+          let insertAt;
+          if (targetIdx === -1) {
+            insertAt = parentNode.children.length;
+          } else {
+            // Ajuster l'index : chaque suppression avant targetIdx décale d'un rang
+            const removedBefore = draggedIndices.filter(i => i < targetIdx).length;
+            insertAt = targetIdx - removedBefore;
+          }
+          draggedNodes.forEach((n, offset) => parentNode.children.splice(insertAt + offset, 0, n));
+        } else {
+          // Variante individuelle : opérer sur le parent réel du nœud dragué
+          function findNodeById(n, id) {
+            if (n.id === id) return n;
+            for (const c of n.children) { const f = findNodeById(c, id); if (f) return f; }
+            return null;
+          }
+          const movedNode = findNodeById(rep, currentDragVarId);
+          if (!movedNode || !movedNode.parent) return;
+          const realParent = movedNode.parent;
+
+          const fromIdx = realParent.children.findIndex(c => c.id === currentDragVarId);
+          if (fromIdx === -1) return;
+          const moved = realParent.children.splice(fromIdx, 1)[0];
+
+          // insertBeforeId peut être dans realParent ou dans un parent différent.
+          // On cherche d'abord dans realParent, sinon on insère à la fin.
+          let insertAt = insertBeforeId
+            ? realParent.children.findIndex(c => c.id === insertBeforeId)
+            : -1;
+          if (insertAt === -1) insertAt = realParent.children.length;
+          realParent.children.splice(insertAt, 0, moved);
+        }
+        currentDragVarId = null;
+        currentDragVarParentId = null;
+        scheduleRepertoireSync(rep.id);
+        render();
+      });
+      return dz;
+    }
+
     // ── Render one named variant item ─────────────────────────────────
-    function renderVariantItem(child, d) {
+    function renderVariantItem(child, d, parentNode) {
       const item = document.createElement('div');
       item.className = `sub-var-item ${state.currentNode.id === child.id ? 'active' : ''}`;
       item.style.marginLeft = d * 15 + 'px';
@@ -3209,6 +3390,29 @@ function createSection(label, items, key, container) {
         render();
       };
       item.oncontextmenu = e => handleRightClick(e, 'repertoire_subitem', child);
+      // Drag-to-reorder variante (même mécanique que les cartes répertoire)
+      item.addEventListener('mousedown', e => {
+        if (e.target.closest('button, .tree-toggle, .rep-medal-badge')) return;
+        e.stopPropagation();
+        item.draggable = true;
+      });
+      item.addEventListener('mouseup', () => { item.draggable = false; });
+      item.addEventListener('dragstart', e => {
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', child.id);
+        currentDragVarId = child.id;
+        currentDragVarParentId = parentNode ? parentNode.id : null;
+        setTimeout(() => item.classList.add('rep-dragging'), 0);
+      });
+      item.addEventListener('dragend', () => {
+        item.draggable = false;
+        currentDragVarId = null;
+        currentDragVarParentId = null;
+        item.classList.remove('rep-dragging');
+        subContainer.querySelectorAll('.rep-drop-zone').forEach(el => el.classList.remove('active'));
+      });
+      subContainer.appendChild(makeVarDropZone(child.id, parentNode, d));
       subContainer.appendChild(item);
       if (state.repExpanded.has(child.id)) {
         buildSubVarTree(child, d + 1, new Set());
@@ -3220,6 +3424,9 @@ function createSection(label, items, key, container) {
       const folders = loadFolders();
       node.children.forEach(child => {
         if (!child.varName) {
+          // On partage processedFolderIds entre toutes les branches unnamed du même niveau.
+          // collectFolderMembers cherche dans tout le sous-arbre, donc le dossier est rendu
+          // complet dès sa première rencontre et ignoré ensuite (même Set partagé).
           buildSubVarTree(child, depth, processedFolderIds);
           return;
         }
@@ -3228,7 +3435,7 @@ function createSection(label, items, key, container) {
         const hasFolderDef = fid && folders[fid];
 
         if (!hasFolderDef) {
-          renderVariantItem(child, depth);
+          renderVariantItem(child, depth, node);
           return;
         }
 
@@ -3236,8 +3443,16 @@ function createSection(label, items, key, container) {
         if (processedFolderIds.has(fid)) return;
         processedFolderIds.add(fid);
 
-        // All direct siblings belonging to this folder
-        const members = node.children.filter(c => c.varName && c.folderId === fid);
+        // Tous les membres du dossier dans tout le sous-arbre du rep (pas seulement
+        // les enfants directs de node) pour gérer les variantes sous des branches unnamed différentes.
+        function collectFolderMembers(n, folderId, result = []) {
+          n.children.forEach(c => {
+            if (c.varName && c.folderId === folderId) result.push(c);
+            else if (!c.varName) collectFolderMembers(c, folderId, result);
+          });
+          return result;
+        }
+        const members = collectFolderMembers(rep, fid);
         const folderKey = '__var_folder__' + fid;
         const folderOpen = state.repExpanded.has(folderKey + '__open')
           || !state.repExpanded.has(folderKey + '__closed');
@@ -3273,7 +3488,30 @@ function createSection(label, items, key, container) {
         folderMain.appendChild(nameSpan);
 
         folderItem.appendChild(folderMain);
+        // Drop zone avant ce dossier de variantes
+        subContainer.appendChild(makeVarDropZone(members[0]?.id || null, node, depth));
         subContainer.appendChild(folderItem);
+        // Drag-to-reorder du dossier de variantes
+        folderItem.addEventListener('mousedown', e => {
+          if (e.target.closest('button, .tree-toggle')) return;
+          folderItem.draggable = true;
+        });
+        folderItem.addEventListener('mouseup', () => { folderItem.draggable = false; });
+        folderItem.addEventListener('dragstart', e => {
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', 'varfolder:' + fid);
+          currentDragVarId = 'varfolder:' + fid;
+          currentDragVarParentId = node.id;
+          setTimeout(() => folderItem.classList.add('rep-dragging'), 0);
+        });
+        folderItem.addEventListener('dragend', () => {
+          folderItem.draggable = false;
+          currentDragVarId = null;
+          currentDragVarParentId = null;
+          folderItem.classList.remove('rep-dragging');
+          subContainer.querySelectorAll('.rep-drop-zone').forEach(el => el.classList.remove('active'));
+        });
         folderItem.onclick = e => {
           e.stopPropagation();
           if (folderOpen) {
@@ -3288,9 +3526,11 @@ function createSection(label, items, key, container) {
         folderItem.oncontextmenu = e => openFolderCtxMenu(e, fid, false);
 
         if (folderOpen) {
-          members.forEach(m => renderVariantItem(m, depth + 1));
+          members.forEach(m => renderVariantItem(m, depth + 1, node));
         }
       });
+      // Drop zone finale (en bas de ce niveau)
+      subContainer.appendChild(makeVarDropZone(null, node, depth));
     }
 
     buildSubVarTree(rep);
@@ -3314,6 +3554,7 @@ function createSection(label, items, key, container) {
     wrap.addEventListener('dragend', () => {
       wrap.draggable = false;
       currentDragColor = null;
+      currentDragIsFolder = false;
       wrap.classList.remove('rep-dragging');
       content.querySelectorAll('.rep-drop-zone').forEach(el => el.classList.remove('active'));
     });
@@ -3392,13 +3633,37 @@ function createSection(label, items, key, container) {
       folderBody.className = 'rep-folder-body';
 
       folderWraps.forEach(b => {
-        folderBody.appendChild(makeDropZone(b.rep.id));
+        folderBody.appendChild(makeDropZone(b.rep.id, true)); // isInsideFolder=true
         folderBody.appendChild(b.wrap);
       });
-      folderBody.appendChild(makeDropZone(null));
+      folderBody.appendChild(makeDropZone(null, true));
+
+      // ── Drag-to-reorder du dossier entier ─────────────────────────
+      folderEl.draggable = false; // activé sur mousedown
+      folderHeader.addEventListener('mousedown', e => {
+        if (e.target.closest('button, .folder-toggle, .tree-toggle')) return;
+        folderEl.draggable = true;
+      });
+      folderHeader.addEventListener('mouseup', () => { folderEl.draggable = false; });
+      folderEl.addEventListener('dragstart', e => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'folder:' + fid);
+        currentDragColor = sectionColor;
+        currentDragIsFolder = true;
+        setTimeout(() => folderEl.classList.add('rep-dragging'), 0);
+      });
+      folderEl.addEventListener('dragend', () => {
+        folderEl.draggable = false;
+        currentDragColor = null;
+        currentDragIsFolder = false;
+        folderEl.classList.remove('rep-dragging');
+        content.querySelectorAll('.rep-drop-zone').forEach(el => el.classList.remove('active'));
+      });
 
       folderEl.appendChild(folderHeader);
       folderEl.appendChild(folderBody);
+      // Drop zone AVANT ce dossier (au niveau section, pas à l'intérieur)
+      content.appendChild(makeDropZone(folderWraps[0].rep.id));
       content.appendChild(folderEl);
     }
     // Si déjà rendu dans un dossier, ne rien faire (déjà ajouté)
@@ -4203,11 +4468,11 @@ function generateMiniboardHtml(fen, move) {
     
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
-        const isLight = (r + c) % 2 === 0;
-        const bg = isLight ? lightSquare : darkSquare;
         // Respecter l'orientation du grand échiquier
         const row = state.boardFlipped ? 7 - r : r;
         const col = state.boardFlipped ? 7 - c : c;
+        const isLight = (row + col) % 2 === 0;
+        const bg = isLight ? lightSquare : darkSquare;
         const piece = board[row][col];
         const sq = String.fromCharCode(97 + col) + (8 - row);
         
