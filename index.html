@@ -10,8 +10,10 @@
 
 <title>Alpha Chess : Beta Fermée</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mliebelt/pgn-parser@1.4.19/lib/index.umd.js"></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@mliebelt/pgn-parser@1.4.19/lib/index.umd.js" defer></script>
 
 <style>
 :root {
@@ -1424,6 +1426,7 @@ body {
   font-size: 0.82rem;
   color: var(--text-main);
   cursor: pointer;
+  user-select: none;
   padding: 5px 12px;
   border-radius: 4px;
   display: flex;
@@ -4041,6 +4044,13 @@ body {
 <div id="modal-overlay-folder" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10100;align-items:center;justify-content:center;">
   <div style="background:var(--bg-color,#1e1e1e);border:1px solid var(--border-color,#444);border-radius:10px;padding:24px 28px;min-width:340px;max-width:480px;width:92%;max-height:80vh;display:flex;flex-direction:column;gap:14px;">
     <h3 id="modal-folder-title" style="margin:0;font-size:1.05em;">📁 Grouper en dossier</h3>
+    <div id="folder-existing-row">
+      <label style="font-size:.85em;color:var(--text-muted,#aaa);">Dossier existant</label>
+      <select id="folder-existing-select"
+        style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--border-color,#555);border-radius:6px;background:var(--input-bg,#2a2a2a);color:var(--text-color,#eee);font-size:.9em;box-sizing:border-box;">
+        <option value="__new__">+ Nouveau dossier…</option>
+      </select>
+    </div>
     <div>
       <label style="font-size:.85em;color:var(--text-muted,#aaa);">Nom du dossier</label>
       <input id="folder-name-input" type="text" placeholder="Ex: Défense française" maxlength="60"

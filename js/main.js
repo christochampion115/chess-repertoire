@@ -50,19 +50,20 @@ async function initializeApp() {
   eventBus.on('hideMenus', ui.hideMenus);
   initDomBindings();
 
+  // Afficher la page d'accueil immédiatement, sans attendre l'auth réseau.
+  ui.hideSplashScreen();
+  ui.showHomeView();
+  ui.render();
+
   auth.registerGuestModeLoader(() => {
     // Ne pas charger les données d'exemple ici pour éviter les doublons
     // Elles seront chargées dans confirmGuestMode()
     ui.render();
   });
 
-  const restored = await auth.bootstrapSession();
+  await auth.bootstrapSession();
 
-  // Dans tous les cas, on démarre sur la page d'accueil.
-  // Le splash screen n'est plus utilisé comme point d'entrée.
-  ui.hideSplashScreen();
-  ui.showHomeView();
-  
+  // Re-render après restauration de session (met à jour le compte, les répertoires, etc.)
   ui.render();
 }
 
