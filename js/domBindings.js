@@ -39,6 +39,7 @@ const BUTTON_BINDINGS = [
   ['btn-reset-position',         () => ui.resetPosition()],
   ['btn-nav-back',               () => ui.navBack()],
   ['btn-nav-forward',            () => ui.navForward()],
+  ['btn-flip-board',             () => ui.flipBoard()],
   ['btn-open-board-theme',       () => ui.openBoardThemeMenu()],
 
   // ── Moniteur ──
@@ -193,12 +194,12 @@ function initCoreUiBindings() {
       const actionEl = event.target.closest('[data-menu-action]');
       if (actionEl) {
         const action = actionEl.getAttribute('data-menu-action');
-        if (action === 'flip-board') ui.flipBoard();
         if (action === 'rename-repertoire') ui.openRenameRepModal();
         if (action === 'name-variation') ui.openNameVarModal();
         if (action === 'add-to-tree') ui.addSelectedMoveToTree();
         if (action === 'open-in-tree') ui.openCurrentNodeInTree();
         if (action === 'group-folder') ui.openFolderGroupModal();
+        if (action === 'remove-from-repertoire') { ui.removeVariantFromRepertoire(); ui.hideMenus(); }
         if (action === 'comment') ui.openCommentModal();
         if (action === 'delete') ui.openDeleteClick();
         return;
