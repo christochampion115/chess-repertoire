@@ -924,7 +924,7 @@ body {
 
 .board-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   width: min(100%, 780px);
   padding-right: 38px;
@@ -1547,7 +1547,7 @@ body {
 
 .board-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   width: min(100%, 780px);
   padding-right: 38px;
@@ -2692,7 +2692,7 @@ body {
     width: 100%;
   }
   .board-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .ctrl-btn {
     min-height: 48px;
@@ -3875,6 +3875,7 @@ body {
       <button class="ctrl-btn" id="btn-reset-position">⟲</button>
       <button class="ctrl-btn" id="btn-nav-back">←</button>
       <button class="ctrl-btn" id="btn-nav-forward">→</button>
+      <button class="ctrl-btn" id="btn-flip-board">↕</button>
       <button class="ctrl-btn" id="btn-open-board-theme">🎨</button>
     </div>
   </div>
@@ -4014,12 +4015,12 @@ body {
 </aside>
 
 <div id="ctx-menu" class="ctx-menu">
-  <div class="menu-item opt-flip" data-menu-action="flip-board">Retourner l'échiquier</div>
   <div class="menu-item opt-rename-rep" style="display:none" data-menu-action="rename-repertoire">Renommer le répertoire</div>
   <div class="menu-item opt-name-var" style="display:none" data-menu-action="name-variation">Nommer la variante</div>
   <div class="menu-item opt-add-tree" style="display:none" data-menu-action="add-to-tree">Ajouter à l'arbre</div>
   <div class="menu-item opt-open-in-tree" style="display:none" data-menu-action="open-in-tree">Ouvrir dans l'arbre</div>
   <div class="menu-item opt-group-folder" style="display:none" data-menu-action="group-folder">📁 Grouper en dossier</div>
+  <div class="menu-item opt-remove-from-rep" style="display:none;color:#fb923c" data-menu-action="remove-from-repertoire">Retirer du répertoire</div>
   <div class="menu-item opt-comment" data-menu-action="comment">Commenter</div>
   <div class="menu-item opt-delete" style="color:#f87171" data-menu-action="delete">Supprimer</div>
   <div class="ctx-annot-section">

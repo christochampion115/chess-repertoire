@@ -1915,19 +1915,19 @@ export function handleRightClick(event, type, target = null, index = -1) {
   const isNode = type === 'monitor' || type === 'arbre' || type === 'board' || isRepSub;
   const isNotRoot = state.menuTarget && state.menuTarget.parent;
 
-  const flipEl = menu.querySelector('.opt-flip');
   const renameEl = menu.querySelector('.opt-rename-rep');
   const nameVarEl = menu.querySelector('.opt-name-var');
   const addTreeEl = menu.querySelector('.opt-add-tree');
   const openInTreeEl = menu.querySelector('.opt-open-in-tree');
   const groupFolderEl = menu.querySelector('.opt-group-folder');
+  const removeFromRepEl = menu.querySelector('.opt-remove-from-rep');
   const commentEl = menu.querySelector('.opt-comment');
   const deleteEl = menu.querySelector('.opt-delete');
 
-  if (flipEl) flipEl.style.display = isMoveContext ? 'none' : 'block';
   if (renameEl) renameEl.style.display = isRepRoot ? 'block' : 'none';
   if (openInTreeEl) openInTreeEl.style.display = (isRepRoot || isRepSub) ? 'block' : 'none';
   if (groupFolderEl) groupFolderEl.style.display = (isRepRoot || isRepSub) ? 'block' : 'none';
+  if (removeFromRepEl) removeFromRepEl.style.display = isRepSub ? 'block' : 'none';
   if (deleteEl) {
     deleteEl.textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
     deleteEl.style.display = isMoveContext ? 'none' : (isRepRoot || (isNode && isNotRoot) ? 'block' : 'none');
@@ -1991,6 +1991,45 @@ export function navForward() {
 
 export function flipBoard() {
   state.boardFlipped = !state.boardFlipped;
+  render();
+}
+
+export function removeVariantFromRepertoire() {
+  const node = state.menuTarget;
+  if (!node || !node.varName) return;
+
+  function countNamedDescendants(n) {
+    let count = 0;
+    n.children.forEach(c => {
+      if (c.varName) count++;
+      count += countNamedDescendants(c);
+    });
+    return count;
+  }
+
+  const subCount = countNamedDescendants(node);
+  if (subCount > 0) {
+    const plural = subCount > 1 ? 's' : '';
+    const confirmed = window.confirm(
+      `Cette variante contient ${subCount} sous-variante${plural}. ` +
+      `Elles seront aussi retirées du répertoire (les coups restent dans l'arbre). Continuer ?`
+    );
+    if (!confirmed) return;
+  }
+
+  function clearNames(n) {
+    if (n.varName) {
+      n.varName = null;
+      n.folderId = null;
+      if (n.varAnnotation) n.varAnnotation = null;
+    }
+    n.children.forEach(clearNames);
+  }
+  clearNames(node);
+
+  let repRoot = node;
+  while (repRoot.parent) repRoot = repRoot.parent;
+  scheduleRepertoireSync(repRoot.id);
   render();
 }
 
@@ -3254,9 +3293,12 @@ function createSection(label, items, key, container) {
       dz.style.marginLeft = d * 15 + 'px';
       dz.addEventListener('dragover', e => {
         if (!currentDragVarId) return;
-        const dragParentId = currentDragVarParentId;
-        const nodeId = parentNode ? parentNode.id : null;
-        if (dragParentId !== nodeId) return;
+        // Pour les dossiers de variantes, on autorise le dépôt depuis n'importe quelle branche
+        if (!currentDragVarId.startsWith('varfolder:')) {
+          const dragParentId = currentDragVarParentId;
+          const nodeId = parentNode ? parentNode.id : null;
+          if (dragParentId !== nodeId) return;
+        }
         e.preventDefault();
         dz.classList.add('active');
       });
@@ -3266,57 +3308,53 @@ function createSection(label, items, key, container) {
       dz.addEventListener('drop', e => {
         e.preventDefault();
         dz.classList.remove('active');
-        if (!currentDragVarId || !parentNode) return;
-        if (currentDragVarParentId !== (parentNode.id || null)) return;
+        if (!currentDragVarId) return;
 
         const isVarFolder = currentDragVarId.startsWith('varfolder:');
+        // Variante non-dossier : contrôle du même parent
+        if (!isVarFolder && (!parentNode || currentDragVarParentId !== (parentNode.id || null))) return;
+
         if (isVarFolder) {
           // Réordonner les dossiers de variantes.
-          // Les membres d'un dossier se trouvent sous des nœuds unnamed dans parentNode.children.
-          // On réordonne ces nœuds unnamed (ou nœuds nommés directs) dans parentNode.children.
+          // Si même parent : opérer sur parentNode.children (variantes directes).
+          // Si parents différents : opérer sur rep.children (branches unnamed au niveau racine).
           const fid = currentDragVarId.slice('varfolder:'.length);
 
-          // Trouver dans parentNode.children le "bloc" de nœuds associés au dossier dragué
-          // Un bloc = les nœuds unnamed dont les descendants incluent des membres de ce dossier,
-          // plus les membres directs.
           function nodeContainsFolderId(n, folderId) {
             if (n.varName && n.folderId === folderId) return true;
             return n.children.some(c => nodeContainsFolderId(c, folderId));
           }
 
-          // Indices dans parentNode.children des nœuds appartenant au dossier dragué
+          const sameParent = parentNode && currentDragVarParentId === (parentNode.id || null);
+          const effectiveParent = sameParent ? parentNode : rep;
+
           const draggedIndices = [];
-          parentNode.children.forEach((c, i) => {
+          effectiveParent.children.forEach((c, i) => {
             if (nodeContainsFolderId(c, fid)) draggedIndices.push(i);
           });
           if (!draggedIndices.length) return;
 
-          // Nœud cible : le nœud dans parentNode.children qui contient insertBeforeId
-          // insertBeforeId = ID du premier membre du dossier destination
           let targetIdx = -1;
           if (insertBeforeId) {
-            parentNode.children.forEach((c, i) => {
+            effectiveParent.children.forEach((c, i) => {
               function hasId(n, id) { return n.id === id || n.children.some(cc => hasId(cc, id)); }
               if (hasId(c, insertBeforeId)) targetIdx = i;
             });
           }
 
-          // Extraire les nœuds du dossier dragué (en partant de la fin pour ne pas décaler)
-          const draggedNodes = draggedIndices.map(i => parentNode.children[i]);
+          const draggedNodes = draggedIndices.map(i => effectiveParent.children[i]);
           for (let i = draggedIndices.length - 1; i >= 0; i--) {
-            parentNode.children.splice(draggedIndices[i], 1);
+            effectiveParent.children.splice(draggedIndices[i], 1);
           }
 
-          // Recalculer la position cible après suppression
           let insertAt;
           if (targetIdx === -1) {
-            insertAt = parentNode.children.length;
+            insertAt = effectiveParent.children.length;
           } else {
-            // Ajuster l'index : chaque suppression avant targetIdx décale d'un rang
             const removedBefore = draggedIndices.filter(i => i < targetIdx).length;
             insertAt = targetIdx - removedBefore;
           }
-          draggedNodes.forEach((n, offset) => parentNode.children.splice(insertAt + offset, 0, n));
+          draggedNodes.forEach((n, offset) => effectiveParent.children.splice(insertAt + offset, 0, n));
         } else {
           // Variante individuelle : opérer sur le parent réel du nœud dragué
           function findNodeById(n, id) {
@@ -3420,14 +3458,14 @@ function createSection(label, items, key, container) {
     }
 
     // ── Walk sub-variant tree, grouping by folderId ───────────────────
-    function buildSubVarTree(node, depth = 0, processedFolderIds = new Set()) {
+    function buildSubVarTree(node, depth = 0, processedFolderIds = new Set(), isUnnamedRecursion = false) {
       const folders = loadFolders();
       node.children.forEach(child => {
         if (!child.varName) {
           // On partage processedFolderIds entre toutes les branches unnamed du même niveau.
           // collectFolderMembers cherche dans tout le sous-arbre, donc le dossier est rendu
           // complet dès sa première rencontre et ignoré ensuite (même Set partagé).
-          buildSubVarTree(child, depth, processedFolderIds);
+          buildSubVarTree(child, depth, processedFolderIds, true);
           return;
         }
 
@@ -3529,8 +3567,11 @@ function createSection(label, items, key, container) {
           members.forEach(m => renderVariantItem(m, depth + 1, node));
         }
       });
-      // Drop zone finale (en bas de ce niveau)
-      subContainer.appendChild(makeVarDropZone(null, node, depth));
+      // Drop zone finale : uniquement au niveau top (pas dans les récursions unnamed)
+      // pour éviter l'accumulation de zones vides créant un espace indésirable
+      if (!isUnnamedRecursion) {
+        subContainer.appendChild(makeVarDropZone(null, node, depth));
+      }
     }
 
     buildSubVarTree(rep);
