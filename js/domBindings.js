@@ -4,6 +4,7 @@ import * as repertoire from './repertoire.js';
 import { toggleAnalysis, setAnalysisDepth, setAnalysisSettings, renderEngineArrows } from './analysis.js';
 import { updateStatsSortBy } from './ui.js';
 import { saveState } from './storage.js';
+import { syncUserSettings } from './auth.js';
 
 const ANALYSIS_SETTINGS_KEY = 'alphaChess.analysisSettings';
 
@@ -310,6 +311,7 @@ function _saveAnalysisSettings() {
     ...(state.analysisSettings ?? {}),
     depth: state.analysisDepth ?? 10,
   });
+  syncUserSettings();
 }
 
 /** Initialise la modale Paramètres d'analyse (bouton rouage + modale) */

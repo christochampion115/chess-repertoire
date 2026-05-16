@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { eventBus } from './events.js';
 import { isDescendant, getPathString } from './arbre.js';
-import { scheduleRepertoireSync, registerCreatedRepertoire, deleteRepertoireFromBackend } from './auth.js';
+import { scheduleRepertoireSync, registerCreatedRepertoire, deleteRepertoireFromBackend, syncUserSettings } from './auth.js';
 import { loadState, saveState } from './storage.js';
 
 const FOLDERS_KEY = 'alphaChess.repFolders';
@@ -58,6 +58,7 @@ export function createNewRepertoire(config = null) {
         folders[folderId] = newName;
         saveState(FOLDERS_KEY, folders);
         state.repFolders = { ...folders };
+        syncUserSettings();
       } else {
         folderId = null;
       }

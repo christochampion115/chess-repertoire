@@ -9,7 +9,20 @@ const AUTH_USER_KEY = 'alphaChess.authUser';
 const LOCAL_REPERTOIRES_KEY = 'alphaChess.localRepertoires';
 const SELECTION_KEY = 'alphaChess.workspaceSelection';
 const DELETED_REP_IDS_KEY = 'alphaChess.deletedRepertoireIds';
+const FOLDERS_KEY = 'alphaChess.repFolders';
+const BOARD_THEME_KEY = 'alphaChess.boardTheme';
+const ANALYSIS_SETTINGS_KEY = 'alphaChess.analysisSettings';
 const SYNC_DEBOUNCE_MS = 1000;
+
+// ─── Mode lecture seule ───────────────────────────────────────────────────────
+// Quand l'app tourne sur 127.0.0.1 (Live Server), elle charge les données
+// depuis le serveur de production mais ne sauvegarde RIEN (ni en DB, ni en
+// localStorage). C'est l'interface de test.
+export function isReadOnlyMode() {
+  return typeof window !== 'undefined' &&
+    window.location != null &&
+    window.location.hostname === '127.0.0.1';
+}
 
 let syncTimer = null;
 let syncInFlight = false;
@@ -243,8 +256,8 @@ function restoreWorkspaceSelection(snapshot) {
 }
 
 function persistLocalRepertoires() {
-  // Ne rien sauvegarder en mode invité : la persistence est liée au compte.
-  if (!state.auth.user) {
+  // Ne rien sauvegarder en mode invité ou en mode test (127.0.0.1).
+  if (!state.auth.user || isReadOnlyMode()) {
     return;
   }
 
@@ -290,7 +303,7 @@ function getActiveRepertoire() {
 }
 
 function scheduleDirtyFlush() {
-  if (!state.auth.token || !state.auth.user || dirtyRepertoireIds.size === 0) {
+  if (isReadOnlyMode() || !state.auth.token || !state.auth.user || dirtyRepertoireIds.size === 0) {
     return;
   }
 
@@ -614,6 +627,8 @@ async function finalizeAuthenticatedSession(response) {
     window.DEBUG_MODE && console.log('[DEBUG]', { step: 'finalizeAuthenticatedSession:GET_repertoires', count: repertoireResponse?.repertoires?.length ?? 0 });
     const remoteLoaded = applyRemoteRepertoires(repertoireResponse?.repertoires || []);
     setAuthenticatedState({ token, user });
+    // Charger les paramètres (dossiers, ordre, thème, analyse) depuis la DB
+    await fetchAndApplyRemoteSettings(token);
 
     if (!remoteLoaded && loadLocalRepertoiresIntoState()) {
       setAuthenticatedState({ token, user });
@@ -715,6 +730,114 @@ export function setAuthMode(mode) {
   state.auth.error = '';
 }
 
+// ─── Paramètres utilisateur (dossiers, ordre, thème, analyse) ─────────────────
+// Ces paramètres sont stockés en DB via /api/user-settings pour être accessibles
+// depuis n'importe quel domaine/navigateur. Le localStorage sert de cache local.
+
+let settingsSyncTimer = null;
+
+/**
+ * Synchronise les paramètres locaux courants (dossiers, ordre, thème, analyse)
+ * vers la DB. Silencieux en cas d'erreur. Sans effet en mode lecture seule.
+ */
+export function syncUserSettings() {
+  if (isReadOnlyMode() || !state.auth.token || !state.auth.user) return;
+
+  if (settingsSyncTimer) clearTimeout(settingsSyncTimer);
+  settingsSyncTimer = setTimeout(async () => {
+    settingsSyncTimer = null;
+    try {
+      const settings = {
+        repFolders: state.repFolders || {},
+        repOrder: state.repertoires.filter(r => !r.isExample).map(r => String(r.id)),
+        boardTheme: state.boardTheme || null,
+        analysisSettings: {
+          ...(state.analysisSettings || {}),
+          depth: state.analysisDepth ?? 10
+        },
+        statsFilters: {
+          eloMin: state.statsFilters?.eloMin ?? 0,
+          eloMax: state.statsFilters?.eloMax ?? 3000,
+          currentDatabase: state.statsFilters?.currentDatabase ?? 'lichess',
+          sortBy: state.statsFilters?.sortBy ?? 'frequency'
+        }
+      };
+      await apiRequest('/user-settings', {
+        method: 'PUT',
+        token: state.auth.token,
+        body: { settings }
+      });
+    } catch {
+      // Non-critique : la prochaine sync réussira
+    }
+  }, 600);
+}
+
+/**
+ * Applique les paramètres reçus depuis la DB dans le state et le localStorage.
+ */
+function applyRemoteSettings(settings) {
+  if (!settings || typeof settings !== 'object') return;
+
+  if (settings.repFolders && typeof settings.repFolders === 'object') {
+    state.repFolders = settings.repFolders;
+    saveState(FOLDERS_KEY, settings.repFolders);
+  }
+
+  if (Array.isArray(settings.repOrder) && settings.repOrder.length > 0) {
+    saveState('rep-display-order', settings.repOrder);
+    // Réordonner state.repertoires selon l'ordre serveur
+    const orderMap = new Map(settings.repOrder.map((id, i) => [String(id), i]));
+    state.repertoires.sort((a, b) => {
+      const ia = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : Infinity;
+      const ib = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : Infinity;
+      return ia - ib;
+    });
+  }
+
+  if (settings.boardTheme && settings.boardTheme.light && settings.boardTheme.dark) {
+    state.boardTheme = settings.boardTheme;
+    saveState(BOARD_THEME_KEY, settings.boardTheme);
+  }
+
+  if (settings.analysisSettings && typeof settings.analysisSettings === 'object') {
+    Object.assign(state.analysisSettings, settings.analysisSettings);
+    state.analysisSettings.multiPV = Math.min(5, Math.max(1, state.analysisSettings.multiPV ?? 3));
+    state.analysisSettings.arrowCount = Math.min(
+      state.analysisSettings.multiPV,
+      Math.max(1, state.analysisSettings.arrowCount ?? 3)
+    );
+    if (Number.isFinite(settings.analysisSettings.depth)) {
+      state.analysisDepth = Math.min(20, Math.max(5, settings.analysisSettings.depth));
+    }
+    saveState(ANALYSIS_SETTINGS_KEY, { ...state.analysisSettings, depth: state.analysisDepth });
+  }
+
+  if (settings.statsFilters && typeof settings.statsFilters === 'object') {
+    const sf = settings.statsFilters;
+    if (Number.isFinite(sf.eloMin)) state.statsFilters.eloMin = sf.eloMin;
+    if (Number.isFinite(sf.eloMax)) state.statsFilters.eloMax = sf.eloMax;
+    if (sf.currentDatabase) state.statsFilters.currentDatabase = sf.currentDatabase;
+    if (sf.sortBy) state.statsFilters.sortBy = sf.sortBy;
+    saveState('alphaChess.statsFilters', {
+      eloMin: state.statsFilters.eloMin,
+      eloMax: state.statsFilters.eloMax,
+      currentDatabase: state.statsFilters.currentDatabase,
+      sortBy: state.statsFilters.sortBy
+    });
+  }
+}
+
+async function fetchAndApplyRemoteSettings(token) {
+  try {
+    const response = await apiRequest('/user-settings', { token });
+    applyRemoteSettings(response?.settings || {});
+  } catch {
+    // Non-critique : on garde les valeurs localStorage
+  }
+}
+
+
 export async function bootstrapSession() {
   const token = loadState(AUTH_TOKEN_KEY);
   const user = loadState(AUTH_USER_KEY);
@@ -749,6 +872,8 @@ export async function bootstrapSession() {
     window.DEBUG_MODE && console.log('[DEBUG]', { step: 'bootstrapSession:GET_repertoires', count: repertoireResponse?.repertoires?.length ?? 0 });
     const remoteLoaded = applyRemoteRepertoires(repertoireResponse?.repertoires || []);
     setAuthenticatedState({ token, user: sessionResponse.user });
+    // Charger les paramètres (dossiers, ordre, thème, analyse) depuis la DB
+    await fetchAndApplyRemoteSettings(token);
 
     if (!remoteLoaded && loadLocalRepertoiresIntoState()) {
       setAuthenticatedState({ token, user: sessionResponse.user });
@@ -893,6 +1018,7 @@ function getRepertoireForCurrentNode() {
 }
 
 export function scheduleRepertoireSync(forceRepId = null) {
+  if (isReadOnlyMode()) return;
   const repForNode = getRepertoireForCurrentNode();
   const activeRep = getActiveRepertoire();
   window.DEBUG_MODE && console.log('[DEBUG]', { step: 'scheduleRepertoireSync', activeRepIndex: state.activeRepIndex, repForNodeId: repForNode?.id, repForNodeName: repForNode?.name, activeRepId: activeRep?.id, hasToken: !!state.auth.token, hasUser: !!state.auth.user });
@@ -926,6 +1052,7 @@ export function scheduleRepertoireSync(forceRepId = null) {
 }
 
 export function registerCreatedRepertoire(repertoire) {
+  if (isReadOnlyMode()) return;
   persistLocalRepertoires();
 
   // Ne jamais synchroniser les données d'exemple
@@ -957,6 +1084,7 @@ export function registerCreatedRepertoire(repertoire) {
 }
 
 export function deleteRepertoireFromBackend(repertoire) {
+  if (isReadOnlyMode()) return;
   if (!repertoire) {
     return;
   }
@@ -1023,6 +1151,10 @@ export function getAccountStatusText() {
     return 'Mode invite';
   }
 
+  if (isReadOnlyMode()) {
+    return 'Mode test';
+  }
+
   if (state.auth.syncStatus === 'saving') {
     return 'Sauvegarde...';
   }
@@ -1037,6 +1169,10 @@ export function getAccountStatusText() {
 export function getSyncStatusText() {
   if (!state.auth.user) {
     return 'Connectez-vous pour sauvegarder vos repertoires.';
+  }
+
+  if (isReadOnlyMode()) {
+    return 'Mode test — les modifications ne sont pas enregistrées.';
   }
 
   if (state.auth.syncStatus === 'saving') {

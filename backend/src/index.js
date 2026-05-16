@@ -5,6 +5,7 @@ const authRoutes = require('./routes/authRoutes');
 const repertoireRoutes = require('./routes/repertoireRoutes');
 const lichessStatsRoutes = require('./routes/lichessStatsRoutes');
 const trainingStatsRoutes = require('./routes/trainingStatsRoutes');
+const userSettingsRoutes = require('./routes/userSettingsRoutes');
 const { initDb } = require('./db');
 const { corsOrigin } = require('./config');
 
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/repertoires', repertoireRoutes);
 app.use('/api/lichess', lichessStatsRoutes);
 app.use('/api/training-stats', trainingStatsRoutes);
+app.use('/api/user-settings', userSettingsRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
