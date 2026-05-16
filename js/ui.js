@@ -11,7 +11,7 @@ import {
   confirmDelete as confirmDeleteMove,
 } from './repertoire.js';
 import { fetchLichessStats } from './stats.js';
-import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync } from './auth.js';
+import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync, syncUserSettings, isReadOnlyMode } from './auth.js';
 import { apiRequest } from './api.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
@@ -24,6 +24,7 @@ let currentDragVarParentId = null;
 
 function saveRepOrder() {
   saveState('rep-display-order', state.repertoires.map(r => r.id));
+  syncUserSettings();
 }
 
 const BOARD_THEME_KEY = 'alphaChess.boardTheme';
@@ -633,6 +634,13 @@ function syncStatsFilterControls() {
       state.lastStatsRequestKey = '';
       state.statsSelectedUci = '';
       scheduleStatsReloadForCurrentFen();
+      saveState('alphaChess.statsFilters', {
+        eloMin: state.statsFilters.eloMin,
+        eloMax: state.statsFilters.eloMax,
+        currentDatabase: state.statsFilters.currentDatabase,
+        sortBy: state.statsFilters.sortBy
+      });
+      syncUserSettings();
     };
 
     eloButton.addEventListener('click', (event) => {
@@ -646,6 +654,13 @@ function syncStatsFilterControls() {
         state.lastStatsRequestKey = '';
         state.statsSelectedUci = '';
         scheduleStatsReloadForCurrentFen();
+        saveState('alphaChess.statsFilters', {
+          eloMin: state.statsFilters.eloMin,
+          eloMax: state.statsFilters.eloMax,
+          currentDatabase: state.statsFilters.currentDatabase,
+          sortBy: state.statsFilters.sortBy
+        });
+        syncUserSettings();
       }
       syncStatsFilterControls();
     });
@@ -659,6 +674,13 @@ function syncStatsFilterControls() {
         state.lastStatsRequestKey = '';
         state.statsSelectedUci = '';
         scheduleStatsReloadForCurrentFen();
+        saveState('alphaChess.statsFilters', {
+          eloMin: state.statsFilters.eloMin,
+          eloMax: state.statsFilters.eloMax,
+          currentDatabase: state.statsFilters.currentDatabase,
+          sortBy: state.statsFilters.sortBy
+        });
+        syncUserSettings();
       }
 
       state.statsFilters.eloPanelOpen = !state.statsFilters.eloPanelOpen;
@@ -686,6 +708,13 @@ function syncStatsFilterControls() {
       state.lastStatsRequestKey = '';
       state.statsSelectedUci = '';
       scheduleStatsReloadForCurrentFen();
+      saveState('alphaChess.statsFilters', {
+        eloMin: state.statsFilters.eloMin,
+        eloMax: state.statsFilters.eloMax,
+        currentDatabase: state.statsFilters.currentDatabase,
+        sortBy: state.statsFilters.sortBy
+      });
+      syncUserSettings();
       syncStatsFilterControls();
     });
     mastersButton.dataset.bound = '1';
@@ -1013,6 +1042,13 @@ function handleStatsClick(move) {
 export function updateStatsSortBy(sortType) {
   if (!['frequency', 'winrate', 'winrate-white', 'winrate-black', 'engine'].includes(sortType)) return;
   state.statsFilters.sortBy = sortType;
+  saveState('alphaChess.statsFilters', {
+    eloMin: state.statsFilters.eloMin,
+    eloMax: state.statsFilters.eloMax,
+    currentDatabase: state.statsFilters.currentDatabase,
+    sortBy: state.statsFilters.sortBy
+  });
+  syncUserSettings();
   refreshStatsPanels();
 }
 
@@ -1325,6 +1361,7 @@ export function openBoardThemeMenu() {
     document.getElementById('theme-classic').onclick = () => {
         state.boardTheme = { light: '#ebecd0', dark: '#779556' };
         saveState(BOARD_THEME_KEY, state.boardTheme);
+        syncUserSettings();
         closeModals();
         render();
     };
@@ -1332,6 +1369,7 @@ export function openBoardThemeMenu() {
     document.getElementById('theme-blue').onclick = () => {
         state.boardTheme = { light: '#d0e7ff', dark: '#4a90e2' };
         saveState(BOARD_THEME_KEY, state.boardTheme);
+        syncUserSettings();
         closeModals();
         render();
     };
@@ -1339,6 +1377,7 @@ export function openBoardThemeMenu() {
     document.getElementById('theme-gray').onclick = () => {
         state.boardTheme = { light: '#e5e5e5', dark: '#666' };
         saveState(BOARD_THEME_KEY, state.boardTheme);
+        syncUserSettings();
         closeModals();
         render();
     };
@@ -1346,6 +1385,7 @@ export function openBoardThemeMenu() {
     document.getElementById('theme-rose').onclick = () => {
         state.boardTheme = { light: '#ffd6e7', dark: '#ff8ab8' };
         saveState(BOARD_THEME_KEY, state.boardTheme);
+        syncUserSettings();
         closeModals();
         render();
     };
@@ -1353,6 +1393,7 @@ export function openBoardThemeMenu() {
     document.getElementById('theme-mauve').onclick = () => {
         state.boardTheme = { light: '#f3e8ff', dark: '#b388ff' };
         saveState(BOARD_THEME_KEY, state.boardTheme);
+        syncUserSettings();
         closeModals();
         render();
     };
@@ -1360,6 +1401,7 @@ export function openBoardThemeMenu() {
     document.getElementById('theme-wood').onclick = () => {
         state.boardTheme = { light: '#f0d9b5', dark: '#b58863' };
         saveState(BOARD_THEME_KEY, state.boardTheme);
+        syncUserSettings();
         closeModals();
         render();
     };
@@ -1456,6 +1498,7 @@ function loadFolders() {
 function saveFolders(folders) {
   saveState(FOLDERS_KEY, folders);
   state.repFolders = folders;
+  syncUserSettings();
 }
 
 /**
@@ -1669,10 +1712,35 @@ export function openFolderGroupModal() {
     // Tous les répertoires de même couleur
     items = state.repertoires.filter(r => r.color === target.color);
   } else {
-    // Toutes les variantes nommées du répertoire parent
-    let root = target;
-    while (root.parent) root = root.parent;
-    items = collectNamedVariants(root);
+    // Variantes nommées du même étage que la cible (même parent visuel)
+    let repRoot = target;
+    while (repRoot.parent) repRoot = repRoot.parent;
+
+    // Parent visuel de target = premier ancêtre nommé, ou repRoot
+    let targetVisualParent = target.parent;
+    while (targetVisualParent && targetVisualParent !== repRoot && !targetVisualParent.varName) {
+      targetVisualParent = targetVisualParent.parent;
+    }
+    if (!targetVisualParent) targetVisualParent = repRoot;
+
+    // Collecter toutes les variantes nommées partageant ce même parent visuel
+    const result = [];
+    function walkForLevel(node) {
+      node.children.forEach(c => {
+        if (c.varName) {
+          // Calculer le parent visuel de c
+          let vp = c.parent;
+          while (vp && vp !== repRoot && !vp.varName) vp = vp.parent;
+          if (!vp) vp = repRoot;
+          if (vp === targetVisualParent) result.push(c);
+          walkForLevel(c); // parcourir en profondeur pour les sous-variantes
+        } else {
+          walkForLevel(c);
+        }
+      });
+    }
+    walkForLevel(repRoot);
+    items = result;
   }
 
   const titleEl = document.getElementById('modal-folder-title');
@@ -3286,19 +3354,45 @@ function createSection(label, items, key, container) {
     const subContainer = document.createElement('div');
     subContainer.className = 'sub-variants-container';
 
+    // ── Helpers drag variantes ────────────────────────────────────────
+    // Recherche d'un nœud par id dans tout le sous-arbre de rep
+    function findNodeInRep(id) {
+      function walk(n) {
+        if (n.id === id) return n;
+        for (const c of n.children) { const f = walk(c); if (f) return f; }
+        return null;
+      }
+      return walk(rep);
+    }
+    // Ancêtre commun le plus profond (unnamed) de deux nœuds dans le sous-arbre de rep.
+    // Permet de trouver le bon niveau de splice même pour des variantes sous des branches différentes.
+    function getLCA(nodeA, nodeB) {
+      const ancestorsA = new Set();
+      let cur = nodeA;
+      while (cur) { ancestorsA.add(cur.id); cur = cur.parent; }
+      cur = nodeB;
+      while (cur) { if (ancestorsA.has(cur.id)) return cur; cur = cur.parent; }
+      return rep;
+    }
+    // Enfant direct de parent sur le chemin vers descendant.
+    function findAnchorIn(descendant, parent) {
+      let node = descendant;
+      while (node && node.parent !== parent) node = node.parent;
+      return node;
+    }
+
     // ── Drop zone entre variantes (réordonnancement) ──────────────────
-    function makeVarDropZone(insertBeforeId, parentNode, d) {
+    // levelId : string partagé par tous les items au même étage visuel dans ce rep
+    //   (rep.id pour depth=0, variantId pour sous-variantes de cette variante).
+    // Utilise getLCA pour trouver dynamiquement le bon nœud de splice
+    // même quand les items sont sous des branches unnamed différentes.
+    function makeVarDropZone(insertBeforeId, levelId, d) {
       const dz = document.createElement('div');
       dz.className = 'rep-drop-zone';
       dz.style.marginLeft = d * 15 + 'px';
       dz.addEventListener('dragover', e => {
         if (!currentDragVarId) return;
-        // Pour les dossiers de variantes, on autorise le dépôt depuis n'importe quelle branche
-        if (!currentDragVarId.startsWith('varfolder:')) {
-          const dragParentId = currentDragVarParentId;
-          const nodeId = parentNode ? parentNode.id : null;
-          if (dragParentId !== nodeId) return;
-        }
+        if (currentDragVarParentId !== levelId) return;
         e.preventDefault();
         dz.classList.add('active');
       });
@@ -3308,76 +3402,58 @@ function createSection(label, items, key, container) {
       dz.addEventListener('drop', e => {
         e.preventDefault();
         dz.classList.remove('active');
-        if (!currentDragVarId) return;
+        if (!currentDragVarId || currentDragVarParentId !== levelId) return;
 
         const isVarFolder = currentDragVarId.startsWith('varfolder:');
-        // Variante non-dossier : contrôle du même parent
-        if (!isVarFolder && (!parentNode || currentDragVarParentId !== (parentNode.id || null))) return;
 
         if (isVarFolder) {
-          // Réordonner les dossiers de variantes.
-          // Si même parent : opérer sur parentNode.children (variantes directes).
-          // Si parents différents : opérer sur rep.children (branches unnamed au niveau racine).
           const fid = currentDragVarId.slice('varfolder:'.length);
-
+          function getFirstMemberOf(folderId) {
+            function walk(n) {
+              if (n.varName && n.folderId === folderId) return n;
+              for (const c of n.children) { const f = walk(c); if (f) return f; }
+              return null;
+            }
+            return walk(rep);
+          }
+          const movedMember = getFirstMemberOf(fid);
+          if (!movedMember) return;
+          const targetNode = insertBeforeId ? findNodeInRep(insertBeforeId) : null;
+          const spliceParent = targetNode ? getLCA(movedMember, targetNode) : movedMember.parent;
           function nodeContainsFolderId(n, folderId) {
             if (n.varName && n.folderId === folderId) return true;
             return n.children.some(c => nodeContainsFolderId(c, folderId));
           }
-
-          const sameParent = parentNode && currentDragVarParentId === (parentNode.id || null);
-          const effectiveParent = sameParent ? parentNode : rep;
-
           const draggedIndices = [];
-          effectiveParent.children.forEach((c, i) => {
+          spliceParent.children.forEach((c, i) => {
             if (nodeContainsFolderId(c, fid)) draggedIndices.push(i);
           });
           if (!draggedIndices.length) return;
-
-          let targetIdx = -1;
-          if (insertBeforeId) {
-            effectiveParent.children.forEach((c, i) => {
-              function hasId(n, id) { return n.id === id || n.children.some(cc => hasId(cc, id)); }
-              if (hasId(c, insertBeforeId)) targetIdx = i;
-            });
-          }
-
-          const draggedNodes = draggedIndices.map(i => effectiveParent.children[i]);
+          const targetAnchor = targetNode ? findAnchorIn(targetNode, spliceParent) : null;
+          const targetIdx = targetAnchor ? spliceParent.children.indexOf(targetAnchor) : -1;
+          const draggedNodes = draggedIndices.map(i => spliceParent.children[i]);
           for (let i = draggedIndices.length - 1; i >= 0; i--) {
-            effectiveParent.children.splice(draggedIndices[i], 1);
+            spliceParent.children.splice(draggedIndices[i], 1);
           }
+          const removedBefore = targetIdx === -1 ? 0 : draggedIndices.filter(i => i < targetIdx).length;
+          const insertAt = targetIdx === -1 ? spliceParent.children.length : targetIdx - removedBefore;
+          draggedNodes.forEach((n, offset) => spliceParent.children.splice(insertAt + offset, 0, n));
 
-          let insertAt;
-          if (targetIdx === -1) {
-            insertAt = effectiveParent.children.length;
-          } else {
-            const removedBefore = draggedIndices.filter(i => i < targetIdx).length;
-            insertAt = targetIdx - removedBefore;
-          }
-          draggedNodes.forEach((n, offset) => effectiveParent.children.splice(insertAt + offset, 0, n));
         } else {
-          // Variante individuelle : opérer sur le parent réel du nœud dragué
-          function findNodeById(n, id) {
-            if (n.id === id) return n;
-            for (const c of n.children) { const f = findNodeById(c, id); if (f) return f; }
-            return null;
-          }
-          const movedNode = findNodeById(rep, currentDragVarId);
-          if (!movedNode || !movedNode.parent) return;
-          const realParent = movedNode.parent;
-
-          const fromIdx = realParent.children.findIndex(c => c.id === currentDragVarId);
+          const movedNode = findNodeInRep(currentDragVarId);
+          if (!movedNode) return;
+          const targetNode = insertBeforeId ? findNodeInRep(insertBeforeId) : null;
+          const spliceParent = targetNode ? getLCA(movedNode, targetNode) : movedNode.parent;
+          const movedAnchor = findAnchorIn(movedNode, spliceParent);
+          if (!movedAnchor) return;
+          const fromIdx = spliceParent.children.indexOf(movedAnchor);
           if (fromIdx === -1) return;
-          const moved = realParent.children.splice(fromIdx, 1)[0];
-
-          // insertBeforeId peut être dans realParent ou dans un parent différent.
-          // On cherche d'abord dans realParent, sinon on insère à la fin.
-          let insertAt = insertBeforeId
-            ? realParent.children.findIndex(c => c.id === insertBeforeId)
-            : -1;
-          if (insertAt === -1) insertAt = realParent.children.length;
-          realParent.children.splice(insertAt, 0, moved);
+          spliceParent.children.splice(fromIdx, 1);
+          const targetAnchor = targetNode ? findAnchorIn(targetNode, spliceParent) : null;
+          const insertAt = targetAnchor ? spliceParent.children.indexOf(targetAnchor) : -1;
+          spliceParent.children.splice(insertAt === -1 ? spliceParent.children.length : insertAt, 0, movedAnchor);
         }
+
         currentDragVarId = null;
         currentDragVarParentId = null;
         scheduleRepertoireSync(rep.id);
@@ -3440,7 +3516,7 @@ function createSection(label, items, key, container) {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', child.id);
         currentDragVarId = child.id;
-        currentDragVarParentId = parentNode ? parentNode.id : null;
+        currentDragVarParentId = parentNode;
         setTimeout(() => item.classList.add('rep-dragging'), 0);
       });
       item.addEventListener('dragend', () => {
@@ -3453,19 +3529,21 @@ function createSection(label, items, key, container) {
       subContainer.appendChild(makeVarDropZone(child.id, parentNode, d));
       subContainer.appendChild(item);
       if (state.repExpanded.has(child.id)) {
-        buildSubVarTree(child, d + 1, new Set());
+        buildSubVarTree(child, d + 1, new Set(), child.id);
       }
     }
 
     // ── Walk sub-variant tree, grouping by folderId ───────────────────
-    function buildSubVarTree(node, depth = 0, processedFolderIds = new Set(), isUnnamedRecursion = false) {
+    // levelId : identifiant de l'étage visuel (rep.id pour depth=0, variantId pour sous-variantes)
+    function buildSubVarTree(node, depth = 0, processedFolderIds = new Set(), levelId = rep.id) {
       const folders = loadFolders();
+      let renderedSomething = false; // true si au moins un item a été rendu à ce niveau
       node.children.forEach(child => {
         if (!child.varName) {
           // On partage processedFolderIds entre toutes les branches unnamed du même niveau.
           // collectFolderMembers cherche dans tout le sous-arbre, donc le dossier est rendu
           // complet dès sa première rencontre et ignoré ensuite (même Set partagé).
-          buildSubVarTree(child, depth, processedFolderIds, true);
+          buildSubVarTree(child, depth, processedFolderIds, levelId);
           return;
         }
 
@@ -3473,13 +3551,15 @@ function createSection(label, items, key, container) {
         const hasFolderDef = fid && folders[fid];
 
         if (!hasFolderDef) {
-          renderVariantItem(child, depth, node);
+          renderedSomething = true;
+          renderVariantItem(child, depth, levelId);
           return;
         }
 
         // Folder: render once on first encounter
         if (processedFolderIds.has(fid)) return;
         processedFolderIds.add(fid);
+        renderedSomething = true;
 
         // Tous les membres du dossier dans tout le sous-arbre du rep (pas seulement
         // les enfants directs de node) pour gérer les variantes sous des branches unnamed différentes.
@@ -3532,6 +3612,7 @@ function createSection(label, items, key, container) {
         // Drag-to-reorder du dossier de variantes
         folderItem.addEventListener('mousedown', e => {
           if (e.target.closest('button, .tree-toggle')) return;
+          e.stopPropagation(); // empêche le bubble vers wrap.mousedown
           folderItem.draggable = true;
         });
         folderItem.addEventListener('mouseup', () => { folderItem.draggable = false; });
@@ -3540,7 +3621,7 @@ function createSection(label, items, key, container) {
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain', 'varfolder:' + fid);
           currentDragVarId = 'varfolder:' + fid;
-          currentDragVarParentId = node.id;
+          currentDragVarParentId = levelId;
           setTimeout(() => folderItem.classList.add('rep-dragging'), 0);
         });
         folderItem.addEventListener('dragend', () => {
@@ -3564,17 +3645,16 @@ function createSection(label, items, key, container) {
         folderItem.oncontextmenu = e => openFolderCtxMenu(e, fid, false);
 
         if (folderOpen) {
-          members.forEach(m => renderVariantItem(m, depth + 1, node));
+          members.forEach(m => renderVariantItem(m, depth + 1, m.id));
         }
       });
-      // Drop zone finale : uniquement au niveau top (pas dans les récursions unnamed)
-      // pour éviter l'accumulation de zones vides créant un espace indésirable
-      if (!isUnnamedRecursion) {
-        subContainer.appendChild(makeVarDropZone(null, node, depth));
+      // Drop zone finale
+      if (renderedSomething) {
+        subContainer.appendChild(makeVarDropZone(null, levelId, depth));
       }
     }
 
-    buildSubVarTree(rep);
+    buildSubVarTree(rep, 0, new Set(), rep.id);
     if (subContainer.children.length > 0 && state.repExpanded.has(rep.id)) {
       wrap.appendChild(subContainer);
     }
@@ -3587,6 +3667,7 @@ function createSection(label, items, key, container) {
     });
     wrap.addEventListener('mouseup', () => { wrap.draggable = false; });
     wrap.addEventListener('dragstart', e => {
+      e.stopPropagation(); // empêche le bubble vers folderEl.dragstart qui écraserait le dataTransfer
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', rep.id);
       currentDragColor = rep.color;

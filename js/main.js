@@ -43,6 +43,15 @@ async function initializeApp() {
     state.analysisDepth = Math.min(20, Math.max(5, savedAnalysisSettings.depth));
   }
 
+  // Restaurer les filtres stats (Elo range, base, tri) depuis le localStorage
+  const savedStatsFilters = loadState('alphaChess.statsFilters');
+  if (savedStatsFilters && typeof savedStatsFilters === 'object') {
+    if (Number.isFinite(savedStatsFilters.eloMin)) state.statsFilters.eloMin = savedStatsFilters.eloMin;
+    if (Number.isFinite(savedStatsFilters.eloMax)) state.statsFilters.eloMax = savedStatsFilters.eloMax;
+    if (savedStatsFilters.currentDatabase) state.statsFilters.currentDatabase = savedStatsFilters.currentDatabase;
+    if (savedStatsFilters.sortBy) state.statsFilters.sortBy = savedStatsFilters.sortBy;
+  }
+
   assignDomReferences();
   eventBus.on('render', ui.render);
   eventBus.on('syncDone', ui.updateAccountUI); // mise à jour statut sync sans re-render complet

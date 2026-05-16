@@ -62,6 +62,14 @@ async function initDb() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      "userId" INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      settings TEXT NOT NULL DEFAULT '{}',
+      "updatedAt" TEXT NOT NULL
+    )
+  `);
+
   // Nettoyage des tokens expirés au démarrage
   await pool.query('DELETE FROM revoked_tokens WHERE "expiresAt" < $1', [new Date().toISOString()]);
 }
