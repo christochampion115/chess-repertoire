@@ -2,6 +2,7 @@ import { state, initState } from './state.js';
 import { eventBus } from './events.js';
 import { saveState, loadState, clearState } from './storage.js';
 import { apiRequest } from './api.js';
+import { sanitizeTranspositions, sanitizeAllRepertoires } from './repertoire.js';
 import { serializeRepertoire, deserializeRepertoire, hydrateRepertoires } from './repertoirePersistence.js';
 
 const AUTH_TOKEN_KEY = 'alphaChess.authToken';
@@ -105,11 +106,19 @@ function deserializeStoredRepertoire(rawRepertoire) {
     return null;
   }
 
+  let deserialized;
   if (rawRepertoire.rootId && Array.isArray(rawRepertoire.nodes)) {
-    return deserializeRepertoire(rawRepertoire);
+    deserialized = deserializeRepertoire(rawRepertoire);
+  } else {
+    deserialized = hydrateRepertoires([rawRepertoire])[0] || null;
   }
 
-  return hydrateRepertoires([rawRepertoire])[0] || null;
+  // Nettoyer les transpositions invalides
+  if (deserialized) {
+    sanitizeTranspositions(deserialized);
+  }
+
+  return deserialized;
 }
 
 function findNodeById(rootNode, nodeId) {
@@ -288,6 +297,7 @@ function loadLocalRepertoiresIntoState(selectionSnapshot = null) {
   }
   
   state.repertoires = deserializedReps;
+  sanitizeAllRepertoires();
   restoreWorkspaceSelection(selection);
 
   return state.repertoires.length > 0;
@@ -509,6 +519,7 @@ function applyRemoteRepertoires(repertoires) {
   }
 
   state.repertoires = loadedRepertoires;
+  sanitizeAllRepertoires();
   // Double-check : s'assurer qu'aucune donnée d'exemple n'a glissé à travers
   state.repertoires = state.repertoires.filter(rep => !rep.isExample);
   restoreWorkspaceSelection(selection);

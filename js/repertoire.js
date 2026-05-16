@@ -601,7 +601,7 @@ export function addMove(parent, san) {
   }
 
   const now = nextCreatedAt();
-  const transpo = state.activeRepIndex !== -1 ? findTranspositionFast(targetFen, now) : null;
+  const transpo = state.activeRepIndex !== -1 ? findTranspositionFast(targetFen, now, parent) : null;
   const node = {
     id: Math.random().toString(36).substr(2, 9),
     san: move.san,
@@ -655,15 +655,45 @@ function buildFenIndex(rep) {
 /**
  * Recherche de transposition en O(1) via l'index FEN.
  * Remplace findTranspositionInActiveRep (DFS O(n)) pour les performances.
+ * Valide que le candidat n'est PAS un descendant du parent actuel
+ * (garantit que la transposition va d'une branche basse vers une branche plus haute).
  */
-function findTranspositionFast(fen, currentTime) {
+function findTranspositionFast(fen, currentTime, currentParent) {
   if (state.activeRepIndex === -1) return null;
   const rep = state.repertoires[state.activeRepIndex];
   if (!rep) return null;
   if (!rep._fenIndex) buildFenIndex(rep);
   const nf = normalizeFen(fen);
   const candidate = rep._fenIndex.get(nf);
-  return (candidate && candidate.createdAt < currentTime) ? candidate : null;
+  
+  // Vérifier que le candidat est valide en temps et en arborescence
+  if (!candidate || candidate.createdAt >= currentTime) return null;
+  
+  // Valider que le candidat n'est PAS un descendant du parent actuel
+  // (sinon ce serait une transposition "vers le bas", ce qui est interdit)
+  if (currentParent && isNodeDescendantOf(candidate, currentParent)) {
+    return null;
+  }
+  
+  // Valider que le candidat a des enfants (au moins une continuation)
+  // Sinon, la transposition ne mène nulle part
+  if (!candidate.children || candidate.children.length === 0) {
+    return null;
+  }
+  
+  return candidate;
+}
+
+/**
+ * Vérifie si `node` est un descendant de `ancestor`.
+ */
+function isNodeDescendantOf(node, ancestor) {
+  let temp = node;
+  while (temp) {
+    if (temp.id === ancestor.id) return true;
+    temp = temp.parent;
+  }
+  return false;
 }
 
 function findTranspositionInActiveRep(fen, currentTime) {
@@ -682,6 +712,74 @@ function findTranspositionInActiveRep(fen, currentTime) {
 
   search(state.repertoires[state.activeRepIndex]);
   return found;
+}
+
+/**
+ * Valide et nettoie les transpositions d'un répertoire après désérialisation.
+ * Invalide les transpositions qui violent les contraintes:
+ * 1. sourceNode n'existe pas
+ * 2. sourceNode n'a pas d'enfants (aucune continuation)
+ * 3. sourceNode est un descendant du nœud actuel (transposition "vers le bas")
+ */
+export function sanitizeTranspositions(repertoire) {
+  if (!repertoire || typeof repertoire !== 'object') return;
+
+  const invalidatedIds = new Set();
+
+  function walk(node) {
+    // Si ce nœud est marqué comme invalide, l'invalider
+    if (node.isTransposition && invalidatedIds.has(node.id)) {
+      node.isTransposition = false;
+      node.sourceNode = null;
+    }
+
+    // Valider les transpositions dont ce nœud est parent
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        if (child.isTransposition && child.sourceNode) {
+          let isValid = true;
+
+          // Contrainte 1 : sourceNode existe (déjà testé mais au cas où)
+          if (!child.sourceNode) {
+            isValid = false;
+          }
+          // Contrainte 2 : sourceNode a des enfants
+          else if (!child.sourceNode.children || child.sourceNode.children.length === 0) {
+            isValid = false;
+          }
+          // Contrainte 3 : sourceNode n'est pas un descendant du parent de child
+          else if (isNodeDescendantOf(child.sourceNode, node)) {
+            isValid = false;
+          }
+
+          if (!isValid) {
+            invalidatedIds.add(child.id);
+            child.isTransposition = false;
+            child.sourceNode = null;
+          }
+        }
+      }
+    }
+
+    // Récursion
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach(walk);
+    }
+  }
+
+  walk(repertoire);
+}
+
+/**
+ * Nettoie toutes les transpositions de tous les répertoires dans le state.
+ * À appeler après le chargement/restauration des répertoires.
+ */
+export function sanitizeAllRepertoires() {
+  if (state.repertoires && Array.isArray(state.repertoires)) {
+    for (const repertoire of state.repertoires) {
+      sanitizeTranspositions(repertoire);
+    }
+  }
 }
 
 export function selectSymbol(symbol) {
