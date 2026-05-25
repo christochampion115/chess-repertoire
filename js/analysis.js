@@ -720,6 +720,8 @@ export function renderEngineArrows() {
   if (!svg) return;
   svg.innerHTML = '';
 
+  if (state.trainingActive) return;
+
   const settings = state.analysisSettings ?? {};
   if (!state.isAnalysisEnabled || !settings.showArrows) return;
 

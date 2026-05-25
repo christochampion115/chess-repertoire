@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const authRoutes = require('./routes/authRoutes');
 const repertoireRoutes = require('./routes/repertoireRoutes');
 const lichessStatsRoutes = require('./routes/lichessStatsRoutes');
+const chesscomStatsRoutes = require('./routes/chesscomStatsRoutes');
 const trainingStatsRoutes = require('./routes/trainingStatsRoutes');
 const userSettingsRoutes = require('./routes/userSettingsRoutes');
 const { initDb } = require('./db');
@@ -24,6 +25,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/repertoires', repertoireRoutes);
 app.use('/api/lichess', lichessStatsRoutes);
+app.use('/api/chesscom', chesscomStatsRoutes);
 app.use('/api/training-stats', trainingStatsRoutes);
 app.use('/api/user-settings', userSettingsRoutes);
 
@@ -40,12 +42,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000;
 initDb()
-  .then(() => {
+  .catch((error) => {
+    console.warn('[dev] Database unavailable — auth/repertoires routes will fail:', error.message);
+  })
+  .finally(() => {
     app.listen(PORT, () => {
       console.log(`Alpha Chess backend listening on http://localhost:${PORT}`);
     });
-  })
-  .catch((error) => {
-    console.error('Database initialization failed:', error);
-    process.exit(1);
   });

@@ -829,6 +829,8 @@ function applyRemoteSettings(settings) {
     if (Number.isFinite(sf.eloMin)) state.statsFilters.eloMin = sf.eloMin;
     if (Number.isFinite(sf.eloMax)) state.statsFilters.eloMax = sf.eloMax;
     if (sf.currentDatabase) state.statsFilters.currentDatabase = sf.currentDatabase;
+    // Le mode "player" est session-only : on ne le restaure pas au chargement
+    if (state.statsFilters.currentDatabase === 'player') state.statsFilters.currentDatabase = 'lichess';
     if (sf.sortBy) state.statsFilters.sortBy = sf.sortBy;
     saveState('alphaChess.statsFilters', {
       eloMin: state.statsFilters.eloMin,

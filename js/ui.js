@@ -10,7 +10,7 @@ import {
   confirmRenameRep,
   confirmDelete as confirmDeleteMove,
 } from './repertoire.js';
-import { fetchLichessStats } from './stats.js';
+import { fetchLichessStats, fetchPlayerStats } from './stats.js';
 import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync, syncUserSettings, isReadOnlyMode } from './auth.js';
 import { apiRequest } from './api.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
@@ -403,6 +403,10 @@ function getStatsRequestKey(fen) {
   const min = state.statsFilters?.eloMin ?? ELO_MIN;
   const max = state.statsFilters?.eloMax ?? ELO_MAX;
   const db = state.statsFilters?.currentDatabase ?? 'lichess';
+  if (db === 'player') {
+    const f = state.statsFilters;
+    return `${fen || ''}|player|${f.playerUsername}|${f.playerColor}|${f.playerTimeClass}|${f.playerDateFrom}-${f.playerDateTo}|${f.playerEloMin}-${f.playerEloMax}`;
+  }
   return `${fen || ''}|${min},${max}|${db}`;
 }
 
@@ -579,7 +583,8 @@ function syncStatsFilterControls() {
   }
 
   const isMasters = state.statsFilters.currentDatabase === 'masters';
-  const isLichess = !isMasters;
+  const isPlayer  = state.statsFilters.currentDatabase === 'player';
+  const isLichess = !isMasters && !isPlayer;
 
   const normalizedRange = normalizeEloRange(state.statsFilters.eloMin, state.statsFilters.eloMax, 'max');
   state.statsFilters.eloMin = normalizedRange.min;
@@ -592,8 +597,36 @@ function syncStatsFilterControls() {
 
   const eloLabel = formatEloRangeLabel(state.statsFilters.eloMin, state.statsFilters.eloMax);
   eloValue.textContent = eloLabel;
-  // Badge : "Masters" en mode masters, sinon plage Elo
-  eloBadge.textContent = isMasters ? 'Masters' : eloLabel;
+  // Sous-étiquette Elo : visible uniquement en mode Lichess (pas Masters, pas Joueur)
+  eloBadge.textContent = eloLabel;
+  eloBadge.style.display = isLichess ? '' : 'none';
+
+  // Sous-étiquette Joueur : visible uniquement en mode player, avec tooltip au survol
+  const playerBadge = document.getElementById('stats-filter-player-badge');
+  const playerTooltip = document.getElementById('stats-player-tooltip');
+  if (playerBadge) {
+    if (isPlayer && state.statsFilters.playerUsername) {
+      playerBadge.textContent = `@${state.statsFilters.playerUsername}`;
+      playerBadge.style.display = '';
+      if (playerTooltip) {
+        const pf = state.statsFilters;
+        const colorLabel = pf.playerColor === 'black' ? 'Noirs' : 'Blancs';
+        const tcMap = { all: 'Toutes', bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapide', daily: 'Corresp.' };
+        const tcLabel = tcMap[pf.playerTimeClass || 'all'] || 'Toutes';
+        const lines = [`@${pf.playerUsername}`, `Couleur : ${colorLabel}`, `Cadence : ${tcLabel}`];
+        if (pf.playerDateFrom || pf.playerDateTo) {
+          lines.push(`Période : ${pf.playerDateFrom || '…'} → ${pf.playerDateTo || '…'}`);
+        }
+        if (pf.playerEloMin > 0 || pf.playerEloMax < 3000) {
+          lines.push(`Elo adv : ${pf.playerEloMin} – ${pf.playerEloMax}`);
+        }
+        playerTooltip.textContent = lines.join('\n');
+      }
+    } else {
+      playerBadge.style.display = 'none';
+      if (playerTooltip) playerTooltip.textContent = '';
+    }
+  }
 
   // Panneau Elo : uniquement quand la base Lichess est sélectionnée
   eloPanel.hidden = !isLichess || !state.statsFilters.eloPanelOpen;
@@ -605,6 +638,12 @@ function syncStatsFilterControls() {
   // Bouton Masters : actif quand mode masters
   if (mastersButton) {
     mastersButton.classList.toggle('active', isMasters);
+  }
+
+  // Bouton Joueur : actif quand mode player
+  const playerButton = document.getElementById('stats-filter-player-btn');
+  if (playerButton) {
+    playerButton.classList.toggle('active', isPlayer);
   }
 
   // ─── Listeners Elo (une seule fois) ───────────────────────────────────────
@@ -720,6 +759,14 @@ function syncStatsFilterControls() {
     mastersButton.dataset.bound = '1';
   }
 
+  // ─── Listeners Joueur (une seule fois) ────────────────────────────────────
+  if (playerButton && !playerButton.dataset.bound) {
+    playerButton.addEventListener('click', () => {
+      openPlayerStatsModal();
+    });
+    playerButton.dataset.bound = '1';
+  }
+
   if (!document.body.dataset.elopaneloutsidebound) {
     document.addEventListener('click', (event) => {
       if (!state.statsFilters?.eloPanelOpen) return;
@@ -733,6 +780,191 @@ function syncStatsFilterControls() {
   }
 
   updateSortButtonStates();
+}
+
+function openPlayerStatsModal() {
+  const modal = document.getElementById('modal-player-stats');
+  if (!modal || !state.modalOverlayEl) return;
+
+  // Réinitialiser l'état de la modale (toujours montrer le formulaire)
+  const formSection = document.getElementById('player-stats-form-section');
+  const loadSection = document.getElementById('player-stats-loading-section');
+  const progressFill = document.getElementById('player-stats-progress-fill');
+  if (formSection) formSection.style.display = '';
+  if (loadSection) loadSection.style.display = 'none';
+  if (progressFill) { progressFill.style.transition = 'none'; progressFill.style.width = '0%'; }
+
+  // Pré-remplir avec valeurs actuelles
+  const f = state.statsFilters;
+  const usernameInput = document.getElementById('player-stats-username');
+  if (usernameInput) usernameInput.value = f.playerUsername || '';
+
+  const colorWhite = document.getElementById('player-stats-color-white');
+  const colorBlack = document.getElementById('player-stats-color-black');
+  if (colorWhite && colorBlack) {
+    colorWhite.checked = f.playerColor !== 'black';
+    colorBlack.checked = f.playerColor === 'black';
+  }
+
+  const timeclassSelect = document.getElementById('player-stats-timeclass');
+  if (timeclassSelect) timeclassSelect.value = f.playerTimeClass || 'all';
+
+  const dateFrom = document.getElementById('player-stats-datefrom-year');
+  const dateFromM = document.getElementById('player-stats-datefrom-month');
+  const dateTo = document.getElementById('player-stats-dateto-year');
+  const dateToM = document.getElementById('player-stats-dateto-month');
+  if (f.playerDateFrom) {
+    const [yr, mn] = (f.playerDateFrom || '').split('/');
+    if (dateFrom) dateFrom.value = yr || '';
+    if (dateFromM) dateFromM.value = mn || '';
+  } else {
+    if (dateFrom) dateFrom.value = '';
+    if (dateFromM) dateFromM.value = '';
+  }
+  if (f.playerDateTo) {
+    const [yr, mn] = (f.playerDateTo || '').split('/');
+    if (dateTo) dateTo.value = yr || '';
+    if (dateToM) dateToM.value = mn || '';
+  } else {
+    if (dateTo) dateTo.value = '';
+    if (dateToM) dateToM.value = '';
+  }
+
+  const eloMin = document.getElementById('player-stats-elomin');
+  if (eloMin) eloMin.value = f.playerEloMin > 0 ? String(f.playerEloMin) : '';
+
+  const eloMax = document.getElementById('player-stats-elomax');
+  if (eloMax) eloMax.value = f.playerEloMax < 3000 ? String(f.playerEloMax) : '';
+
+  const errorEl = document.getElementById('player-stats-error');
+  if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+
+  // Ouvrir le modal
+  state.modalOverlayEl.style.display = 'flex';
+  modal.style.display = 'block';
+  if (usernameInput) usernameInput.focus();
+
+  // Binder les boutons (une seule fois)
+  if (!modal.dataset.bound) {
+    const cancelBtn = document.getElementById('btn-player-stats-cancel');
+    const confirmBtn = document.getElementById('btn-player-stats-confirm');
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => { closeModals(); });
+    }
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async () => {
+        const username = (document.getElementById('player-stats-username')?.value || '').trim();
+        const errorDiv = document.getElementById('player-stats-error');
+
+        if (!username) {
+          if (errorDiv) { errorDiv.textContent = 'Le pseudo Chess.com est requis.'; errorDiv.style.display = ''; }
+          return;
+        }
+
+        const color = document.getElementById('player-stats-color-black')?.checked ? 'black' : 'white';
+        const timeClass = document.getElementById('player-stats-timeclass')?.value || 'all';
+        const fromYear = (document.getElementById('player-stats-datefrom-year')?.value || '').trim();
+        const fromMonth = (document.getElementById('player-stats-datefrom-month')?.value || '').trim();
+        const toYear = (document.getElementById('player-stats-dateto-year')?.value || '').trim();
+        const toMonth = (document.getElementById('player-stats-dateto-month')?.value || '').trim();
+        const dateFromVal = (fromYear && fromMonth) ? `${fromYear}/${fromMonth}` : '';
+        const dateToVal = (toYear && toMonth) ? `${toYear}/${toMonth}` : '';
+        const rawEloMin = parseInt(document.getElementById('player-stats-elomin')?.value || '0', 10);
+        const rawEloMax = parseInt(document.getElementById('player-stats-elomax')?.value || '3000', 10);
+        const playerEloMin = Number.isFinite(rawEloMin) ? Math.min(3000, Math.max(0, rawEloMin)) : 0;
+        const playerEloMax = Number.isFinite(rawEloMax) ? Math.min(3000, Math.max(0, rawEloMax)) : 3000;
+
+        const newFilters = { playerUsername: username, playerColor: color, playerTimeClass: timeClass, playerDateFrom: dateFromVal, playerDateTo: dateToVal, playerEloMin, playerEloMax };
+        const fen = state.currentNode?.fen;
+
+        // Clé de cache (même format que getStatsRequestKey pour player)
+        const cacheKey = `${fen || ''}|player|${username}|${color}|${timeClass}|${dateFromVal}-${dateToVal}|${playerEloMin}-${playerEloMax}`;
+
+        // Vérifier le cache frontend avant de lancer le téléchargement
+        if (state.statsCache?.has(cacheKey)) {
+          Object.assign(state.statsFilters, newFilters, { currentDatabase: 'player', eloPanelOpen: false });
+          state.lichessStats = state.statsCache.get(cacheKey);
+          state.lastStatsRequestKey = cacheKey;
+          state.statsSelectedUci = '';
+          closeModals();
+          syncStatsFilterControls();
+          state.statsShowAll = false;
+          refreshStatsPanels();
+          requestVisibleMoveAnnotations();
+          return;
+        }
+
+        // Afficher la section de chargement
+        const fSection = document.getElementById('player-stats-form-section');
+        const lSection = document.getElementById('player-stats-loading-section');
+        const loadTitle = document.getElementById('player-stats-loading-title');
+        const pFill = document.getElementById('player-stats-progress-fill');
+        if (fSection) fSection.style.display = 'none';
+        if (lSection) lSection.style.display = '';
+        if (loadTitle) loadTitle.textContent = `Chargement des parties de @${username}…`;
+
+        // Animation de progression simulée : 0% → 80% sur ~45s
+        if (pFill) {
+          pFill.style.transition = 'none';
+          pFill.style.width = '0%';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            pFill.style.transition = 'width 45s cubic-bezier(0.05, 0.5, 0.5, 1)';
+            pFill.style.width = '80%';
+          }));
+        }
+
+        // Contrôleur d'annulation
+        const abortCtrl = new AbortController();
+        const abortBtn = document.getElementById('btn-player-stats-abort');
+        const handleAbort = () => {
+          abortCtrl.abort();
+          if (fSection) fSection.style.display = '';
+          if (lSection) lSection.style.display = 'none';
+          if (pFill) { pFill.style.transition = 'none'; pFill.style.width = '0%'; }
+          if (errorDiv) { errorDiv.textContent = ''; errorDiv.style.display = 'none'; }
+        };
+        if (abortBtn) abortBtn.addEventListener('click', handleAbort, { once: true });
+
+        try {
+          const stats = await fetchPlayerStats(fen, newFilters, abortCtrl.signal);
+
+          // Succès : progression à 100% puis fermeture
+          if (pFill) {
+            pFill.style.transition = 'width 0.3s ease';
+            pFill.style.width = '100%';
+          }
+          await new Promise(r => setTimeout(r, 350));
+
+          Object.assign(state.statsFilters, newFilters, { currentDatabase: 'player', eloPanelOpen: false });
+          state.lichessStats = stats;
+          state.lastStatsRequestKey = cacheKey;
+          state.statsSelectedUci = '';
+          if (!state.statsCache) state.statsCache = new Map();
+          state.statsCache.set(cacheKey, stats);
+
+          closeModals();
+          syncStatsFilterControls();
+          state.statsShowAll = false;
+          refreshStatsPanels();
+          requestVisibleMoveAnnotations();
+
+        } catch (error) {
+          if (abortCtrl.signal.aborted) return; // annulé par l'utilisateur
+          if (fSection) fSection.style.display = '';
+          if (lSection) lSection.style.display = 'none';
+          if (pFill) { pFill.style.transition = 'none'; pFill.style.width = '0%'; }
+          if (errorDiv) {
+            errorDiv.textContent = error.message || 'Erreur de chargement.';
+            errorDiv.style.display = '';
+          }
+        }
+      });
+    }
+
+    modal.dataset.bound = '1';
+  }
 }
 
 function formatPercent(value, total) {
@@ -787,6 +1019,17 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
 
   if (!fen) return;
 
+  // Cache frontal : résultat déjà en mémoire → affichage instantané sans loader
+  if (!force && state.statsCache?.has(requestKey)) {
+    state.lichessStats = state.statsCache.get(requestKey);
+    state.lastStatsRequestKey = requestKey;
+    state.statsSelectedUci = '';
+    state.statsShowAll = false;
+    refreshStatsPanels();
+    requestVisibleMoveAnnotations();
+    return;
+  }
+
   // Cache : même clé et pas forcé → pas de re-fetch
   if (!force && state.lastStatsRequestKey === requestKey) return;
 
@@ -806,18 +1049,31 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
   state.statsLoading = true;
   state.currentStatsRequestKey = requestKey;
   state.statsError = null;
+
+  const database = state.statsFilters?.currentDatabase || 'lichess';
+  const loaderText = document.getElementById('stats-global-loader-text');
+  if (loaderText) {
+    loaderText.textContent = (database === 'player' && state.statsFilters.playerUsername)
+      ? `Chargement des parties de @${state.statsFilters.playerUsername}… (peut prendre 30-60s)`
+      : 'Mise a jour des coups...';
+  }
   showGlobalLoader(); // affiche le loader, masque le panel des coups
 
   try {
-    const database = state.statsFilters?.currentDatabase || 'lichess';
-    const stats = await fetchLichessStats(fen, {
-      min: state.statsFilters.eloMin,
-      max: state.statsFilters.eloMax
-    }, database);
+    let stats;
+    if (database === 'player') {
+      stats = await fetchPlayerStats(fen, state.statsFilters);
+    } else {
+      stats = await fetchLichessStats(fen, {
+        min: state.statsFilters.eloMin,
+        max: state.statsFilters.eloMax
+      }, database);
+    }
     // Sauvegarde les données (le requestKey correspond toujours : statsLoading était true)
     state.lichessStats = stats;
     state.lastStatsRequestKey = requestKey;
     state.statsSelectedUci = '';
+    if (state.statsCache) state.statsCache.set(requestKey, stats);
   } catch (error) {
     state.statsError = error.message || 'Erreur de récupération des statistiques';
     state.lastStatsRequestKey = requestKey;

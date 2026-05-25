@@ -49,6 +49,8 @@ async function initializeApp() {
     if (Number.isFinite(savedStatsFilters.eloMin)) state.statsFilters.eloMin = savedStatsFilters.eloMin;
     if (Number.isFinite(savedStatsFilters.eloMax)) state.statsFilters.eloMax = savedStatsFilters.eloMax;
     if (savedStatsFilters.currentDatabase) state.statsFilters.currentDatabase = savedStatsFilters.currentDatabase;
+    // Le mode "player" est session-only : on ne le restaure pas au chargement
+    if (state.statsFilters.currentDatabase === 'player') state.statsFilters.currentDatabase = 'lichess';
     if (savedStatsFilters.sortBy) state.statsFilters.sortBy = savedStatsFilters.sortBy;
   }
 
