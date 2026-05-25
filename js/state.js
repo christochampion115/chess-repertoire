@@ -21,6 +21,7 @@ export const state = {
   currentNode: null,
   lichessStats: null,
   lastStatsRequestKey: '',
+  statsCache: new Map(),
   statsLoading: false,
   statsError: null,
   statsSelectedUci: '',
@@ -34,9 +35,16 @@ export const state = {
     sortPanelOpen: false,
     eloMin: 0,
     eloMax: 3000,
-    currentDatabase: 'lichess',  // 'lichess' | 'masters'
+    currentDatabase: 'lichess',  // 'lichess' | 'masters' | 'player'
     sortBy: 'frequency',
-    candidatesOpen: true
+    candidatesOpen: true,
+    playerUsername: '',
+    playerColor: 'white',
+    playerTimeClass: 'all',
+    playerDateFrom: '',
+    playerDateTo: '',
+    playerEloMin: 0,
+    playerEloMax: 3000
   },
   deleteTargetIdx: -1,
   pendingDeleteType: '',
