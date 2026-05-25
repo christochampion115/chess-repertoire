@@ -46,6 +46,7 @@ const BUTTON_BINDINGS = [
   // ── Moniteur ──
   ['monitor-menu-trigger',       (event) => ui.toggleMonitorMenu(event)],
   ['btn-open-new-rep',           (event) => ui.openNewRepModal(event)],
+  ['btn-switch-free-play',       () => ui.switchToFreePlay()],
 
   // ── Splash screen ──
   ['btn-splash-login',           () => ui.showSplashForm('login')],
@@ -198,6 +199,7 @@ function initCoreUiBindings() {
         if (action === 'rename-repertoire') ui.openRenameRepModal();
         if (action === 'name-variation') ui.openNameVarModal();
         if (action === 'add-to-tree') ui.addSelectedMoveToTree();
+        if (action === 'explore-free-play') ui.exploreInFreePlay();
         if (action === 'open-in-tree') ui.openCurrentNodeInTree();
         if (action === 'group-folder') ui.openFolderGroupModal();
         if (action === 'remove-from-repertoire') { ui.removeVariantFromRepertoire(); ui.hideMenus(); }

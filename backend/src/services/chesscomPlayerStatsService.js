@@ -219,6 +219,44 @@ function makeGamesCacheKey(filters) {
 
 // ── Orchestrateur principal ───────────────────────────────────────────────────
 
+// Helper partagé : garantit que les parties sont dans gamesCache.
+// Retour instantané si déjà chargées, sinon fetch depuis Chess.com.
+async function ensureGamesLoaded(filters) {
+  const { playerUsername, playerColor } = filters;
+  const gamesCacheKey = makeGamesCacheKey(filters);
+  const cached = cacheGet(gamesCache, gamesCacheKey);
+  if (cached) return cached;
+
+  const archives = await getPlayerArchives(playerUsername);
+  const toFetch  = filterArchiveUrls(
+    archives,
+    filters.playerDateFrom || '',
+    filters.playerDateTo   || ''
+  ).slice(-ARCHIVE_LIMIT);
+
+  const parsedGames  = [];
+  let totalFiltered  = 0;
+  let truncated      = false;
+
+  for (const archiveUrl of toFetch) { // série — anti-429
+    const monthGames = await fetchMonthlyGames(archiveUrl);
+    const valid = filterGames(monthGames, filters);
+    for (const g of valid) {
+      if (totalFiltered >= GAME_LIMIT) { truncated = true; break; }
+      totalFiltered++;
+      if (!g.pgn) continue;
+      const parsed = parseGameToPositions(g.pgn, playerColor);
+      if (parsed) parsedGames.push(parsed);
+    }
+    if (truncated) break;
+  }
+
+  const gamesData = { parsedGames, totalGames: parsedGames.length, truncated };
+  cacheSet(gamesCache, gamesCacheKey, gamesData, GAMES_CACHE_MAX);
+  return gamesData;
+}
+
+// Requête simple : stats pour un seul FEN.
 async function getChesscomPlayerStats(fen, filters) {
   const { playerUsername, playerColor } = filters;
   if (!playerUsername || !playerColor) {
@@ -229,7 +267,7 @@ async function getChesscomPlayerStats(fen, filters) {
   const gamesCacheKey  = makeGamesCacheKey(filters);
   const resultCacheKey = `${gamesCacheKey}|${targetFenNorm}`;
 
-  // ── Niveau 2 : résultat déjà calculé pour ce FEN exact ────────────────────
+  // Niveau 2 : résultat déjà calculé pour ce FEN exact
   const cachedResult = cacheGet(resultCache, resultCacheKey);
   if (cachedResult) {
     return {
@@ -241,45 +279,10 @@ async function getChesscomPlayerStats(fen, filters) {
     };
   }
 
-  // ── Niveau 1 : parties déjà chargées, seulement re-parse pour ce FEN ──────
-  let gamesData;
-  const cachedGames = cacheGet(gamesCache, gamesCacheKey);
-  if (cachedGames) {
-    gamesData = cachedGames;
-  } else {
-    // ── Fetch complet depuis Chess.com ────────────────────────────────────
-    const archives = await getPlayerArchives(playerUsername);
-    const toFetch  = filterArchiveUrls(
-      archives,
-      filters.playerDateFrom || '',
-      filters.playerDateTo   || ''
-    ).slice(-ARCHIVE_LIMIT); // N mois les plus récents dans la plage
+  // Niveau 1 + fetch si besoin
+  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters);
 
-    const parsedGames = [];
-    let totalFiltered = 0;
-    let truncated = false;
-
-    for (const archiveUrl of toFetch) { // série — anti-429
-      const monthGames = await fetchMonthlyGames(archiveUrl);
-      const valid = filterGames(monthGames, filters);
-      for (const g of valid) {
-        if (totalFiltered >= GAME_LIMIT) { truncated = true; break; }
-        totalFiltered++;
-        if (!g.pgn) continue;
-        const parsed = parseGameToPositions(g.pgn, playerColor);
-        if (parsed) parsedGames.push(parsed);
-      }
-      if (truncated) break;
-    }
-
-    gamesData = { parsedGames, totalGames: parsedGames.length, truncated };
-    cacheSet(gamesCache, gamesCacheKey, gamesData, GAMES_CACHE_MAX);
-  }
-
-  const { parsedGames, totalGames, truncated } = gamesData;
-
-  // ── Recherche rapide du FEN cible dans les positions pré-parsées ───────────
-  // O(n*m) scan en mémoire uniquement — aucun appel chess.js, ~1ms pour 400 parties
+  // Scan mémoire uniquement — aucun appel chess.js
   const matches = [];
   for (const pg of parsedGames) {
     const pos = pg.positions.find(p => p.fenNorm === targetFenNorm);
@@ -292,8 +295,45 @@ async function getChesscomPlayerStats(fen, filters) {
     : '';
 
   cacheSet(resultCache, resultCacheKey, { moves, totalGames, truncated, message }, RESULT_CACHE_MAX);
-
   return { moves, totalGames, truncated: truncated || false, fallback: false, message };
 }
 
-module.exports = { getChesscomPlayerStats };
+// Requête batch : traite un tableau de FENs en une seule passe mémoire.
+// Les parties sont attendues déjà en cache (appelé après getChesscomPlayerStats).
+async function getChesscomPlayerStatsBatch(fens, filters) {
+  const { playerUsername, playerColor } = filters;
+  if (!playerUsername || !playerColor) {
+    throw Object.assign(new Error('username et color requis'), { status: 400 });
+  }
+  if (!Array.isArray(fens) || fens.length === 0) return {};
+
+  const gamesCacheKey                          = makeGamesCacheKey(filters);
+  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters);
+  const message = truncated
+    ? `Analyse limitée à ${GAME_LIMIT} parties. Affinez la période ou la cadence pour plus de précision.`
+    : '';
+
+  const results = {};
+  for (const fen of fens) {
+    const fenNorm        = normalizeFen(fen);
+    const resultCacheKey = `${gamesCacheKey}|${fenNorm}`;
+
+    const cached = cacheGet(resultCache, resultCacheKey);
+    if (cached) {
+      results[fen] = { moves: cached.moves, totalGames: cached.totalGames, truncated: cached.truncated, fallback: false, message: cached.message };
+      continue;
+    }
+
+    const matches = [];
+    for (const pg of parsedGames) {
+      const pos = pg.positions.find(p => p.fenNorm === fenNorm);
+      if (pos) matches.push({ san: pos.san, uci: pos.uci, result: pg.result, oppRating: pg.opponentElo });
+    }
+    const moves = aggregateMoves(matches);
+    cacheSet(resultCache, resultCacheKey, { moves, totalGames, truncated, message }, RESULT_CACHE_MAX);
+    results[fen] = { moves, totalGames, truncated: truncated || false, fallback: false, message };
+  }
+  return results;
+}
+
+module.exports = { getChesscomPlayerStats, getChesscomPlayerStatsBatch };

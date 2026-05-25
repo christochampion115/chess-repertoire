@@ -10,7 +10,7 @@ import {
   confirmRenameRep,
   confirmDelete as confirmDeleteMove,
 } from './repertoire.js';
-import { fetchLichessStats, fetchPlayerStats } from './stats.js';
+import { fetchLichessStats, fetchPlayerStats, fetchPlayerStatsBatch } from './stats.js';
 import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync, syncUserSettings, isReadOnlyMode } from './auth.js';
 import { apiRequest } from './api.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
@@ -950,6 +950,30 @@ function openPlayerStatsModal() {
           refreshStatsPanels();
           requestVisibleMoveAnnotations();
 
+          // Préchargement silencieux de toutes les FENs du répertoire actif
+          // → navigation instantanée entre positions sans aller-retour réseau
+          (async () => {
+            try {
+              const root = state.activeRepIndex !== -1 ? state.repertoires[state.activeRepIndex] : null;
+              if (!root) return;
+              const fensSet = new Set();
+              const queue = [root];
+              while (queue.length) {
+                const node = queue.pop();
+                if (node.fen) fensSet.add(node.fen);
+                if (node.children) queue.push(...node.children);
+              }
+              fensSet.delete(state.currentNode?.fen); // déjà en cache
+              if (!fensSet.size) return;
+              const batchResult = await fetchPlayerStatsBatch([...fensSet], newFilters);
+              if (!state.statsCache) state.statsCache = new Map();
+              for (const [fen, statsResult] of Object.entries(batchResult)) {
+                const bKey = `${fen}|player|${newFilters.playerUsername}|${newFilters.playerColor}|${newFilters.playerTimeClass}|${newFilters.playerDateFrom}-${newFilters.playerDateTo}|${newFilters.playerEloMin}-${newFilters.playerEloMax}`;
+                if (!state.statsCache.has(bKey)) state.statsCache.set(bKey, statsResult);
+              }
+            } catch (_) { /* silencieux — navigation reste fonctionnelle */ }
+          })();
+
         } catch (error) {
           if (abortCtrl.signal.aborted) return; // annulé par l'utilisateur
           if (fSection) fSection.style.display = '';
@@ -1435,6 +1459,44 @@ export function addSelectedMoveToTree() {
   state.lastStatsRequestKey = '';
   hideMenus();
   render();
+}
+
+// Lance le jeu libre à partir de la position courante, puis joue le coup candidat.
+export function exploreInFreePlay() {
+  const move = state.contextMenuMove;
+  const uci  = move?.uci;
+  hideMenus();
+  // Si déjà en jeu libre, ne pas réinitialiser l'arbre — jouer directement le coup
+  if (state.activeRepIndex !== -1) {
+    _enterFreePlayAtCurrentPosition();
+  }
+  if (uci) playUciMove(uci);
+  render();
+}
+
+// Bascule en jeu libre depuis le moniteur, en conservant la position courante.
+export function switchToFreePlay() {
+  if (state.activeRepIndex === -1) return; // déjà en jeu libre
+  _enterFreePlayAtCurrentPosition();
+  render();
+}
+
+function _enterFreePlayAtCurrentPosition() {
+  const fen = state.currentNode?.fen || state.chess.fen();
+  state.freePlayRoot = {
+    id:       'free',
+    fen,
+    children: [],
+    parent:   null,
+    moveNum:  0,
+    turn:     'b',
+    san:      'Initial'
+  };
+  state.activeRepIndex = -1;
+  state.currentNode    = state.freePlayRoot;
+  state.chess.load(fen);
+  state.redoStack = [];
+  state.lastStatsRequestKey = '';
 }
 
 export function closeModals() {
@@ -2259,6 +2321,9 @@ export function handleRightClick(event, type, target = null, index = -1) {
   if (nameVarEl) nameVarEl.style.display = isMoveContext ? 'none' : (isNode && isNotRoot ? 'block' : 'none');
   if (commentEl) commentEl.style.display = isMoveContext ? 'none' : (state.activeRepIndex !== -1 ? 'block' : 'none');
   if (addTreeEl) addTreeEl.style.display = isMoveContext ? 'block' : 'none';
+
+  const exploreFreeEl = menu.querySelector('.opt-explore-free');
+  if (exploreFreeEl) exploreFreeEl.style.display = isMoveContext ? 'block' : 'none';
 
   const annotSection = menu.querySelector('.ctx-annot-section');
   if (annotSection) annotSection.style.display = (isRepRoot || isMoveContext) ? 'none' : 'block';
@@ -4116,13 +4181,15 @@ function renderSurvivalMonitorPanel(container) {
 }
 
 function updateMonitor() {
-  const titleEl = document.getElementById('mon-title');
-  const pgnEl = document.getElementById('mon-pgn');
-  const commEl = document.getElementById('mon-comment');
+  const titleEl    = document.getElementById('mon-title');
+  const pgnEl      = document.getElementById('mon-pgn');
+  const commEl     = document.getElementById('mon-comment');
+  const freePlayBtn = document.getElementById('btn-switch-free-play');
   if (state.activeRepIndex === -1) {
     titleEl.textContent = 'Jeu Libre';
     pgnEl.textContent = getPathString(state.currentNode);
     commEl.style.display = 'none';
+    if (freePlayBtn) freePlayBtn.style.display = 'none';
   } else {
     let currentTitle = state.repertoires[state.activeRepIndex].name;
     let temp = state.currentNode;
@@ -4137,6 +4204,7 @@ function updateMonitor() {
     pgnEl.textContent = getPathString(state.currentNode);
     commEl.textContent = state.currentNode.comment || '';
     commEl.style.display = state.currentNode.comment ? 'block' : 'none';
+    if (freePlayBtn) freePlayBtn.style.display = '';
   }
 }
 

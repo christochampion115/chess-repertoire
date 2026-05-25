@@ -161,3 +161,43 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
     `Impossible de joindre le backend Chess.com. Détails: ${networkErrors.join(' | ')}`
   );
 }
+
+export async function fetchPlayerStatsBatch(fens, playerFilters = {}) {
+  if (!Array.isArray(fens) || fens.length === 0) return {};
+
+  const {
+    playerUsername = '',
+    playerColor = 'white',
+    playerTimeClass = 'all',
+    playerDateFrom = '',
+    playerDateTo = '',
+    playerEloMin = 0,
+    playerEloMax = 3000
+  } = playerFilters;
+
+  const body = {
+    fens,
+    username:  playerUsername,
+    color:     playerColor,
+    timeClass: playerTimeClass,
+    dateFrom:  playerDateFrom,
+    dateTo:    playerDateTo,
+    eloMin:    playerEloMin,
+    eloMax:    playerEloMax
+  };
+
+  const proxyCandidates = buildProxyCandidates('/api/chesscom/batchstats');
+
+  for (const endpoint of proxyCandidates) {
+    try {
+      const response = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body)
+      }, 90000);
+      if (!response.ok) continue;
+      return await response.json();
+    } catch (_) { /* essaie le candidat suivant */ }
+  }
+  return {}; // silence — navigation reste fonctionnelle, juste sans prefetch
+}
