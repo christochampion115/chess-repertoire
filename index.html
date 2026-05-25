@@ -291,6 +291,22 @@ body {
   transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
   flex-shrink: 0;
 }
+.btn-free-play {
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 5px;
+  padding: 11px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+  flex-shrink: 0;
+}
+.btn-free-play:hover {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.6);
+}
 
 .monitor-menu-trigger {
   position: absolute;
@@ -4050,6 +4066,7 @@ body {
         <div class="monitor-title" id="mon-title">Jeu Libre</div>
       </div>
       <button class="btn-create-rep" id="btn-open-new-rep">CRÉER RÉP.</button>
+      <button class="btn-free-play" id="btn-switch-free-play" style="display:none">JEU LIBRE</button>
     </div>
     <div class="monitor-pgn" id="mon-pgn"></div>
     <div class="monitor-comment" id="mon-comment"></div>
@@ -4189,6 +4206,7 @@ body {
   <div class="menu-item opt-rename-rep" style="display:none" data-menu-action="rename-repertoire">Renommer le répertoire</div>
   <div class="menu-item opt-name-var" style="display:none" data-menu-action="name-variation">Nommer la variante</div>
   <div class="menu-item opt-add-tree" style="display:none" data-menu-action="add-to-tree">Ajouter à l'arbre</div>
+  <div class="menu-item opt-explore-free" style="display:none" data-menu-action="explore-free-play">Explorer en jeu libre</div>
   <div class="menu-item opt-open-in-tree" style="display:none" data-menu-action="open-in-tree">Ouvrir dans l'arbre</div>
   <div class="menu-item opt-group-folder" style="display:none" data-menu-action="group-folder">📁 Grouper en dossier</div>
   <div class="menu-item opt-remove-from-rep" style="display:none;color:#fb923c" data-menu-action="remove-from-repertoire">Retirer du répertoire</div>
