@@ -16,6 +16,7 @@ import { apiRequest } from './api.js';
 import { requestVisibleMoveAnnotations, renderEvalBar } from './analysis.js';
 import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './statsUtils.js';
 import { saveState, loadState } from './storage.js';
+import { renderMiniBoardFromFen, generateMiniboardHtml as _miniboard } from './boardUtils.js';
 
 let currentDragColor = null;
 let currentDragIsFolder = false;
@@ -1497,6 +1498,26 @@ function _enterFreePlayAtCurrentPosition() {
   state.chess.load(fen);
   state.redoStack = [];
   state.lastStatsRequestKey = '';
+}
+
+export function openFreePlayAtFen(fen) {
+  const safeFen = typeof fen === 'string' && fen.trim() ? fen.trim() : state.chess.fen();
+  state.freePlayRoot = {
+    id: 'free',
+    fen: safeFen,
+    children: [],
+    parent: null,
+    moveNum: 0,
+    turn: 'b',
+    san: 'Initial'
+  };
+  state.activeRepIndex = -1;
+  state.currentNode = state.freePlayRoot;
+  state.chess.load(safeFen);
+  state.redoStack = [];
+  state.lastStatsRequestKey = '';
+  showAppView();
+  render();
 }
 
 export function closeModals() {
@@ -3328,43 +3349,7 @@ function showTrainingSurvivalVictoryModal() {
   if (modal) modal.style.display = 'block';
 }
 
-function renderMiniBoardFromFen(fen) {
-  const pieceMap = {
-    p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
-    P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
-  };
-  const rows = (fen?.split(' ')[0] || '').split('/');
-  if (rows.length !== 8) return '';
-
-  const squares = [];
-  for (let r = 0; r < 8; r += 1) {
-    const row = rows[r] || '';
-    for (const ch of row) {
-      if (/\d/.test(ch)) {
-        const emptyCount = Number(ch);
-        for (let k = 0; k < emptyCount; k += 1) squares.push('');
-      } else {
-        squares.push(pieceMap[ch] || '');
-      }
-    }
-  }
-
-  // Respecter l'orientation du grand échiquier
-  const displaySquares = state.boardFlipped ? squares.slice(0, 64).reverse() : squares.slice(0, 64);
-
-  return `
-    <div class="survival-mini-board">
-      ${displaySquares.map((piece, idx) => {
-        // Calculer la position réelle sur l'échiquier (pas l'index dans displaySquares)
-        const realIdx = state.boardFlipped ? 63 - idx : idx;
-        const rank = Math.floor(realIdx / 8);
-        const file = realIdx % 8;
-        const dark = (rank + file) % 2 === 1;
-        return `<div class="survival-mini-square ${dark ? 'is-dark' : 'is-light'}">${piece}</div>`;
-      }).join('')}
-    </div>
-  `;
-}
+// renderMiniBoardFromFen importé depuis boardUtils.js
 
 function showTrainingDefeatModal() {
   if (!state.trainingActive || state.trainingMode !== 'survival') return;
@@ -3406,7 +3391,7 @@ function showTrainingDefeatModal() {
               <span>Joué: <b>${entry.playedSan}</b></span>
               <span>Attendu: <b>${entry.expectedSan}</b></span>
             </div>
-            ${renderMiniBoardFromFen(entry.fen)}
+            ${renderMiniBoardFromFen(entry.fen, { flipped: state.boardFlipped })}
           </div>
         `).join('');
 
@@ -4902,57 +4887,13 @@ function generateMiniboardHtml(fen, move) {
   try {
     const tempChess = new Chess(fen);
     const from = move.uci.substring(0, 2);
-    const to = move.uci.substring(2, 4);
+    const to   = move.uci.substring(2, 4);
     tempChess.move({ from, to }, { sloppy: true });
-    const board = tempChess.board();
-    
-    // Couleurs du thème principal
-    const lightSquare = state.boardTheme?.light ?? '#ebefd6';
-    const darkSquare = state.boardTheme?.dark ?? '#556173';
-    
-    let html = '<div style="display:grid; grid-template-columns:repeat(8,24px); grid-template-rows:repeat(8,24px); gap:0; background:#000; padding:1px; margin:4px 0; overflow:hidden; width:194px; height:194px;">';
-    
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        // Respecter l'orientation du grand échiquier
-        const row = state.boardFlipped ? 7 - r : r;
-        const col = state.boardFlipped ? 7 - c : c;
-        const isLight = (row + col) % 2 === 0;
-        const bg = isLight ? lightSquare : darkSquare;
-        const piece = board[row][col];
-        const sq = String.fromCharCode(97 + col) + (8 - row);
-        
-        let highlight = '';
-        if (sq === from || sq === to) {
-          highlight = 'box-shadow: inset 0 0 0 2px #ffd700;';
-        }
-        
-        let pieceHtml = '';
-        if (piece) {
-          const map = {
-            'wp': '4/45/Chess_plt45.svg',
-            'wr': '7/72/Chess_rlt45.svg',
-            'wn': '7/70/Chess_nlt45.svg',
-            'wb': 'b/b1/Chess_blt45.svg',
-            'wq': '1/15/Chess_qlt45.svg',
-            'wk': '4/42/Chess_klt45.svg',
-            'bp': 'c/c7/Chess_pdt45.svg',
-            'br': 'f/ff/Chess_rdt45.svg',
-            'bn': 'e/ef/Chess_ndt45.svg',
-            'bb': '9/98/Chess_bdt45.svg',
-            'bq': '4/47/Chess_qdt45.svg',
-            'bk': 'f/f0/Chess_kdt45.svg'
-          };
-          const icon = map[piece.color + piece.type];
-          pieceHtml = `<img src="https://upload.wikimedia.org/wikipedia/commons/${icon}" style="width:22px;height:22px;">`;
-        }
-        
-        html += `<div style="width:24px;height:24px;background:${bg};${highlight}">${pieceHtml}</div>`;
-      }
-    }
-    
-    html += '</div>';
-    return html;
+    return _miniboard(tempChess.fen(), move.uci, {
+      lightSquare: state.boardTheme?.light ?? '#ebefd6',
+      darkSquare:  state.boardTheme?.dark  ?? '#556173',
+      flipped:     state.boardFlipped,
+    });
   } catch (e) {
     return '';
   }
