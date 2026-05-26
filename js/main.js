@@ -66,6 +66,13 @@ async function initializeApp() {
   ui.showHomeView();
   ui.render();
 
+  const openAtFen = sessionStorage.getItem('alphaChess.openAtFen');
+  if (openAtFen) {
+    sessionStorage.removeItem('alphaChess.openAtFen');
+    sessionStorage.removeItem('alphaChess.openFreePlay');
+    ui.openFreePlayAtFen(openAtFen);
+  }
+
   auth.registerGuestModeLoader(() => {
     // Ne pas charger les données d'exemple ici pour éviter les doublons
     // Elles seront chargées dans confirmGuestMode()
