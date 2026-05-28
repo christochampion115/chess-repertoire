@@ -11,111 +11,26 @@ function buildApiBase() {
   return 'http://localhost:4000/api';
 }
 
-// ── Table ECO (prefix matching, du plus long au plus court) ──────────────────
-const ECO_TABLE = [
-  // Ouvertures italiennes / Ruy Lopez
-  { s: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O',   n: 'Ruy Lopez — Variante Ouverte' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6',        n: 'Ruy Lopez — Variante Morphy' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5 a6',                n: 'Ruy Lopez — Défense Morphy' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5 Nf6',              n: 'Ruy Lopez — Variante Berlin' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5',                  n: 'Ruy Lopez' },
-  { s: 'e4 e5 Nf3 Nc6 Bc4 Bc5',             n: 'Partie Italienne — Giuoco Piano' },
-  { s: 'e4 e5 Nf3 Nc6 Bc4 Nf6',             n: 'Partie Italienne — Deux Cavaliers' },
-  { s: 'e4 e5 Nf3 Nc6 Bc4',                 n: 'Partie Italienne' },
-  { s: 'e4 e5 Nf3 Nc6 d4 exd4 Nxd4',       n: 'Partie Écossaise' },
-  { s: 'e4 e5 Nf3 Nc6 d4',                  n: 'Partie Écossaise' },
-  { s: 'e4 e5 Nf3 Nf6',                     n: 'Défense Petroff' },
-  { s: 'e4 e5 Nf3 f5',                      n: 'Contre-Gambit Lettish' },
-  { s: 'e4 e5 Nf3 d6',                      n: 'Défense Philidor' },
-  { s: 'e4 e5 f4 exf4',                     n: 'Gambit du Roi accepté' },
-  { s: 'e4 e5 f4 Bc5',                      n: 'Gambit du Roi — Défense classique' },
-  { s: 'e4 e5 f4',                           n: 'Gambit du Roi' },
-  { s: 'e4 e5 Nc3 Nc6 f4',                  n: 'Partie des Quatre Cavaliers — Gambit' },
-  { s: 'e4 e5 Nc3 Nf6 f4',                  n: 'Partie des Trois Cavaliers' },
-  { s: 'e4 e5 Nc3 Nc6',                     n: 'Partie des Quatre Cavaliers' },
-  // Sicilienne
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6', n: 'Sicilienne — Najdorf' },
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6', n: 'Sicilienne — Scheveningen' },
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6', n: 'Sicilienne — Dragon' },
-  { s: 'e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 d6', n: 'Sicilienne — Classique' },
-  { s: 'e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6',     n: 'Sicilienne — Kan / Taimanov' },
-  { s: 'e4 c5 Nf3 e6 d4 cxd4 Nxd4',         n: 'Sicilienne — Kan' },
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4',         n: 'Sicilienne — Ouverte' },
-  { s: 'e4 c5 Nf3 Nc6 d4 cxd4 Nxd4',        n: 'Sicilienne — Ouverte (4.Nxd4)' },
-  { s: 'e4 c5 c3',                           n: 'Sicilienne — Alapin' },
-  { s: 'e4 c5 Nc3',                          n: 'Sicilienne — Grand Prix Attack' },
-  { s: 'e4 c5 f4',                           n: 'Sicilienne — McDonnell Attack' },
-  { s: 'e4 c5',                              n: 'Défense Sicilienne' },
-  // Française
-  { s: 'e4 e6 d4 d5 Nc3 Bb4',              n: 'Défense Française — Winawer' },
-  { s: 'e4 e6 d4 d5 Nc3 Nf6',             n: 'Défense Française — Classique' },
-  { s: 'e4 e6 d4 d5 e5',                  n: 'Défense Française — Advance' },
-  { s: 'e4 e6 d4 d5 exd5',               n: 'Défense Française — Échange' },
-  { s: 'e4 e6 d4 d5',                    n: 'Défense Française' },
-  { s: 'e4 e6',                           n: 'Défense Française' },
-  // Caro-Kann
-  { s: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5', n: 'Caro-Kann — Classique' },
-  { s: 'e4 c6 d4 d5 e5',                n: 'Caro-Kann — Advance' },
-  { s: 'e4 c6 d4 d5 exd5',             n: 'Caro-Kann — Échange' },
-  { s: 'e4 c6 d4 d5',                  n: 'Caro-Kann' },
-  { s: 'e4 c6',                         n: 'Défense Caro-Kann' },
-  // Pirc / Moderne
-  { s: 'e4 d6 d4 Nf6 Nc3 g6',           n: 'Défense Pirc — Classique' },
-  { s: 'e4 d6 d4 Nf6 Nc3',              n: 'Défense Pirc' },
-  { s: 'e4 g6',                          n: 'Défense Moderne' },
-  // Scandinave
-  { s: 'e4 d5 exd5 Qxd5 Nc3 Qa5',      n: 'Scandinave — Classique' },
-  { s: 'e4 d5 exd5 Nf6',               n: 'Scandinave — Islandais' },
-  { s: 'e4 d5',                          n: 'Défense Scandinave' },
-  // Ouvertures du pion dame
-  { s: 'd4 Nf6 c4 g6 Nc3 Bg7 e4 d6',   n: 'Défense Est-Indienne — Sämisch' },
-  { s: 'd4 Nf6 c4 g6 Nc3 Bg7 e4',      n: 'Défense Est-Indienne' },
-  { s: 'd4 Nf6 c4 g6 Nc3 d5',          n: 'Grünfeld — Classique' },
-  { s: 'd4 Nf6 c4 g6 Nc3',             n: 'Grünfeld / Est-Indienne' },
-  { s: 'd4 Nf6 c4 e6 Nc3 Bb4',        n: 'Défense Nimzo-Indienne' },
-  { s: 'd4 Nf6 c4 e6 Nc3 d5',         n: 'Gambit Dame — Orthodoxe' },
-  { s: 'd4 Nf6 c4 e6 Nf3 b6',         n: 'Défense Reine-Indienne' },
-  { s: 'd4 Nf6 c4 c5',                n: 'Défense Benko / Volga' },
-  { s: 'd4 d5 c4 e6 Nc3 Nf6 Bg5',     n: 'Gambit Dame — Tartakover' },
-  { s: 'd4 d5 c4 e6 Nc3 Nf6 Nf3',     n: 'Gambit Dame' },
-  { s: 'd4 d5 c4 e6 Nc3 Nf6',         n: 'Gambit Dame' },
-  { s: 'd4 d5 c4 dxc4',               n: 'Gambit Dame accepté' },
-  { s: 'd4 d5 c4 c6 Nf3 Nf6',        n: 'Défense Slave' },
-  { s: 'd4 d5 c4 c6',                n: 'Défense Slave' },
-  { s: 'd4 d5 c4',                   n: 'Gambit Dame' },
-  { s: 'd4 d5',                      n: 'Gambit Dame (préliminaire)' },
-  { s: 'd4 e6 c4 Nf6',              n: 'Indien du Roi' },
-  { s: 'd4 f5 c4 Nf6 g3',           n: 'Défense Néerlandaise — Leningrad' },
-  { s: 'd4 f5',                      n: 'Défense Néerlandaise' },
-  // Ouvertures anglaise / Réti / Flank
-  { s: 'c4 e5 Nc3 Nf6 Nf3',        n: 'Anglaise — Variante symétrique' },
-  { s: 'c4 c5 Nf3 Nf6 d4',         n: 'Anglaise — Accélérée' },
-  { s: 'c4 e5',                     n: 'Ouverture Anglaise' },
-  { s: 'c4 Nf6 Nc3 d5 cxd5',       n: 'Anglaise — Réti' },
-  { s: 'c4',                        n: 'Ouverture Anglaise' },
-  { s: 'Nf3 d5 c4',                n: 'Réti — Gambit Dame inversé' },
-  { s: 'Nf3 Nf6 g3 d5',           n: 'Système Réti' },
-  { s: 'Nf3 Nf6 g3',              n: 'Système Réti' },
-  { s: 'Nf3',                      n: 'Ouverture Réti' },
-  { s: 'g3',                       n: 'Fianchetto du Roi' },
-  { s: 'f4',                       n: 'Attaque Bird' },
-  { s: 'b3',                       n: 'Ouverture Nimzovitch-Larsen' },
-  { s: 'b4',                       n: 'Gambit Sokolsky (Orang-outan)' },
-  { s: 'd4 Nf6',                   n: 'Indien du Roi (prél.)' },
-  { s: 'd4',                       n: 'Ouverture pion dame' },
-  { s: 'e4',                       n: 'Ouverture pion roi' },
-];
+// ── Base de données d'ouvertures (Lichess chess-openings, 3706 entrées) ──────
+// Chargée à la volée depuis data/openings.json
+let OPENINGS = null;
 
-// Trier du plus long au plus court pour le matching greedy
-ECO_TABLE.sort((a, b) => b.s.length - a.s.length);
+async function ensureOpeningsLoaded() {
+  if (OPENINGS) return;
+  const res = await fetch('data/openings.json');
+  if (!res.ok) throw new Error(`Impossible de charger les ouvertures (${res.status})`);
+  const data = await res.json();
+  OPENINGS = data.openings;
+}
 
 function pathToString(path) {
   return path.join(' ');
 }
 
 function lookupEco(path) {
+  if (!OPENINGS) return null;
   const str = pathToString(path);
-  for (const entry of ECO_TABLE) {
+  for (const entry of OPENINGS) {
     if (str.startsWith(entry.s) || str === entry.s) return entry.n;
   }
   return null;
@@ -967,6 +882,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const data = await runAnalysis(params);
+      await ensureOpeningsLoaded();
       stopProgress(true);
       await new Promise(resolve => setTimeout(resolve, 400));
       showView('view-results-wrap');
