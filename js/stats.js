@@ -112,7 +112,7 @@ export async function fetchLichessStats(fen, ratingsRange = { min: 0, max: 3000 
   );
 }
 
-export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
+export async function fetchPlayerStats(fen, playerFilters = {}, signal = null, onProgress = null) {
   if (!fen) throw new Error('FEN is required');
 
   const {
@@ -132,6 +132,44 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
   if (playerEloMin > 0) params.set('eloMin', String(playerEloMin));
   if (playerEloMax < 3000) params.set('eloMax', String(playerEloMax));
 
+  // SSE streaming — progrès en temps réel par archive
+  if (onProgress) {
+    const sseCandidates = buildProxyCandidates('/api/chesscom/stats/stream');
+    for (const endpoint of sseCandidates) {
+      if (signal?.aborted) throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
+      const url = `${endpoint}?${params.toString()}`;
+      try {
+        const response = await fetch(url, { headers: { Accept: 'text/event-stream' }, signal, mode: 'cors' });
+        if (!response.ok) continue;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'archive') { onProgress(data); }
+              else if (data.type === 'complete') { return data.data; }
+              else if (data.type === 'error') { throw new Error(data.error); }
+            }
+          }
+        }
+        // Stream fermé sans événement complete → essaie le candidat suivant
+        continue;
+      } catch (error) {
+        if (signal?.aborted || error?.name === 'AbortError') throw error;
+        continue;
+      }
+    }
+    // Fallback : aucun candidat SSE n'a fonctionné → requête JSON normale
+  }
+
+  // Requête JSON standard (identique à avant)
   const proxyCandidates = buildProxyCandidates('/api/chesscom/stats');
   const networkErrors = [];
 

@@ -46,6 +46,62 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// SSE : progrès en temps réel pendant le chargement des archives Chess.com.
+// Mêmes paramètres que GET /stats. Événements :
+//   data: {"type":"archive","current":3,"total":15,"gamesInArchive":45}
+//   data: {"type":"complete","data":{moves:[],totalGames:500,…}}
+//   data: {"type":"error","error":"…"}
+router.get('/stats/stream', async (req, res) => {
+  const fen      = typeof req.query.fen      === 'string' ? req.query.fen.trim()      : '';
+  const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+  const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
+
+  if (!fen)      return res.status(400).json({ error: 'Paramètre fen requis' });
+  if (!username) return res.status(400).json({ error: 'Paramètre username requis' });
+  if (!ALLOWED_COLORS.has(color))
+    return res.status(400).json({ error: 'Paramètre color invalide (white|black)' });
+
+  const timeClass = ALLOWED_TIMECLASSES.has(req.query.timeClass) ? req.query.timeClass : 'all';
+  const dateFrom  = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
+  const dateTo    = typeof req.query.dateTo   === 'string' ? req.query.dateTo.trim()   : '';
+
+  const eloMinRaw = Number.parseInt(req.query.eloMin, 10);
+  const eloMaxRaw = Number.parseInt(req.query.eloMax, 10);
+  const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0, Math.min(3000, eloMinRaw)) : 0;
+  const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0, Math.min(3000, eloMaxRaw)) : 3000;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  let isClosed = false;
+  req.on('close', () => { isClosed = true; });
+
+  const safeWrite = (data) => { if (!isClosed) res.write(data); };
+
+  try {
+    const stats = await getChesscomPlayerStats(fen, {
+      playerUsername:  username,
+      playerColor:     color,
+      playerTimeClass: timeClass,
+      playerDateFrom:  dateFrom,
+      playerDateTo:    dateTo,
+      playerEloMin,
+      playerEloMax
+    }, (progress) => {
+      safeWrite(`data: ${JSON.stringify({ type: 'archive', ...progress })}\n\n`);
+    });
+    safeWrite(`data: ${JSON.stringify({ type: 'complete', data: stats })}\n\n`);
+  } catch (error) {
+    console.error('[chesscom stream] error', error);
+    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur Chess.com proxy' })}\n\n`);
+  }
+  if (!isClosed) res.end();
+});
+
 // Batch : reçoit un tableau de FENs, retourne { [fen]: stats } en une seule passe mémoire.
 // Les parties doivent être déjà en cache côté backend (appelé après /stats).
 router.post('/batchstats', async (req, res) => {

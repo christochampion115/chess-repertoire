@@ -18,6 +18,10 @@ import { getMoveTotalGames, getMoveWinRate, getMoveEnginePreference } from './st
 import { saveState, loadState } from './storage.js';
 import { renderMiniBoardFromFen, generateMiniboardHtml as _miniboard } from './boardUtils.js';
 
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
 let currentDragColor = null;
 let currentDragIsFolder = false;
 let currentDragVarId = null;
@@ -390,7 +394,7 @@ export function render() {
   if (openingInfoEl) openingInfoEl.style.display = isTraining ? 'none' : '';
   if (candsSection) candsSection.style.display = isTraining ? 'none' : '';
 
-  if (!isTraining) loadStatsIfNeeded(state.currentNode?.fen);
+  if (!isTraining) loadStatsIfNeeded(state.currentNode?.fen, false, { showLoader: false });
 
   const trainingBanner = document.getElementById('training-banner');
   if (trainingBanner) {
@@ -401,14 +405,15 @@ export function render() {
 }
 
 function getStatsRequestKey(fen) {
+  const normFen = fen ? fen.split(' ').slice(0, 3).join(' ') : '';
   const min = state.statsFilters?.eloMin ?? ELO_MIN;
   const max = state.statsFilters?.eloMax ?? ELO_MAX;
   const db = state.statsFilters?.currentDatabase ?? 'lichess';
   if (db === 'player') {
     const f = state.statsFilters;
-    return `${fen || ''}|player|${f.playerUsername}|${f.playerColor}|${f.playerTimeClass}|${f.playerDateFrom}-${f.playerDateTo}|${f.playerEloMin}-${f.playerEloMax}`;
+    return `${normFen}|player|${f.playerUsername}|${f.playerColor}|${f.playerTimeClass}|${f.playerDateFrom}-${f.playerDateTo}|${f.playerEloMin}-${f.playerEloMax}`;
   }
-  return `${fen || ''}|${min},${max}|${db}`;
+  return `${normFen}|${min},${max}|${db}`;
 }
 
 function normalizeEloRange(minRaw, maxRaw, source = 'max') {
@@ -688,7 +693,7 @@ function syncStatsFilterControls() {
         return;
       }
 
-      if (state.statsFilters.currentDatabase === 'masters') {
+      if (state.statsFilters.currentDatabase !== 'lichess') {
         // Retour en mode lichess
         state.statsFilters.currentDatabase = 'lichess';
         state.lastStatsRequestKey = '';
@@ -877,11 +882,23 @@ function openPlayerStatsModal() {
         const playerEloMin = Number.isFinite(rawEloMin) ? Math.min(3000, Math.max(0, rawEloMin)) : 0;
         const playerEloMax = Number.isFinite(rawEloMax) ? Math.min(3000, Math.max(0, rawEloMax)) : 3000;
 
+        // Remettre l'échiquier sur la position de départ et orienter selon la couleur choisie
+        const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        state.freePlayRoot = { id: 'free', fen: START_FEN, children: [], parent: null, moveNum: 0, turn: 'b', san: 'Initial' };
+        state.activeRepIndex = -1;
+        state.currentNode = state.freePlayRoot;
+        state.chess.load(START_FEN);
+        state.redoStack = [];
+        state.boardFlipped = (color === 'black');
+        state.lastStatsRequestKey = '';
+        render();
+
         const newFilters = { playerUsername: username, playerColor: color, playerTimeClass: timeClass, playerDateFrom: dateFromVal, playerDateTo: dateToVal, playerEloMin, playerEloMax };
         const fen = state.currentNode?.fen;
 
         // Clé de cache (même format que getStatsRequestKey pour player)
-        const cacheKey = `${fen || ''}|player|${username}|${color}|${timeClass}|${dateFromVal}-${dateToVal}|${playerEloMin}-${playerEloMax}`;
+        const normFen = fen ? fen.split(' ').slice(0, 3).join(' ') : '';
+        const cacheKey = `${normFen}|player|${username}|${color}|${timeClass}|${dateFromVal}-${dateToVal}|${playerEloMin}-${playerEloMax}`;
 
         // Vérifier le cache frontend avant de lancer le téléchargement
         if (state.statsCache?.has(cacheKey)) {
@@ -902,41 +919,77 @@ function openPlayerStatsModal() {
         const lSection = document.getElementById('player-stats-loading-section');
         const loadTitle = document.getElementById('player-stats-loading-title');
         const pFill = document.getElementById('player-stats-progress-fill');
+        const pStep = document.getElementById('player-stats-loading-step');
         if (fSection) fSection.style.display = 'none';
         if (lSection) lSection.style.display = '';
         if (loadTitle) loadTitle.textContent = `Chargement des parties de @${username}…`;
 
-        // Animation de progression simulée : 0% → 80% sur ~45s
-        if (pFill) {
-          pFill.style.transition = 'none';
-          pFill.style.width = '0%';
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            pFill.style.transition = 'width 45s cubic-bezier(0.05, 0.5, 0.5, 1)';
-            pFill.style.width = '80%';
-          }));
+        // Verrouillage : empêche la fermeture par clic sur l'overlay ou navigation clavier
+        state.ignoreOverlayClose = true;
+
+        // Suivi de progression en temps réel via SSE
+        let totalGamesSeen = 0;
+        const onProgress = (p) => {
+          totalGamesSeen += p.gamesInArchive;
+          if (pFill) {
+            const pct = Math.round((p.current / p.total) * 85);
+            pFill.style.transition = 'width 0.3s ease';
+            pFill.style.width = pct + '%';
+          }
+          if (pStep) {
+            pStep.textContent = `Mois ${p.current}/${p.total} : ${totalGamesSeen} partie${totalGamesSeen > 1 ? 's' : ''}`;
+          }
+        };
+
+        function stopProgress(success) {
+          if (pFill) {
+            pFill.style.transition = 'width 0.4s ease';
+            pFill.style.width = '100%';
+            pFill.style.background = success
+              ? 'linear-gradient(90deg, #22c55e, #4ade80)'
+              : 'linear-gradient(90deg, #ef4444, #f87171)';
+          }
+          if (pStep) {
+            pStep.textContent = success ? 'Terminé ✓' : 'Erreur';
+          }
         }
+
+        function resetLoadingUI() {
+          state.ignoreOverlayClose = false;
+          if (fSection) fSection.style.display = '';
+          if (lSection) lSection.style.display = 'none';
+          if (pFill) {
+            pFill.style.transition = 'none';
+            pFill.style.width = '0%';
+            pFill.style.background = '';
+          }
+          if (pStep) pStep.textContent = '';
+          if (errorDiv) { errorDiv.textContent = ''; errorDiv.style.display = 'none'; }
+        }
+
+        // Initialise la barre
+        if (pFill) { pFill.style.transition = 'none'; pFill.style.width = '0%'; }
+        if (pStep) pStep.textContent = 'Connexion au serveur Chess.com…';
 
         // Contrôleur d'annulation
         const abortCtrl = new AbortController();
         const abortBtn = document.getElementById('btn-player-stats-abort');
         const handleAbort = () => {
           abortCtrl.abort();
-          if (fSection) fSection.style.display = '';
-          if (lSection) lSection.style.display = 'none';
-          if (pFill) { pFill.style.transition = 'none'; pFill.style.width = '0%'; }
-          if (errorDiv) { errorDiv.textContent = ''; errorDiv.style.display = 'none'; }
+          stopProgress(false);
+          setTimeout(resetLoadingUI, 400);
         };
-        if (abortBtn) abortBtn.addEventListener('click', handleAbort, { once: true });
+        if (abortBtn) {
+          const newAbortBtn = abortBtn.cloneNode(true);
+          abortBtn.replaceWith(newAbortBtn);
+          newAbortBtn.addEventListener('click', handleAbort, { once: true });
+        }
 
         try {
-          const stats = await fetchPlayerStats(fen, newFilters, abortCtrl.signal);
+          const stats = await fetchPlayerStats(fen, newFilters, abortCtrl.signal, onProgress);
 
-          // Succès : progression à 100% puis fermeture
-          if (pFill) {
-            pFill.style.transition = 'width 0.3s ease';
-            pFill.style.width = '100%';
-          }
-          await new Promise(r => setTimeout(r, 350));
+          stopProgress(true);
+          await sleep(400);
 
           Object.assign(state.statsFilters, newFilters, { currentDatabase: 'player', eloPanelOpen: false });
           state.lichessStats = stats;
@@ -945,6 +998,7 @@ function openPlayerStatsModal() {
           if (!state.statsCache) state.statsCache = new Map();
           state.statsCache.set(cacheKey, stats);
 
+          state.ignoreOverlayClose = false;
           closeModals();
           syncStatsFilterControls();
           state.statsShowAll = false;
@@ -952,10 +1006,12 @@ function openPlayerStatsModal() {
           requestVisibleMoveAnnotations();
 
           // Préchargement silencieux de toutes les FENs du répertoire actif
-          // → navigation instantanée entre positions sans aller-retour réseau
+          // (ou de l'arbre de jeu libre) → navigation instantanée sans aller-retour réseau
           (async () => {
             try {
-              const root = state.activeRepIndex !== -1 ? state.repertoires[state.activeRepIndex] : null;
+              const root = state.activeRepIndex !== -1
+                ? state.repertoires[state.activeRepIndex]
+                : state.freePlayRoot;
               if (!root) return;
               const fensSet = new Set();
               const queue = [root];
@@ -964,26 +1020,28 @@ function openPlayerStatsModal() {
                 if (node.fen) fensSet.add(node.fen);
                 if (node.children) queue.push(...node.children);
               }
-              fensSet.delete(state.currentNode?.fen); // déjà en cache
+              fensSet.delete(state.currentNode?.fen);
               if (!fensSet.size) return;
               const batchResult = await fetchPlayerStatsBatch([...fensSet], newFilters);
               if (!state.statsCache) state.statsCache = new Map();
               for (const [fen, statsResult] of Object.entries(batchResult)) {
-                const bKey = `${fen}|player|${newFilters.playerUsername}|${newFilters.playerColor}|${newFilters.playerTimeClass}|${newFilters.playerDateFrom}-${newFilters.playerDateTo}|${newFilters.playerEloMin}-${newFilters.playerEloMax}`;
+                const normFen = fen ? fen.split(' ').slice(0, 3).join(' ') : '';
+                const bKey = `${normFen}|player|${newFilters.playerUsername}|${newFilters.playerColor}|${newFilters.playerTimeClass}|${newFilters.playerDateFrom}-${newFilters.playerDateTo}|${newFilters.playerEloMin}-${newFilters.playerEloMax}`;
                 if (!state.statsCache.has(bKey)) state.statsCache.set(bKey, statsResult);
               }
             } catch (_) { /* silencieux — navigation reste fonctionnelle */ }
           })();
 
         } catch (error) {
-          if (abortCtrl.signal.aborted) return; // annulé par l'utilisateur
-          if (fSection) fSection.style.display = '';
-          if (lSection) lSection.style.display = 'none';
-          if (pFill) { pFill.style.transition = 'none'; pFill.style.width = '0%'; }
-          if (errorDiv) {
-            errorDiv.textContent = error.message || 'Erreur de chargement.';
-            errorDiv.style.display = '';
-          }
+          if (abortCtrl.signal.aborted) return;
+          stopProgress(false);
+          setTimeout(() => {
+            resetLoadingUI();
+            if (errorDiv) {
+              errorDiv.textContent = error.message || 'Erreur de chargement.';
+              errorDiv.style.display = '';
+            }
+          }, 400);
         }
       });
     }
@@ -1040,6 +1098,7 @@ function refreshStatsPanels() {
 
 async function loadStatsIfNeeded(fen, force = false, options = {}) {
   const fromEloChange = Boolean(options.fromEloChange);
+  const showLoader = options.showLoader !== false;
   const requestKey = getStatsRequestKey(fen);
 
   if (!fen) return;
@@ -1063,6 +1122,7 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
     state.pendingStatsRequest = {
       fen,
       force: true,
+      showLoader: showLoader || Boolean(state.pendingStatsRequest?.showLoader),
       fromEloChange: fromEloChange || Boolean(state.pendingStatsRequest?.fromEloChange)
     };
     return;
@@ -1076,13 +1136,16 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
   state.statsError = null;
 
   const database = state.statsFilters?.currentDatabase || 'lichess';
-  const loaderText = document.getElementById('stats-global-loader-text');
-  if (loaderText) {
-    loaderText.textContent = (database === 'player' && state.statsFilters.playerUsername)
-      ? `Chargement des parties de @${state.statsFilters.playerUsername}… (peut prendre 30-60s)`
-      : 'Mise a jour des coups...';
+
+  if (showLoader) {
+    const loaderText = document.getElementById('stats-global-loader-text');
+    if (loaderText) {
+      loaderText.textContent = (database === 'player' && state.statsFilters.playerUsername)
+        ? `Chargement des parties de @${state.statsFilters.playerUsername}… (peut prendre 30-60s)`
+        : 'Mise a jour des coups...';
+    }
+    showGlobalLoader(); // affiche le loader, masque le panel des coups
   }
-  showGlobalLoader(); // affiche le loader, masque le panel des coups
 
   try {
     let stats;
@@ -1113,17 +1176,27 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
 
     if (pending && pending.fen) {
       // Le loader reste visible pendant la nouvelle requête
-      loadStatsIfNeeded(pending.fen, true, { fromEloChange: pending.fromEloChange });
+      loadStatsIfNeeded(pending.fen, true, {
+        showLoader: pending.showLoader !== false,
+        fromEloChange: pending.fromEloChange
+      });
       return;
     }
 
-    // Pas de requête en attente : masque le loader (avec durée min.) puis affiche les coups
-    hideGlobalLoaderAndRender(() => {
-      stopEloMiniLoaderWhenReady();
+    if (showLoader) {
+      // Pas de requête en attente : masque le loader (avec durée min.) puis affiche les coups
+      hideGlobalLoaderAndRender(() => {
+        stopEloMiniLoaderWhenReady();
+        state.statsShowAll = false;
+        refreshStatsPanels();
+        requestVisibleMoveAnnotations();
+      });
+    } else {
+      // Navigation silencieuse : pas de loader, mise à jour directe
       state.statsShowAll = false;
       refreshStatsPanels();
       requestVisibleMoveAnnotations();
-    });
+    }
   }
 }
 
@@ -1315,7 +1388,6 @@ function handleStatsClick(move) {
   state.statsSelectedUci = move.uci;
   const played = playUciMove(move.uci);
   if (played) {
-    state.lastStatsRequestKey = '';
     render();
   }
 }
