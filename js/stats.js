@@ -38,19 +38,23 @@ function buildProxyCandidates(apiPath = '/api/lichess/stats') {
   const configuredProxy = normalizeBaseUrl(window.LICHESS_STATS_PROXY_URL);
   const configuredApi = normalizeBaseUrl(window.ALPHA_CHESS_API_URL);
 
+  // Serveur local en priorité : le cache des parties s'y trouve
+  candidates.push(`http://localhost:4000${apiPath}`);
+  candidates.push(`http://127.0.0.1:4000${apiPath}`);
+
+  // Même origine que la page (localhost en dev, render.com en prod)
+  if (window.location && /^https?:$/.test(window.location.protocol)) {
+    candidates.push(`${window.location.origin}${apiPath}`);
+  }
+
+  // Proxy distant (lichess uniquement)
   if (configuredProxy && apiPath === '/api/lichess/stats') {
     candidates.push(configuredProxy);
   }
 
+  // API Alpha Chess distante (render.com) — fallback lent
   if (configuredApi) {
     candidates.push(`${configuredApi}${apiPath.replace(/^\/api/, '')}`);
-  }
-
-  candidates.push(`http://localhost:4000${apiPath}`);
-  candidates.push(`http://127.0.0.1:4000${apiPath}`);
-
-  if (window.location && /^https?:$/.test(window.location.protocol)) {
-    candidates.push(`${window.location.origin}${apiPath}`);
   }
 
   return Array.from(new Set(candidates.map(normalizeBaseUrl).filter(Boolean)));
@@ -112,7 +116,7 @@ export async function fetchLichessStats(fen, ratingsRange = { min: 0, max: 3000 
   );
 }
 
-export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
+export async function fetchPlayerStats(fen, playerFilters = {}, signal = null, onProgress = null) {
   if (!fen) throw new Error('FEN is required');
 
   const {
@@ -132,6 +136,44 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
   if (playerEloMin > 0) params.set('eloMin', String(playerEloMin));
   if (playerEloMax < 3000) params.set('eloMax', String(playerEloMax));
 
+  // SSE streaming — progrès en temps réel par archive
+  if (onProgress) {
+    const sseCandidates = buildProxyCandidates('/api/chesscom/stats/stream');
+    for (const endpoint of sseCandidates) {
+      if (signal?.aborted) throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
+      const url = `${endpoint}?${params.toString()}`;
+      try {
+        const response = await fetch(url, { headers: { Accept: 'text/event-stream' }, signal, mode: 'cors' });
+        if (!response.ok) continue;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'archive') { onProgress(data); }
+              else if (data.type === 'complete') { return data.data; }
+              else if (data.type === 'error') { throw new Error(data.error); }
+            }
+          }
+        }
+        // Stream fermé sans événement complete → essaie le candidat suivant
+        continue;
+      } catch (error) {
+        if (signal?.aborted || error?.name === 'AbortError') throw error;
+        continue;
+      }
+    }
+    // Fallback : aucun candidat SSE n'a fonctionné → requête JSON normale
+  }
+
+  // Requête JSON standard (identique à avant)
   const proxyCandidates = buildProxyCandidates('/api/chesscom/stats');
   const networkErrors = [];
 
@@ -140,8 +182,11 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
       throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
     }
     const url = `${endpoint}?${params.toString()}`;
+    const t0 = performance.now();
     try {
       const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' }, signal }, 90000);
+      const t1 = performance.now();
+      console.log(`[stats] GET ${endpoint} → ${response.status} (${Math.round(t1 - t0)}ms)`);
 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -151,6 +196,8 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null) {
 
       return await response.json();
     } catch (error) {
+      const t1 = performance.now();
+      console.log(`[stats] GET ${endpoint} error after ${Math.round(t1 - t0)}ms: ${error.message}`);
       if (signal?.aborted || error?.name === 'AbortError') throw error;
       const message = error && error.message ? error.message : 'Unknown fetch error';
       networkErrors.push(`${endpoint}: ${message}`);

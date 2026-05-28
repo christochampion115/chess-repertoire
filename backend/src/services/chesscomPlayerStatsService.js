@@ -6,7 +6,7 @@ const CHESS_COM_API = 'https://api.chess.com/pub';
 const GAME_LIMIT             = 10000; // max parties filtrées (garde-fou)
 const ARCHIVE_FETCH_DELAY_MS = 80;    // délai inter-archive pour éviter les 429
 const CACHE_TTL_MS  = 20 * 60 * 1000; // 20 min
-const GAMES_CACHE_MAX  = 5;   // entrées max dans gamesCache (LRU simple)
+const GAMES_CACHE_MAX  = 30;  // entrées max dans gamesCache (LRU)
 const RESULT_CACHE_MAX = 500; // entrées max dans resultCache
 
 // ── HTTP (même pattern que lichessStatsService) ───────────────────────────────
@@ -254,11 +254,23 @@ function cacheGet(cache, key) {
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.ts > CACHE_TTL_MS) { cache.delete(key); return null; }
+  entry.ts = Date.now(); // LRU : marquer la dernière utilisation
   return entry;
 }
 
 function cacheSet(cache, key, data, maxSize) {
-  if (cache.size >= maxSize) cache.delete(cache.keys().next().value); // LRU : retire le plus ancien
+  if (cache.size >= maxSize) {
+    // Trouver l'entrée la moins récemment utilisée (ts le plus petit)
+    let oldestKey = null;
+    let oldestTs = Infinity;
+    for (const [k, v] of cache) {
+      if (v.ts < oldestTs) {
+        oldestTs = v.ts;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) cache.delete(oldestKey);
+  }
   cache.set(key, { ...data, ts: Date.now() });
 }
 
@@ -266,22 +278,57 @@ function makeGamesCacheKey(filters) {
   const { playerUsername, playerColor, playerTimeClass = 'all',
           playerDateFrom = '', playerDateTo = '',
           playerEloMin = 0, playerEloMax = 3000 } = filters;
-  return [
+  const key = [
     playerUsername.toLowerCase(), playerColor, playerTimeClass,
     `${playerDateFrom}-${playerDateTo}`, `${playerEloMin}-${playerEloMax}`
   ].join('|');
+  console.log(`[cache] makeGamesCacheKey  user="${playerUsername}" color="${playerColor}" timeClass="${playerTimeClass}" dateFrom="${playerDateFrom}" dateTo="${playerDateTo}" eloMin=${playerEloMin} eloMax=${playerEloMax}  =>  "${key}"`);
+  return key;
 }
 
 // ── Orchestrateur principal ───────────────────────────────────────────────────
 
+// Lock de déduplication : empêche deux téléchargements identiques en parallèle.
+const pendingGamesFetches = new Map();
+
 // Helper partagé : garantit que les parties sont dans gamesCache.
 // Retour instantané si déjà chargées, sinon fetch depuis Chess.com.
-async function ensureGamesLoaded(filters) {
+// onProgress({ current, total, gamesInArchive }) appelé après chaque archive téléchargée.
+async function ensureGamesLoaded(filters, onProgress = null) {
   const { playerUsername, playerColor } = filters;
   const gamesCacheKey = makeGamesCacheKey(filters);
-  const cached = cacheGet(gamesCache, gamesCacheKey);
-  if (cached) return cached;
 
+  // Cache mémoire
+  const cached = cacheGet(gamesCache, gamesCacheKey);
+  if (cached) {
+    console.log(`[cache] HIT  gamesCache  ${gamesCacheKey}`);
+    return cached;
+  }
+
+  // Déduplication : si un téléchargement est déjà en cours pour ces mêmes filtres, attendre
+  const existing = pendingGamesFetches.get(gamesCacheKey);
+  if (existing) {
+    console.log(`[cache] WAIT gamesCache  ${gamesCacheKey}  (rejoint un téléchargement en cours)`);
+    return existing;
+  }
+
+  console.log(`[cache] MISS gamesCache  ${gamesCacheKey}  → téléchargement`);
+  console.time(`fetchAllGames:${gamesCacheKey}`);
+  const promise = fetchAllGames(filters, onProgress, playerUsername, playerColor);
+  pendingGamesFetches.set(gamesCacheKey, promise);
+
+  try {
+    const result = await promise;
+    console.timeEnd(`fetchAllGames:${gamesCacheKey}`);
+    cacheSet(gamesCache, gamesCacheKey, result, GAMES_CACHE_MAX);
+    return result;
+  } finally {
+    pendingGamesFetches.delete(gamesCacheKey);
+  }
+}
+
+// Cœur du téléchargement : séquence archives → filtrage → parsing.
+async function fetchAllGames(filters, onProgress, playerUsername, playerColor) {
   const archives = await getPlayerArchives(playerUsername);
   const toFetch  = filterArchiveUrls(
     archives,
@@ -295,10 +342,13 @@ async function ensureGamesLoaded(filters) {
   let parseFail      = 0;
   let truncated      = false;
 
+  let archiveIdx = 0;
   for (const archiveUrl of toFetch) { // série — anti-429
+    archiveIdx++;
     const monthGames = await fetchMonthlyGames(archiveUrl);
     await new Promise(r => setTimeout(r, ARCHIVE_FETCH_DELAY_MS)); // respire entre archives
     const valid = filterGames(monthGames, filters);
+    if (onProgress) { onProgress({ current: archiveIdx, total: toFetch.length, gamesInArchive: valid.length }); }
     for (const g of valid) {
       if (totalFiltered >= GAME_LIMIT) { truncated = true; break; }
       totalFiltered++;
@@ -314,13 +364,12 @@ async function ensureGamesLoaded(filters) {
 
   // totalFiltered = parties qui ont passé les filtres (couleur/cadence/elo)
   // parsedGames.length peut être inférieur : parties sans PGN ou parsing échoué
-  const gamesData = { parsedGames, totalGames: totalFiltered, truncated };
-  cacheSet(gamesCache, gamesCacheKey, gamesData, GAMES_CACHE_MAX);
-  return gamesData;
+  return { parsedGames, totalGames: totalFiltered, truncated };
 }
 
 // Requête simple : stats pour un seul FEN.
-async function getChesscomPlayerStats(fen, filters) {
+// onProgress propagé à ensureGamesLoaded pour le suivi des archives.
+async function getChesscomPlayerStats(fen, filters, onProgress = null) {
   const { playerUsername, playerColor } = filters;
   if (!playerUsername || !playerColor) {
     throw Object.assign(new Error('username et color requis'), { status: 400 });
@@ -330,9 +379,12 @@ async function getChesscomPlayerStats(fen, filters) {
   const gamesCacheKey  = makeGamesCacheKey(filters);
   const resultCacheKey = `${gamesCacheKey}|${targetFenNorm}`;
 
+  console.log(`[cache] getChesscomPlayerStats  fen="${fen}"  targetFenNorm="${targetFenNorm}"  resultCacheKey="${resultCacheKey}"`);
+
   // Niveau 2 : résultat déjà calculé pour ce FEN exact
   const cachedResult = cacheGet(resultCache, resultCacheKey);
   if (cachedResult) {
+    console.log(`[cache] HIT  resultCache  ${resultCacheKey}`);
     return {
       moves: cachedResult.moves,
       totalGames: cachedResult.totalGames,
@@ -342,8 +394,10 @@ async function getChesscomPlayerStats(fen, filters) {
     };
   }
 
+  console.log(`[cache] MISS resultCache  ${resultCacheKey}  → scan mémoire`);
+  console.time(`scan:${targetFenNorm}`);
   // Niveau 1 + fetch si besoin
-  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters);
+  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters, onProgress);
 
   // Scan mémoire uniquement — aucun appel chess.js
   const matches = [];
@@ -351,6 +405,9 @@ async function getChesscomPlayerStats(fen, filters) {
     const pos = pg.positions.find(p => p.fenNorm === targetFenNorm);
     if (pos) matches.push({ san: pos.san, uci: pos.uci, result: pg.result, oppRating: pg.opponentElo });
   }
+
+  console.timeEnd(`scan:${targetFenNorm}`);
+  console.log(`[cache] scan  ${targetFenNorm}  → ${matches.length} match(es) sur ${parsedGames.length} parties`);
 
   const moves   = aggregateMoves(matches);
   const message = truncated
@@ -363,7 +420,7 @@ async function getChesscomPlayerStats(fen, filters) {
 
 // Requête batch : traite un tableau de FENs en une seule passe mémoire.
 // Les parties sont attendues déjà en cache (appelé après getChesscomPlayerStats).
-async function getChesscomPlayerStatsBatch(fens, filters) {
+async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
   const { playerUsername, playerColor } = filters;
   if (!playerUsername || !playerColor) {
     throw Object.assign(new Error('username et color requis'), { status: 400 });
@@ -371,19 +428,30 @@ async function getChesscomPlayerStatsBatch(fens, filters) {
   if (!Array.isArray(fens) || fens.length === 0) return {};
 
   const gamesCacheKey                          = makeGamesCacheKey(filters);
-  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters);
+  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters, onProgress);
   const message = truncated
     ? `Analyse limitée à ${GAME_LIMIT} parties. Affinez la période ou la cadence pour plus de précision.`
     : '';
 
-  const results = {};
-  for (const fen of fens) {
+  const results      = {};
+  const totalFens    = fens.length;
+  let processedCount = 0;
+
+  for (let i = 0; i < totalFens; i++) {
+    // Céder l'event-loop toutes les 50 FENs pour ne pas bloquer les autres requêtes
+    if (i > 0 && i % 50 === 0) {
+      await new Promise(resolve => setImmediate(resolve));
+      if (onProgress) onProgress({ current: i, total: totalFens });
+    }
+
+    const fen = fens[i];
     const fenNorm        = normalizeFen(fen);
     const resultCacheKey = `${gamesCacheKey}|${fenNorm}`;
 
     const cached = cacheGet(resultCache, resultCacheKey);
     if (cached) {
       results[fen] = { moves: cached.moves, totalGames: cached.totalGames, truncated: cached.truncated, fallback: false, message: cached.message };
+      processedCount++;
       continue;
     }
 
@@ -395,7 +463,10 @@ async function getChesscomPlayerStatsBatch(fens, filters) {
     const moves = aggregateMoves(matches);
     cacheSet(resultCache, resultCacheKey, { moves, totalGames, truncated, message }, RESULT_CACHE_MAX);
     results[fen] = { moves, totalGames, truncated: truncated || false, fallback: false, message };
+    processedCount++;
   }
+
+  console.log(`[batch] ${processedCount}/${totalFens} FENs scannés — ${Object.keys(results).length} résultats`);
   return results;
 }
 

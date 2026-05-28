@@ -564,41 +564,21 @@ function clearSessionState({ message = '', loadGuestData = false } = {}) {
 }
 
 // Appelée lors d'une expiration de session détectée EN ARRIÈRE-PLAN (sync, delete).
-// Efface uniquement le token pour stopper les boucles de sync,
-// mais CONSERVE state.auth.user pour ne pas afficher "invité" à l'utilisateur
-// et ne pas réinitialiser l'espace de travail.
+// Réinitialise complètement l'état d'auth pour que l'UI reflète le mode invité.
 function markTokenExpired() {
-  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'markTokenExpired', userKept: state.auth.user?.username, repsKept: state.repertoires.length });
-  clearPersistedSession();
-  state.auth.token = '';
-  state.auth.syncStatus = 'expired';
-  state.auth.syncMessage = 'Session expirée – reconnectez-vous pour synchroniser.';
-  if (syncTimer) {
-    clearTimeout(syncTimer);
-    syncTimer = null;
-  }
-  syncQueued = false;
-  syncInFlight = false;
-}
-
-function handleBackgroundSessionExpired(message = 'Session expiree.') {
-  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'handleBackgroundSessionExpired', message, userBefore: state.auth.user?.username, caller: new Error().stack?.split('\n')[2]?.trim() });
-  clearPersistedSession();
-
+  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'markTokenExpired', userBefore: state.auth.user?.username, repsBefore: state.repertoires.length });
   state.auth.user = null;
   state.auth.token = '';
   state.auth.status = 'guest';
-  state.auth.error = message;
+  state.auth.error = 'Session expirée. Reconnectez-vous pour synchroniser.';
   state.auth.isSubmitting = false;
   state.auth.syncStatus = 'error';
-  state.auth.syncMessage = 'Session expiree. Reconnectez-vous pour synchroniser.';
-  window.DEBUG_MODE && console.log('[DEBUG]', { step: 'handleBackgroundSessionExpired:user_set_null', message });
-
+  state.auth.syncMessage = 'Session expirée – reconnectez-vous pour synchroniser.';
+  clearPersistedSession();
   if (syncTimer) {
     clearTimeout(syncTimer);
     syncTimer = null;
   }
-
   syncQueued = false;
   syncInFlight = false;
 }

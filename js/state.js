@@ -48,6 +48,7 @@ export const state = {
   },
   deleteTargetIdx: -1,
   pendingDeleteType: '',
+  ignoreOverlayClose: false,
   _suppressSync: false,  // true pendant les imports PGN en masse (évite O(n) sérialisations)
   trainingActive: false,
   trainingRoot: null,

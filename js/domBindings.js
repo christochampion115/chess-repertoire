@@ -99,6 +99,8 @@ function initKeyboardNavigationBindings() {
   document.addEventListener('keydown', (event) => {
     if (shouldIgnoreKeyboardNavigationTarget(event.target)) return;
 
+    if (state.modalOverlayEl?.style?.display === 'flex') return;
+
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
       ui.navBack();
@@ -136,6 +138,7 @@ function initCoreUiBindings() {
   if (modalOverlay && !modalOverlay.dataset.overlaybound) {
     modalOverlay.addEventListener('click', (event) => {
       if (event.target !== modalOverlay) return;
+      if (state.ignoreOverlayClose) return;
       ui.closeModals();
     });
     modalOverlay.dataset.overlaybound = '1';
