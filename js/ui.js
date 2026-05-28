@@ -988,6 +988,64 @@ function openPlayerStatsModal() {
         try {
           const stats = await fetchPlayerStats(fen, newFilters, abortCtrl.signal, onProgress);
 
+          // ── Phase 2 : pré-cache de toutes les positions navigables ──────
+          // On génère les FENs résultant des coups légaux depuis la position
+          // actuelle (premiers clics dans le panneau des stats) + les FENs
+          // de l'arbre (répertoire / jeu libre). Tout est mis en cache pour
+          // que la navigation après fermeture soit instantanée.
+          if (pFill) {
+            pFill.style.transition = 'width 0.3s ease';
+            pFill.style.width = '85%';
+          }
+          if (pStep) pStep.textContent = 'Analyse des archives terminée. Pré-cache des positions…';
+
+          const allFens = new Set();
+          // 2a. Positions générées par les coups légaux (board → stats)
+          const legalMoves = state.chess.moves({ verbose: true });
+          if (legalMoves.length > 0) {
+            for (const m of legalMoves) {
+              state.chess.move(m.san);
+              allFens.add(state.chess.fen());
+              state.chess.undo();
+            }
+          }
+          // 2b. Positions de l'arbre (répertoire / jeu libre)
+          const root = state.activeRepIndex !== -1
+            ? state.repertoires[state.activeRepIndex]
+            : state.freePlayRoot;
+          if (root) {
+            const queue = [root];
+            while (queue.length) {
+              const node = queue.shift();
+              if (node.fen) allFens.add(node.fen);
+              if (node.children) queue.push(...node.children);
+            }
+          }
+          allFens.delete(state.currentNode?.fen); // déjà chargé
+
+          if (allFens.size > 0) {
+            if (pFill) {
+              pFill.style.transition = 'width 0.3s ease';
+              pFill.style.width = '92%';
+            }
+            if (pStep) pStep.textContent = `Pré-cache de ${allFens.size} positions…`;
+            const batchPromise = fetchPlayerStatsBatch([...allFens], newFilters)
+              .then(result => {
+                if (!state.statsCache) state.statsCache = new Map();
+                for (const [fen, statsResult] of Object.entries(result)) {
+                  const normFen = fen ? fen.split(' ').slice(0, 3).join(' ') : '';
+                  const bKey = `${normFen}|player|${newFilters.playerUsername}|${newFilters.playerColor}|${newFilters.playerTimeClass}|${newFilters.playerDateFrom}-${newFilters.playerDateTo}|${newFilters.playerEloMin}-${newFilters.playerEloMax}`;
+                  if (!state.statsCache.has(bKey)) state.statsCache.set(bKey, statsResult);
+                }
+                return result;
+              })
+              .catch(() => {});
+            // Pas de timeout court : on veut TOUT pré-cacher avant de fermer
+            const timeoutPromise = new Promise(r => setTimeout(r, 120000));
+            await Promise.race([batchPromise, timeoutPromise]);
+          }
+
+          // ── Phase 3 : finalisation ──────────────────────────────────────
           stopProgress(true);
           await sleep(400);
 
@@ -1004,33 +1062,6 @@ function openPlayerStatsModal() {
           state.statsShowAll = false;
           refreshStatsPanels();
           requestVisibleMoveAnnotations();
-
-          // Préchargement silencieux de toutes les FENs du répertoire actif
-          // (ou de l'arbre de jeu libre) → navigation instantanée sans aller-retour réseau
-          (async () => {
-            try {
-              const root = state.activeRepIndex !== -1
-                ? state.repertoires[state.activeRepIndex]
-                : state.freePlayRoot;
-              if (!root) return;
-              const fensSet = new Set();
-              const queue = [root];
-              while (queue.length) {
-                const node = queue.pop();
-                if (node.fen) fensSet.add(node.fen);
-                if (node.children) queue.push(...node.children);
-              }
-              fensSet.delete(state.currentNode?.fen);
-              if (!fensSet.size) return;
-              const batchResult = await fetchPlayerStatsBatch([...fensSet], newFilters);
-              if (!state.statsCache) state.statsCache = new Map();
-              for (const [fen, statsResult] of Object.entries(batchResult)) {
-                const normFen = fen ? fen.split(' ').slice(0, 3).join(' ') : '';
-                const bKey = `${normFen}|player|${newFilters.playerUsername}|${newFilters.playerColor}|${newFilters.playerTimeClass}|${newFilters.playerDateFrom}-${newFilters.playerDateTo}|${newFilters.playerEloMin}-${newFilters.playerEloMax}`;
-                if (!state.statsCache.has(bKey)) state.statsCache.set(bKey, statsResult);
-              }
-            } catch (_) { /* silencieux — navigation reste fonctionnelle */ }
-          })();
 
         } catch (error) {
           if (abortCtrl.signal.aborted) return;
@@ -1145,12 +1176,18 @@ async function loadStatsIfNeeded(fen, force = false, options = {}) {
         : 'Mise a jour des coups...';
     }
     showGlobalLoader(); // affiche le loader, masque le panel des coups
+  } else {
+    // Navigation silencieuse : badge dans la section coups candidats
+    showStatsPanelLoadingBadge();
   }
 
   try {
     let stats;
     if (database === 'player') {
+      const label = `fetchPlayerStats:${requestKey.substring(0, 40)}`;
+      console.time(label);
       stats = await fetchPlayerStats(fen, state.statsFilters);
+      console.timeEnd(label);
     } else {
       stats = await fetchLichessStats(fen, {
         min: state.statsFilters.eloMin,
@@ -1208,12 +1245,20 @@ function retryStats() {
   loadStatsIfNeeded(fen, true);
 }
 
+function showStatsPanelLoadingBadge(panel) {
+  const statsPanel = panel || document.getElementById('stats-panel');
+  if (!statsPanel) return;
+  statsPanel.innerHTML = '';
+  const badge = document.createElement('div');
+  badge.className = 'stats-loading-badge';
+  badge.innerHTML = '<span class="stats-loading-spinner"></span><span class="stats-loading-text">Chargement en cours ... Peut prendre un certain temps pour les premiers coups.</span>';
+  statsPanel.appendChild(badge);
+}
+
 function renderStatsPanel(statsPanel, statsDetails) {
   const stats = state.lichessStats;
-
   if (state.statsLoading) {
-    statsPanel.innerHTML = '';
-    if (statsDetails) statsDetails.innerHTML = '';
+    showStatsPanelLoadingBadge(statsPanel);
     return;
   }
 
@@ -1385,7 +1430,7 @@ function renderStatsDetails(detailsPanel) {
 
 function handleStatsClick(move) {
   if (!move) return;
-  state.statsSelectedUci = move.uci;
+  state.statsSelectedUci = '';
   const played = playUciMove(move.uci);
   if (played) {
     render();
@@ -5003,10 +5048,13 @@ async function loadCountermoves(move) {
     }
     
     const nextFen = tempChess.fen();
-    const nextStats = await fetchLichessStats(nextFen, {
-      min: state.statsFilters?.eloMin ?? 0,
-      max: state.statsFilters?.eloMax ?? 3000
-    }, state.statsFilters?.currentDatabase ?? 'lichess');
+    const db = state.statsFilters?.currentDatabase ?? 'lichess';
+    const nextStats = db === 'player'
+      ? await fetchPlayerStats(nextFen, state.statsFilters)
+      : await fetchLichessStats(nextFen, {
+          min: state.statsFilters?.eloMin ?? 0,
+          max: state.statsFilters?.eloMax ?? 3000
+        }, db);
     
     const topMoves = (nextStats.moves || []).slice(0, 3);
     countermovesCache[move.uci] = topMoves;

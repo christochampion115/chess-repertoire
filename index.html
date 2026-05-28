@@ -2369,6 +2369,33 @@ body {
   width: 100%;
 }
 
+.stats-loading-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(148, 163, 184, 0.05);
+}
+.stats-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(122, 174, 203, 0.3);
+  border-top-color: #7aaecb;
+  animation: stats-loading-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.stats-loading-text {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+@keyframes stats-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
 .stats-filter-badge-row {
   margin-top: 4px;
   display: flex;

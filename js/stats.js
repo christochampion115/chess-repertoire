@@ -38,19 +38,23 @@ function buildProxyCandidates(apiPath = '/api/lichess/stats') {
   const configuredProxy = normalizeBaseUrl(window.LICHESS_STATS_PROXY_URL);
   const configuredApi = normalizeBaseUrl(window.ALPHA_CHESS_API_URL);
 
+  // Serveur local en priorité : le cache des parties s'y trouve
+  candidates.push(`http://localhost:4000${apiPath}`);
+  candidates.push(`http://127.0.0.1:4000${apiPath}`);
+
+  // Même origine que la page (localhost en dev, render.com en prod)
+  if (window.location && /^https?:$/.test(window.location.protocol)) {
+    candidates.push(`${window.location.origin}${apiPath}`);
+  }
+
+  // Proxy distant (lichess uniquement)
   if (configuredProxy && apiPath === '/api/lichess/stats') {
     candidates.push(configuredProxy);
   }
 
+  // API Alpha Chess distante (render.com) — fallback lent
   if (configuredApi) {
     candidates.push(`${configuredApi}${apiPath.replace(/^\/api/, '')}`);
-  }
-
-  candidates.push(`http://localhost:4000${apiPath}`);
-  candidates.push(`http://127.0.0.1:4000${apiPath}`);
-
-  if (window.location && /^https?:$/.test(window.location.protocol)) {
-    candidates.push(`${window.location.origin}${apiPath}`);
   }
 
   return Array.from(new Set(candidates.map(normalizeBaseUrl).filter(Boolean)));
@@ -178,8 +182,11 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null, o
       throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
     }
     const url = `${endpoint}?${params.toString()}`;
+    const t0 = performance.now();
     try {
       const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' }, signal }, 90000);
+      const t1 = performance.now();
+      console.log(`[stats] GET ${endpoint} → ${response.status} (${Math.round(t1 - t0)}ms)`);
 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -189,6 +196,8 @@ export async function fetchPlayerStats(fen, playerFilters = {}, signal = null, o
 
       return await response.json();
     } catch (error) {
+      const t1 = performance.now();
+      console.log(`[stats] GET ${endpoint} error after ${Math.round(t1 - t0)}ms: ${error.message}`);
       if (signal?.aborted || error?.name === 'AbortError') throw error;
       const message = error && error.message ? error.message : 'Unknown fetch error';
       networkErrors.push(`${endpoint}: ${message}`);

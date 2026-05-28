@@ -278,10 +278,12 @@ function makeGamesCacheKey(filters) {
   const { playerUsername, playerColor, playerTimeClass = 'all',
           playerDateFrom = '', playerDateTo = '',
           playerEloMin = 0, playerEloMax = 3000 } = filters;
-  return [
+  const key = [
     playerUsername.toLowerCase(), playerColor, playerTimeClass,
     `${playerDateFrom}-${playerDateTo}`, `${playerEloMin}-${playerEloMax}`
   ].join('|');
+  console.log(`[cache] makeGamesCacheKey  user="${playerUsername}" color="${playerColor}" timeClass="${playerTimeClass}" dateFrom="${playerDateFrom}" dateTo="${playerDateTo}" eloMin=${playerEloMin} eloMax=${playerEloMax}  =>  "${key}"`);
+  return key;
 }
 
 // ── Orchestrateur principal ───────────────────────────────────────────────────
@@ -377,6 +379,8 @@ async function getChesscomPlayerStats(fen, filters, onProgress = null) {
   const gamesCacheKey  = makeGamesCacheKey(filters);
   const resultCacheKey = `${gamesCacheKey}|${targetFenNorm}`;
 
+  console.log(`[cache] getChesscomPlayerStats  fen="${fen}"  targetFenNorm="${targetFenNorm}"  resultCacheKey="${resultCacheKey}"`);
+
   // Niveau 2 : résultat déjà calculé pour ce FEN exact
   const cachedResult = cacheGet(resultCache, resultCacheKey);
   if (cachedResult) {
@@ -429,14 +433,25 @@ async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
     ? `Analyse limitée à ${GAME_LIMIT} parties. Affinez la période ou la cadence pour plus de précision.`
     : '';
 
-  const results = {};
-  for (const fen of fens) {
+  const results      = {};
+  const totalFens    = fens.length;
+  let processedCount = 0;
+
+  for (let i = 0; i < totalFens; i++) {
+    // Céder l'event-loop toutes les 50 FENs pour ne pas bloquer les autres requêtes
+    if (i > 0 && i % 50 === 0) {
+      await new Promise(resolve => setImmediate(resolve));
+      if (onProgress) onProgress({ current: i, total: totalFens });
+    }
+
+    const fen = fens[i];
     const fenNorm        = normalizeFen(fen);
     const resultCacheKey = `${gamesCacheKey}|${fenNorm}`;
 
     const cached = cacheGet(resultCache, resultCacheKey);
     if (cached) {
       results[fen] = { moves: cached.moves, totalGames: cached.totalGames, truncated: cached.truncated, fallback: false, message: cached.message };
+      processedCount++;
       continue;
     }
 
@@ -448,7 +463,10 @@ async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
     const moves = aggregateMoves(matches);
     cacheSet(resultCache, resultCacheKey, { moves, totalGames, truncated, message }, RESULT_CACHE_MAX);
     results[fen] = { moves, totalGames, truncated: truncated || false, fallback: false, message };
+    processedCount++;
   }
+
+  console.log(`[batch] ${processedCount}/${totalFens} FENs scannés — ${Object.keys(results).length} résultats`);
   return results;
 }
 
