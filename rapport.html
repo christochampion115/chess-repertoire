@@ -19,6 +19,7 @@
       --text-strong:   #f8fafc;
       --accent-blue:   #7aaecb;
       --accent-hover:  #9cc3dc;
+      --accent-blue-soft: rgba(122,174,203,0.18);
       --accent-green:  #6ee7b7;
       --accent-red:    #f9a8b8;
       --accent-orange: #fbbf24;
@@ -83,9 +84,9 @@
       letter-spacing: .05em;
       padding: 2px 8px;
       border-radius: 100px;
-      background: rgba(59,130,246,.18);
+      background: var(--accent-blue-soft, rgba(122,174,203,0.18));
       color: var(--accent-blue);
-      border: 1px solid rgba(59,130,246,.35);
+      border: 1px solid rgba(122,174,203,0.28);
     }
 
     /* ── Layout ── */
@@ -131,7 +132,7 @@
     .form-input {
       width: 100%;
       background: var(--monitor-bg);
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       color: var(--text-main);
       padding: 10px 14px;
@@ -155,7 +156,7 @@
       gap: 8px;
       padding: 10px;
       background: var(--monitor-bg);
-      border: 2px solid var(--soft-border);
+      border: 2px solid var(--border-color);
       border-radius: 8px;
       cursor: pointer;
       color: var(--text-muted);
@@ -165,9 +166,9 @@
     }
     .color-btn input[type="radio"] { display: none; }
     .color-btn.selected {
-      border-color: var(--accent-blue);
+      border-color: rgba(122,174,203,0.5);
       color: var(--accent-blue);
-      background: rgba(59,130,246,.1);
+      background: rgba(122,174,203,0.1);
     }
 
     /* Advanced filters toggle */
@@ -218,7 +219,7 @@
     .elo-input {
       width: 100px;
       background: var(--monitor-bg);
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       color: var(--text-main);
       padding: 9px 12px;
@@ -251,8 +252,8 @@
     .form-estimate {
       margin-top: 20px;
       padding: 10px 16px;
-      background: rgba(59,130,246,.07);
-      border: 1px solid rgba(59,130,246,.2);
+      background: rgba(122,174,203,0.07);
+      border: 1px solid rgba(122,174,203,0.15);
       border-radius: 8px;
       font-size: 0.82rem;
       color: var(--text-muted);
@@ -283,7 +284,7 @@
       width: 100%;
       padding: 13px;
       margin-top: 22px;
-      background: var(--accent-blue);
+      background: rgba(122,174,203,0.85);
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -292,7 +293,7 @@
       cursor: pointer;
       transition: background 0.15s, transform 0.1s;
     }
-    .btn-run:hover  { background: var(--accent-hover); }
+    .btn-run:hover  { background: rgba(122,174,203,1); }
     .btn-run:active { transform: scale(0.99); }
 
     /* ════════════════════ LOADING ════════════════════ */
@@ -322,7 +323,7 @@
 
     .loading-bar-track {
       background: var(--monitor-bg);
-      border: 1px solid var(--soft-border);
+      border: 1px solid rgba(148,163,184,0.15);
       border-radius: 100px;
       height: 10px;
       overflow: hidden;
@@ -334,8 +335,7 @@
       width: 0%;
       border-radius: 100px;
       background: linear-gradient(90deg, var(--accent-blue), #818cf8);
-      transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1),
-                  background 0.5s;
+      transition: width 0.3s ease;
     }
 
     .loading-step-label {
@@ -354,7 +354,7 @@
 
     .btn-cancel {
       background: none;
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       color: var(--text-muted);
       padding: 7px 18px;
       border-radius: 7px;
@@ -396,7 +396,7 @@
       align-items: center;
       gap: 6px;
       background: none;
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       color: var(--text-muted);
       padding: 7px 14px;
       border-radius: 7px;
@@ -417,7 +417,7 @@
     .report-summary-card {
       background: var(--surface-soft);
       border: 1px solid var(--border-color);
-      border-radius: 10px;
+      border-radius: var(--radius);
       padding: 16px;
       text-align: center;
     }
@@ -454,6 +454,181 @@
       color: var(--text-muted);
       margin: -6px 0 18px;
     }
+
+    /* ── Groupes hiérarchiques ─────────────────────────────────────────────── */
+    .report-group {
+      background: var(--surface-soft);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .report-group-card {
+      padding: 16px 18px;
+      border-left: 4px solid rgba(148, 163, 184, 0.3);
+    }
+    .report-group-card.report-item--critical  { border-left: 4px solid rgba(251, 113, 133, 0.55); }
+    .report-group-card.report-item--important { border-left: 4px solid rgba(251, 191, 36,  0.55); }
+    .report-group-card.report-item--minor     { border-left: 4px solid rgba(253, 230, 138, 0.45); }
+
+    .report-group-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 16px;
+      background: var(--surface-soft);
+      border: none;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 0.80rem;
+      cursor: pointer;
+      text-align: left;
+    }
+    .report-group-toggle:hover {
+      background: rgba(148,163,184,0.06);
+    }
+    .report-group-card.report-item--critical  { border-left: 4px solid rgba(251, 113, 133, 0.55); }
+    .report-group-card.report-item--important { border-left: 4px solid rgba(251, 191, 36,  0.55); }
+    .report-group-card.report-item--minor     { border-left: 4px solid rgba(253, 230, 138, 0.45); }
+
+    /* Barre de toggle des lignes critiques dans la carte */
+    .report-group-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 16px;
+      background: var(--surface);
+      border: none;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 0.80rem;
+      cursor: pointer;
+      text-align: left;
+    }
+    .report-group-toggle:hover {
+      background: var(--surface-muted);
+    }
+
+    .report-group-arrow {
+      font-size: 0.6rem;
+      width: 12px;
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+
+    /* Texte d'explication répartition des défaites */
+    .report-group-explanation {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 6px 0 0;
+      line-height: 1.45;
+    }
+
+    /* Note quand une variante large domine sans détail par ligne */
+    .report-group-note {
+      padding: 8px 16px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-color);
+      font-style: italic;
+    }
+
+    /* ── Carte ligne critique (enfant compact) ───────────────────────────── */
+    /* ── Sous-section enfants (problématiques / compensatrices) ─────────── */
+    .report-subsection-label {
+      padding: 10px 16px 4px 28px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    /* ── Mentions honorables (items orphelins) ──────────────────────────── */
+    .report-honorable {
+      margin-top: 24px;
+      padding: 12px 16px;
+      border-top: 2px dashed var(--border-color);
+    }
+    .report-honorable-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .report-honorable-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      opacity: 0.6;
+      margin-bottom: 12px;
+    }
+
+    .report-group-body {
+      border-top: none;
+      background: rgba(15,23,42,0.5);
+    }
+
+    .report-child-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 16px 10px 28px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--surface-soft);
+    }
+    .report-child-card:last-child {
+      border-bottom: none;
+    }
+
+    .report-child-card:hover {
+      background: rgba(148,163,184,0.06);
+    }
+
+    .report-child-line {
+      font-size: 0.82rem;
+      font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    .report-child-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .report-child-stats .priority-badge {
+      font-size: 0.6rem;
+      padding: 1px 6px;
+    }
+    .report-child-score {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 30px;
+      color: var(--text-strong);
+    }
+    .report-child-gap {
+      color: var(--danger);
+      font-weight: 600;
+      min-width: 30px;
+    }
+    .report-child-losses {
+      color: var(--accent);
+    }
+    .report-child-total {
+      color: var(--text-muted);
+    }
+    .report-child-conf {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+    .report-child-stats .conf-dots { gap: 2px; }
+    .report-child-stats .conf-dot { width: 7px; height: 7px; }
 
     /* Section titles */
     .report-section-title {
@@ -502,28 +677,27 @@
       color: var(--accent-blue);
       border-bottom-color: var(--accent-blue);
     }
-    .report-item--good {
-      background: var(--surface-soft);
-      border: 1px solid rgba(34, 197, 94, 0.2);
-      border-left: 4px solid var(--accent-green);
-      border-radius: 10px;
-      padding: 16px 18px;
-      margin-bottom: 10px;
-    }
-
-    /* Items */
+    /* Items (hors group-card) */
     .report-item {
       background: var(--surface-soft);
       border: 1px solid var(--border-color);
       border-left: 4px solid var(--soft-border);
-      border-radius: 10px;
+      border-radius: var(--radius);
       padding: 16px 18px;
       margin-bottom: 10px;
       transition: border-color 0.15s;
     }
-    .report-item.report-item--critical  { border-left: 3px solid rgba(251, 113, 133, 0.55); }
-    .report-item.report-item--important { border-left: 3px solid rgba(251, 191, 36,  0.55); }
-    .report-item.report-item--minor     { border-left: 3px solid rgba(253, 230, 138, 0.45); }
+    .report-item.report-item--critical  { border-left: 4px solid rgba(251, 113, 133, 0.55); }
+    .report-item.report-item--important { border-left: 4px solid rgba(251, 191, 36,  0.55); }
+    .report-item.report-item--minor     { border-left: 4px solid rgba(253, 230, 138, 0.45); }
+    .report-item--good {
+      background: var(--surface-soft);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      border-left: 4px solid var(--accent-green);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 10px;
+    }
 
     .report-item-layout {
       display: grid;
@@ -595,7 +769,7 @@
       color: var(--accent-blue);
       font-weight: 700;
       padding: 1px 4px;
-      background: rgba(59,130,246,.15);
+      background: rgba(122,174,203,.15);
       border-radius: 3px;
     }
 
@@ -647,7 +821,7 @@
       padding: 10px 12px;
       border-radius: 8px;
       background: #0b1526;
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       color: var(--text-main);
       text-transform: none;
       letter-spacing: 0;
@@ -706,7 +880,7 @@
     .conf-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
-      background: var(--soft-border);
+      background: var(--border-color);
     }
     .conf-dot.filled { background: var(--accent-blue); }
 
@@ -728,11 +902,11 @@
       transition: all 0.15s;
     }
     .report-btn--primary {
-      background: rgba(59,130,246,.15);
+      background: rgba(122,174,203,.15);
       color: var(--accent-blue);
-      border: 1px solid rgba(59,130,246,.3);
+      border: 1px solid rgba(122,174,203,.3);
     }
-    .report-btn--primary:hover { background: rgba(59,130,246,.25); }
+    .report-btn--primary:hover { background: rgba(122,174,203,.25); }
 
     /* Good items */
     .report-item-good {
@@ -755,7 +929,7 @@
       padding: 48px 24px;
       background: var(--surface-soft);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
+      border-radius: var(--radius);
     }
 
     /* ── Échiquier mini (résultats) — même CSS que survival-mini-board dans index.html ── */
@@ -791,7 +965,7 @@
     .fen-board {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       overflow: hidden;
       background: #09111e;
@@ -803,6 +977,7 @@
       width: 280px;
       height: 280px;
       grid-template-columns: repeat(8, minmax(0, 1fr));
+      grid-template-rows: repeat(8, minmax(0, 1fr));
     }
 
     .fen-square {
@@ -820,6 +995,7 @@
     .fen-board--editor .fen-square {
       cursor: pointer;
       font-size: 1.45rem;
+      height: 100%;
     }
 
     /* Images dans le board éditeur (280px → cases ~35px) */
@@ -830,8 +1006,8 @@
       pointer-events: none;
     }
 
-    .fen-square.is-light { background: #ebecd0; color: #1f2937; }
-    .fen-square.is-dark  { background: #779556; color: #0f172a; }
+    .fen-square.is-light { background: var(--fen-light, #ebecd0); color: #1f2937; }
+    .fen-square.is-dark  { background: var(--fen-dark, #779556); color: #0f172a; }
 
     /* Dernier coup : calque jaune translucide (comme main board) */
     .fen-square.is-highlight::after {
@@ -896,7 +1072,7 @@
     .position-builder {
       display: none;
       padding: 14px;
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       border-radius: 10px;
       background: rgba(13,27,42,.55);
     }
@@ -921,7 +1097,7 @@
 
     .position-action-btn {
       background: var(--monitor-bg);
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       color: var(--text-main);
       border-radius: 8px;
       min-height: 34px;
@@ -931,7 +1107,7 @@
 
     .position-action-btn:hover {
       border-color: var(--accent-blue);
-      background: rgba(59,130,246,.12);
+      background: rgba(122,174,203,.12);
     }
 
     .position-controls {
@@ -954,7 +1130,7 @@
       justify-content: center;
       gap: 4px;
       padding: 6px 8px;
-      border: 1px solid var(--soft-border);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       background: var(--monitor-bg);
       font-size: 0.78rem;
@@ -1006,6 +1182,14 @@
 
       .report-item-board {
         justify-content: flex-start;
+      }
+
+      .report-child-card {
+        padding-left: 14px;
+      }
+
+      .report-child-stats {
+        gap: 6px;
       }
 
       .fen-board--editor {
@@ -1135,14 +1319,6 @@
         <div class="form-section-title">Paramètres d'analyse</div>
 
         <div class="form-group">
-          <label class="form-label">Profondeur d'analyse</label>
-          <div class="slider-wrap">
-            <input type="range" id="rapport-depth" min="4" max="14" step="2" value="10" />
-            <span class="slider-val" id="rapport-depth-val">10 demi-coups (5 coups)</span>
-          </div>
-        </div>
-
-        <div class="form-group">
           <label class="form-label">Position de départ</label>
           <label class="position-filter-toggle" for="rapport-position-enabled">
             <input type="checkbox" id="rapport-position-enabled" />
@@ -1166,6 +1342,7 @@
 
                 <label class="form-label" for="rapport-position-fen-input">FEN générée</label>
                 <input type="text" id="rapport-position-fen-input" class="form-input position-fen-input" autocomplete="off" spellcheck="false" readonly />
+                <input type="hidden" id="rapport-position-path" value="" />
               </div>
             </div>
           </div>

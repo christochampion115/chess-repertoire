@@ -189,4 +189,66 @@ router.get('/report', async (req, res) => {
   }
 });
 
+// SSE : résultat du rapport de priorités d'entraînement (sans progression temps réel).
+router.get('/report/stream', async (req, res) => {
+  const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+  const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
+
+  if (!username) return res.status(400).json({ error: 'Paramètre username requis' });
+  if (!ALLOWED_COLORS.has(color))
+    return res.status(400).json({ error: 'Paramètre color invalide (white|black)' });
+
+  const timeClass  = ALLOWED_TIMECLASSES.has(req.query.timeClass) ? req.query.timeClass : 'all';
+  const dateFrom   = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
+  const dateTo     = typeof req.query.dateTo   === 'string' ? req.query.dateTo.trim()   : '';
+  const startFen   = typeof req.query.startFen === 'string' ? req.query.startFen.trim() : '';
+
+  const eloMinRaw  = Number.parseInt(req.query.eloMin, 10);
+  const eloMaxRaw  = Number.parseInt(req.query.eloMax, 10);
+  const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0, Math.min(3000, eloMinRaw)) : 0;
+  const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0, Math.min(3000, eloMaxRaw)) : 3000;
+
+  const maxDepthRaw = Number.parseInt(req.query.maxDepth, 10);
+  const minFreqRaw  = Number.parseInt(req.query.minFreq,  10);
+  const maxDepth    = Number.isFinite(maxDepthRaw) ? Math.max(4, Math.min(14, maxDepthRaw)) : 10;
+  const minFreq     = Number.isFinite(minFreqRaw)  ? Math.max(2, Math.min(30, minFreqRaw))  : 5;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  let isClosed = false;
+  req.on('close', () => { isClosed = true; });
+
+  const safeWrite = (data) => { if (!isClosed) res.write(data); };
+
+  try {
+    const report = await getChesscomReport(
+      {
+        playerUsername: username,
+        playerColor: color,
+        playerTimeClass: timeClass,
+        playerDateFrom: dateFrom,
+        playerDateTo: dateTo,
+        playerEloMin,
+        playerEloMax,
+        playerStartFen: startFen,
+      },
+      { maxDepth, minFreq },
+      (progress) => {
+        const evtType = progress.phase ? 'phase' : 'archive';
+        safeWrite(`data: ${JSON.stringify({ type: evtType, ...progress })}\n\n`);
+      }
+    );
+    safeWrite(`data: ${JSON.stringify({ type: 'complete', data: report })}\n\n`);
+  } catch (error) {
+    console.error('[chesscom report stream] error', error);
+    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur rapport Chess.com' })}\n\n`);
+  }
+  if (!isClosed) res.end();
+});
+
 module.exports = router;

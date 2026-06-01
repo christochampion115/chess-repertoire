@@ -1,4 +1,7 @@
 import { generateMiniboardHtml } from './boardUtils.js';
+import { loadState } from './storage.js';
+
+const BOARD_THEME_KEY = 'alphaChess.boardTheme';
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  rapport.js — Analyse de performances / Rapport de priorités d'entraînement
@@ -11,114 +14,36 @@ function buildApiBase() {
   return 'http://localhost:4000/api';
 }
 
-// ── Table ECO (prefix matching, du plus long au plus court) ──────────────────
-const ECO_TABLE = [
-  // Ouvertures italiennes / Ruy Lopez
-  { s: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O',   n: 'Ruy Lopez — Variante Ouverte' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6',        n: 'Ruy Lopez — Variante Morphy' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5 a6',                n: 'Ruy Lopez — Défense Morphy' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5 Nf6',              n: 'Ruy Lopez — Variante Berlin' },
-  { s: 'e4 e5 Nf3 Nc6 Bb5',                  n: 'Ruy Lopez' },
-  { s: 'e4 e5 Nf3 Nc6 Bc4 Bc5',             n: 'Partie Italienne — Giuoco Piano' },
-  { s: 'e4 e5 Nf3 Nc6 Bc4 Nf6',             n: 'Partie Italienne — Deux Cavaliers' },
-  { s: 'e4 e5 Nf3 Nc6 Bc4',                 n: 'Partie Italienne' },
-  { s: 'e4 e5 Nf3 Nc6 d4 exd4 Nxd4',       n: 'Partie Écossaise' },
-  { s: 'e4 e5 Nf3 Nc6 d4',                  n: 'Partie Écossaise' },
-  { s: 'e4 e5 Nf3 Nf6',                     n: 'Défense Petroff' },
-  { s: 'e4 e5 Nf3 f5',                      n: 'Contre-Gambit Lettish' },
-  { s: 'e4 e5 Nf3 d6',                      n: 'Défense Philidor' },
-  { s: 'e4 e5 f4 exf4',                     n: 'Gambit du Roi accepté' },
-  { s: 'e4 e5 f4 Bc5',                      n: 'Gambit du Roi — Défense classique' },
-  { s: 'e4 e5 f4',                           n: 'Gambit du Roi' },
-  { s: 'e4 e5 Nc3 Nc6 f4',                  n: 'Partie des Quatre Cavaliers — Gambit' },
-  { s: 'e4 e5 Nc3 Nf6 f4',                  n: 'Partie des Trois Cavaliers' },
-  { s: 'e4 e5 Nc3 Nc6',                     n: 'Partie des Quatre Cavaliers' },
-  // Sicilienne
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6', n: 'Sicilienne — Najdorf' },
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6', n: 'Sicilienne — Scheveningen' },
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6', n: 'Sicilienne — Dragon' },
-  { s: 'e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 d6', n: 'Sicilienne — Classique' },
-  { s: 'e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6',     n: 'Sicilienne — Kan / Taimanov' },
-  { s: 'e4 c5 Nf3 e6 d4 cxd4 Nxd4',         n: 'Sicilienne — Kan' },
-  { s: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4',         n: 'Sicilienne — Ouverte' },
-  { s: 'e4 c5 Nf3 Nc6 d4 cxd4 Nxd4',        n: 'Sicilienne — Ouverte (4.Nxd4)' },
-  { s: 'e4 c5 c3',                           n: 'Sicilienne — Alapin' },
-  { s: 'e4 c5 Nc3',                          n: 'Sicilienne — Grand Prix Attack' },
-  { s: 'e4 c5 f4',                           n: 'Sicilienne — McDonnell Attack' },
-  { s: 'e4 c5',                              n: 'Défense Sicilienne' },
-  // Française
-  { s: 'e4 e6 d4 d5 Nc3 Bb4',              n: 'Défense Française — Winawer' },
-  { s: 'e4 e6 d4 d5 Nc3 Nf6',             n: 'Défense Française — Classique' },
-  { s: 'e4 e6 d4 d5 e5',                  n: 'Défense Française — Advance' },
-  { s: 'e4 e6 d4 d5 exd5',               n: 'Défense Française — Échange' },
-  { s: 'e4 e6 d4 d5',                    n: 'Défense Française' },
-  { s: 'e4 e6',                           n: 'Défense Française' },
-  // Caro-Kann
-  { s: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5', n: 'Caro-Kann — Classique' },
-  { s: 'e4 c6 d4 d5 e5',                n: 'Caro-Kann — Advance' },
-  { s: 'e4 c6 d4 d5 exd5',             n: 'Caro-Kann — Échange' },
-  { s: 'e4 c6 d4 d5',                  n: 'Caro-Kann' },
-  { s: 'e4 c6',                         n: 'Défense Caro-Kann' },
-  // Pirc / Moderne
-  { s: 'e4 d6 d4 Nf6 Nc3 g6',           n: 'Défense Pirc — Classique' },
-  { s: 'e4 d6 d4 Nf6 Nc3',              n: 'Défense Pirc' },
-  { s: 'e4 g6',                          n: 'Défense Moderne' },
-  // Scandinave
-  { s: 'e4 d5 exd5 Qxd5 Nc3 Qa5',      n: 'Scandinave — Classique' },
-  { s: 'e4 d5 exd5 Nf6',               n: 'Scandinave — Islandais' },
-  { s: 'e4 d5',                          n: 'Défense Scandinave' },
-  // Ouvertures du pion dame
-  { s: 'd4 Nf6 c4 g6 Nc3 Bg7 e4 d6',   n: 'Défense Est-Indienne — Sämisch' },
-  { s: 'd4 Nf6 c4 g6 Nc3 Bg7 e4',      n: 'Défense Est-Indienne' },
-  { s: 'd4 Nf6 c4 g6 Nc3 d5',          n: 'Grünfeld — Classique' },
-  { s: 'd4 Nf6 c4 g6 Nc3',             n: 'Grünfeld / Est-Indienne' },
-  { s: 'd4 Nf6 c4 e6 Nc3 Bb4',        n: 'Défense Nimzo-Indienne' },
-  { s: 'd4 Nf6 c4 e6 Nc3 d5',         n: 'Gambit Dame — Orthodoxe' },
-  { s: 'd4 Nf6 c4 e6 Nf3 b6',         n: 'Défense Reine-Indienne' },
-  { s: 'd4 Nf6 c4 c5',                n: 'Défense Benko / Volga' },
-  { s: 'd4 d5 c4 e6 Nc3 Nf6 Bg5',     n: 'Gambit Dame — Tartakover' },
-  { s: 'd4 d5 c4 e6 Nc3 Nf6 Nf3',     n: 'Gambit Dame' },
-  { s: 'd4 d5 c4 e6 Nc3 Nf6',         n: 'Gambit Dame' },
-  { s: 'd4 d5 c4 dxc4',               n: 'Gambit Dame accepté' },
-  { s: 'd4 d5 c4 c6 Nf3 Nf6',        n: 'Défense Slave' },
-  { s: 'd4 d5 c4 c6',                n: 'Défense Slave' },
-  { s: 'd4 d5 c4',                   n: 'Gambit Dame' },
-  { s: 'd4 d5',                      n: 'Gambit Dame (préliminaire)' },
-  { s: 'd4 e6 c4 Nf6',              n: 'Indien du Roi' },
-  { s: 'd4 f5 c4 Nf6 g3',           n: 'Défense Néerlandaise — Leningrad' },
-  { s: 'd4 f5',                      n: 'Défense Néerlandaise' },
-  // Ouvertures anglaise / Réti / Flank
-  { s: 'c4 e5 Nc3 Nf6 Nf3',        n: 'Anglaise — Variante symétrique' },
-  { s: 'c4 c5 Nf3 Nf6 d4',         n: 'Anglaise — Accélérée' },
-  { s: 'c4 e5',                     n: 'Ouverture Anglaise' },
-  { s: 'c4 Nf6 Nc3 d5 cxd5',       n: 'Anglaise — Réti' },
-  { s: 'c4',                        n: 'Ouverture Anglaise' },
-  { s: 'Nf3 d5 c4',                n: 'Réti — Gambit Dame inversé' },
-  { s: 'Nf3 Nf6 g3 d5',           n: 'Système Réti' },
-  { s: 'Nf3 Nf6 g3',              n: 'Système Réti' },
-  { s: 'Nf3',                      n: 'Ouverture Réti' },
-  { s: 'g3',                       n: 'Fianchetto du Roi' },
-  { s: 'f4',                       n: 'Attaque Bird' },
-  { s: 'b3',                       n: 'Ouverture Nimzovitch-Larsen' },
-  { s: 'b4',                       n: 'Gambit Sokolsky (Orang-outan)' },
-  { s: 'd4 Nf6',                   n: 'Indien du Roi (prél.)' },
-  { s: 'd4',                       n: 'Ouverture pion dame' },
-  { s: 'e4',                       n: 'Ouverture pion roi' },
-];
+// ── Base de données d'ouvertures (Lichess chess-openings, 3706 entrées) ──────
+// Chargée à la volée depuis data/openings.json
+let OPENINGS = null;
 
-// Trier du plus long au plus court pour le matching greedy
-ECO_TABLE.sort((a, b) => b.s.length - a.s.length);
+async function ensureOpeningsLoaded() {
+  if (OPENINGS) return;
+  const res = await fetch('data/openings.json');
+  if (!res.ok) throw new Error(`Impossible de charger les ouvertures (${res.status})`);
+  const data = await res.json();
+  OPENINGS = data.openings;
+}
 
 function pathToString(path) {
   return path.join(' ');
 }
 
 function lookupEco(path) {
+  if (!OPENINGS) return null;
   const str = pathToString(path);
-  for (const entry of ECO_TABLE) {
+  for (const entry of OPENINGS) {
     if (str.startsWith(entry.s) || str === entry.s) return entry.n;
   }
   return null;
+}
+
+// ── Numéro de coup depuis une FEN ──────────────────────────────────────────────
+function getMoveNumberFromFen(fen) {
+  if (!fen) return 1;
+  const parts = fen.split(' ');
+  return parseInt(parts[parts.length - 1], 10) || 1;
 }
 
 // ── Nommage d'ouverture (répertoires > ECO > fallback) ────────────────────────
@@ -136,9 +61,12 @@ function getOpeningName(item, repertoires) {
     }
   }
 
-  // 2. Table ECO
-  const eco = lookupEco(fullPath);
-  if (eco) return eco;
+  // 2. Table ECO (uniquement pour les chemins complets d'au moins 3 demi-coups,
+  //    pour éviter les noms trompeurs sur les chemins relatifs à une position filtrée)
+  if (fullPath.length >= 3) {
+    const eco = lookupEco(fullPath);
+    if (eco) return eco;
+  }
 
   // 3. Fallback: nom du parent + derniers coups
   const parentEco = lookupEco(item.contextPath);
@@ -151,11 +79,39 @@ function getOpeningName(item, repertoires) {
   return 'Position initiale';
 }
 
+// Variante qui prend un path directement (utile pour les groupes sans header)
+function getOpeningNameByPath(fullPath, fenBefore, repertoires) {
+  // 1. Répertoires
+  if (Array.isArray(repertoires)) {
+    for (const rep of repertoires) {
+      if (rep && rep.name) {
+        const repFen = rep.fen ? rep.fen.split(' ')[0] : null;
+        const beforeFen = fenBefore ? fenBefore.split(' ')[0] : null;
+        if (repFen && beforeFen && repFen === beforeFen) return rep.name;
+      }
+    }
+  }
+  // 2. ECO lookup (pas de limite de profondeur : le path groupe est absolu)
+  if (fullPath.length >= 1) {
+    const eco = lookupEco(fullPath);
+    if (eco) return eco;
+  }
+  // 3. Fallback
+  const parentEco = lookupEco(fullPath.slice(0, -1));
+  if (parentEco && fullPath.length > 0) {
+    return `${parentEco} : ${fullPath[fullPath.length - 1]}`;
+  }
+  if (fullPath.length > 0) return `1.${fullPath[0]}…`;
+  return 'Position initiale';
+}
+
 // ── Notation PGN d'un chemin de coups ────────────────────────────────────────
-function pathToPgn(path, highlightLast = false) {
+function pathToPgn(path, highlightLast = false, startMove = 1) {
   let html = '';
   for (let i = 0; i < path.length; i++) {
-    if (i % 2 === 0) html += `<span class="pgn-movenum">${Math.floor(i / 2) + 1}.</span>`;
+    if (i % 2 === 0) {
+      html += `<span class="pgn-movenum">${startMove + Math.floor(i / 2)}.</span>`;
+    }
     const isLast = i === path.length - 1;
     const cls    = (isLast && highlightLast) ? ' class="pgn-player-move"' : '';
     html += `<span${cls}>${path[i]}</span> `;
@@ -168,13 +124,6 @@ function priorityBadge(item) {
   if (item.priority >= 5 && item.gap >= 0.10) return { badgeClass: 'badge-critical', itemClass: 'report-item--critical', label: 'CRITIQUE', rank: 3 };
   if (item.priority >= 2 || item.gap >= 0.08)  return { badgeClass: 'badge-important', itemClass: 'report-item--important', label: 'IMPORTANT', rank: 2 };
   return { badgeClass: 'badge-minor', itemClass: 'report-item--minor', label: 'MINEUR', rank: 1 };
-}
-
-function compareReportItems(a, b) {
-  return (priorityBadge(b).rank - priorityBadge(a).rank)
-    || (b.priority - a.priority)
-    || (b.gap - a.gap)
-    || (b.total - a.total);
 }
 
 // ── Barre WDL visuelle ────────────────────────────────────────────────────────
@@ -207,8 +156,8 @@ function confidenceDots(total) {
   return `<span class="conf-dots">${dots}</span>`;
 }
 
-// ── Estimation de durée en fonction des paramètres ───────────────────────────
-function estimateDuration(dateFrom, dateTo, maxDepth) {
+// ── Estimation de durée (simplifiée, sans profondeur) ────────────────────────
+function estimateDuration(dateFrom, dateTo) {
   let months = 12;
   if (dateFrom && dateTo) {
     const d1 = new Date(dateFrom + '-01');
@@ -221,10 +170,7 @@ function estimateDuration(dateFrom, dateTo, maxDepth) {
     const d1 = new Date(dateFrom + '-01');
     if (!isNaN(d1)) months = Math.max(1, (now - d1) / (1000 * 60 * 60 * 24 * 30));
   }
-  const base = 20;
-  const perMonth = 3;
-  const perDepth = maxDepth > 8 ? (maxDepth - 8) * 3 : 0;
-  return Math.min(120, Math.round(base + months * perMonth + perDepth));
+  return Math.min(90, Math.round(15 + months * 3));
 }
 
 // ── Lire les répertoires en localStorage ─────────────────────────────────────
@@ -411,8 +357,8 @@ function getMiniBoardPieceIcon(piece) {
   return map[piece.color + piece.type];
 }
 
-function renderFenBoardHtml(fen, { highlightUci = '', flipped = false } = {}) {
-  return generateMiniboardHtml(fen, highlightUci, { flipped });
+function renderFenBoardHtml(fen, { highlightUci = '', flipped = false, lightSquare, darkSquare } = {}) {
+  return generateMiniboardHtml(fen, highlightUci, { flipped, lightSquare, darkSquare });
 }
 
 function resetPositionEditor(fen = START_FEN) {
@@ -426,11 +372,19 @@ function resetPositionEditor(fen = START_FEN) {
 function syncPositionFenField() {
   const input = document.getElementById('rapport-position-fen-input');
   if (input && positionEditorState.chess) input.value = positionEditorState.chess.fen();
+  const pathField = document.getElementById('rapport-position-path');
+  if (pathField && positionEditorState.chess) pathField.value = positionEditorState.chess.history().join(' ');
 }
 
 function renderPositionBoard() {
   const board = document.getElementById('rapport-position-board');
   if (!board) return;
+
+  const theme = loadState(BOARD_THEME_KEY);
+  if (theme?.light && theme?.dark) {
+    board.style.setProperty('--fen-light', theme.light);
+    board.style.setProperty('--fen-dark', theme.dark);
+  }
 
   const chess = positionEditorState.chess || new Chess();
   const matrix = chess.board();
@@ -564,18 +518,293 @@ function initPositionEditor() {
   });
 }
 
+// ── Regroupement hiérarchique (mode libre) ───────────────────────────────────
+// Les items sont groupés par leurs 4 premiers demi-coups.
+// Un groupe est affiché si son écart à la baseline globale > 5%.
+// Dans chaque groupe, les enfants sont scindés en :
+//   — lignes problématiques  (score < groupScore, triées par lossesAvoided)
+//   — lignes compensatrices  (score > groupScore, triées par lossesAvoided)
+function groupItems(items, baselineScore) {
+  const groups = new Map();
+  for (const item of items) {
+    if (item.depth < 4) continue;
+    const ply = Math.min(item.contextPath.length, 4);
+    const key = item.contextPath.slice(0, ply).join(' ');
+    if (!key) continue;
+
+    if (!groups.has(key)) {
+      groups.set(key, { key, children: [], total: 0, wins: 0, draws: 0, losses: 0, lossesAvoided: 0, fen: null, fenUci: null });
+    }
+    const g = groups.get(key);
+    g.total  += item.total;
+    g.wins   += item.wins;
+    g.draws  += item.draws;
+    g.losses += item.losses;
+    g.lossesAvoided += item.lossesAvoided;
+    g.children.push(item);
+  }
+
+  for (const g of groups.values()) {
+    const moves = g.key.split(' ');
+    try {
+      const chess = new Chess();
+      for (const m of moves) chess.move(m);
+      g.fen    = chess.fen();
+      g.fenUci = null;
+    } catch (e) {
+      g.fen = null;
+    }
+
+    const groupScore = g.total > 0 ? (g.wins + 0.5 * g.draws) / g.total : 0;
+    g.groupScore = groupScore;
+    g.groupGap   = baselineScore - groupScore;
+
+    // Scinder les enfants : problématiques (< moyenne) / compensatrices (> moyenne)
+    g.problematicLines = g.children
+      .filter(c => c.score < groupScore)
+      .sort((a, b) => b.lossesAvoided - a.lossesAvoided);
+    g.compensatingLines = g.children
+      .filter(c => c.score > groupScore)
+      .sort((a, b) => b.lossesAvoided - a.lossesAvoided);
+  }
+
+  return Array.from(groups.values());
+}
+
+// ── Carte variante large (carte heavy complète : board, WDL, stats) ────────
+function renderGroupAsHeavyCard(group, baselineScore, params, boardTheme, repertoires, startMove) {
+  const hPct = (group.groupScore * 100).toFixed(0);
+  const hGapVal = group.groupGap * 100;
+  const hGap = hGapVal.toFixed(0);
+  const basePct = (baselineScore * 100).toFixed(0);
+  const fullPath = group.key ? group.key.split(' ') : [];
+  const pgnHtml = pathToPgn(fullPath, false, startMove) || '';
+  const lossPct = group.total > 0 ? ((group.losses / group.total) * 100).toFixed(0) : '—';
+
+  const fenForBoard       = group.fen;
+  const groupHighlightUci = group.fenUci;
+
+  const groupBadge = { badgeClass: group.groupGap >= 0.08 ? 'badge-critical' : group.groupGap >= 0.06 ? 'badge-important' : 'badge-minor', itemClass: group.groupGap >= 0.08 ? 'report-item--critical' : group.groupGap >= 0.06 ? 'report-item--important' : '', label: group.groupGap >= 0.08 ? 'CRITIQUE' : group.groupGap >= 0.06 ? 'IMPORTANT' : 'MINEUR', rank: group.groupGap >= 0.08 ? 3 : group.groupGap >= 0.06 ? 2 : 1 };
+
+  const allChildren = [...(group.problematicLines || []), ...(group.compensatingLines || [])];
+
+  let explanation = '';
+  if (allChildren.length > 0) {
+    const childLossShare = allChildren.reduce((s, c) => s + c.losses, 0);
+    const ratio = childLossShare / Math.max(1, group.losses);
+    if (ratio > 0.7) {
+      explanation = `⚠️ ${(ratio * 100).toFixed(0)}% de vos défaites dans cette ouverture sont concentrées dans ${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''} spécifique${allChildren.length > 1 ? 's' : ''}.`;
+    } else if (ratio > 0.3) {
+      explanation = `📊 ${(ratio * 100).toFixed(0)}% des défaites sont capturées par ces lignes spécifiques — le reste est réparti sur d'autres variantes.`;
+    } else {
+      explanation = `📊 Les pertes sont réparties uniformément — aucun problème de ligne particulière, l'ouverture entière est difficile.`;
+    }
+  } else {
+    const lossRate = group.losses / Math.max(1, group.total);
+    const baselineLossRate = 1 - baselineScore;
+    if (lossRate > baselineLossRate * 1.3) {
+      explanation = `⚠️ Score anormalement bas sur cette ouverture dans son ensemble (${lossPct}% de défaites).`;
+    } else {
+      explanation = `📊 Légère sous-performance globale — pas de ligne spécifique à cibler.`;
+    }
+  }
+
+  const hasChildren = allChildren.length > 0;
+
+  return `
+    <div class="report-group-card report-item ${groupBadge.itemClass}">
+      <div class="report-item-layout">
+        <div>
+            <div class="report-item-header">
+              <span class="priority-badge ${groupBadge.badgeClass}">${groupBadge.label}</span>
+              <div class="report-item-name">${getOpeningNameByPath(fullPath, fenForBoard, repertoires)}</div>
+              <div class="report-item-meta">${group.total} parties · ${lossPct}% de défaites</div>
+            </div>
+
+          ${pgnHtml ? `<div class="report-item-line">${pgnHtml}</div>` : ''}
+
+          <div class="report-item-stats">
+            <div class="stat-block">
+              <div class="stat-block-val ${parseInt(hPct, 10) < parseInt(basePct, 10) ? 'stat-bad' : ''}">${hPct}%</div>
+              <div class="stat-block-lbl">${renderMetricLabel('Score variante', METRIC_HELP.lineScore)}</div>
+            </div>
+            <div class="stat-block stat-block--gap">
+              <div class="stat-block-val stat-bad ${hGapVal >= 0 ? '' : 'stat-good'}">${hGapVal >= 0 ? `−${hGap}%` : `+${Math.abs(hGapVal).toFixed(0)}%`}</div>
+              <div class="stat-block-lbl">${renderMetricLabel('Écart', METRIC_HELP.gap)}</div>
+            </div>
+            <div class="stat-block stat-block--loss">
+              <div class="stat-block-val stat-bad">${Math.round(group.lossesAvoided * 16)} pts</div>
+              <div class="stat-block-lbl">Pertes Evitables</div>
+            </div>
+          </div>
+
+          ${wdlBar(group.wins, group.draws, group.losses)}
+
+          <div class="report-group-explanation">${explanation}</div>
+
+          <div class="report-item-footer">
+            ${confidenceDots(group.total)}
+            <span class="conf-label">${group.total >= 100 ? 'Très fiable' : group.total >= 30 ? 'Fiable' : group.total >= 10 ? 'Échantillon moyen' : 'Peu de données'}</span>
+          </div>
+        </div>
+          ${fenForBoard ? `<div class="report-item-board">
+          ${renderFenBoardHtml(fenForBoard, { highlightUci: groupHighlightUci, flipped: params.color === 'black', lightSquare: boardTheme?.light, darkSquare: boardTheme?.dark })}
+        </div>` : ''}
+      </div>
+      ${hasChildren ? `<button class="report-group-toggle" aria-expanded="true">
+        <span class="report-group-arrow">▼</span>
+        <span>${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''}</span>
+      </button>` : ''}
+    </div>`;
+}
+
+// ── Carte variante large "meilleures performances" ─────────────────────────
+function renderGroupAsHeavyCardStrengths(group, baselineScore, params, boardTheme, repertoires, startMove) {
+  const hPct = (group.groupScore * 100).toFixed(0);
+  const hGapVal = Math.abs(group.groupGap * 100);
+  const hGap = hGapVal.toFixed(0);
+  const basePct = (baselineScore * 100).toFixed(0);
+  const fullPath = group.key ? group.key.split(' ') : [];
+  const pgnHtml = pathToPgn(fullPath, false, startMove) || '';
+  const winPct = group.total > 0 ? ((group.wins / group.total) * 100).toFixed(0) : '—';
+  const fenForBoard       = group.fen;
+  const groupHighlightUci = group.fenUci;
+
+  const allChildren = [...(group.problematicLines || []), ...(group.compensatingLines || [])];
+
+  let explanation = '';
+  if (allChildren.length > 0) {
+    const childWinShare = allChildren.reduce((s, c) => s + c.wins, 0);
+    const ratio = childWinShare / Math.max(1, group.wins);
+    if (ratio > 0.7) {
+      explanation = `🏆 ${(ratio * 100).toFixed(0)}% de vos victoires dans ce groupe sont concentrées dans ${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''} spécifique${allChildren.length > 1 ? 's' : ''}.`;
+    } else if (ratio > 0.3) {
+      explanation = `📊 ${(ratio * 100).toFixed(0)}% des victoires sont capturées par ces lignes spécifiques — le reste est réparti sur d'autres variantes.`;
+    } else {
+      explanation = `📊 Les gains sont répartis uniformément — pas de ligne particulière qui domine.`;
+    }
+  } else {
+    const winRate = group.wins / Math.max(1, group.total);
+    const baselineWinRate = baselineScore;
+    if (winRate > baselineWinRate * 1.3) {
+      explanation = `🏆 Score anormalement élevé sur cette ouverture dans son ensemble (${winPct}% de victoires).`;
+    } else {
+      explanation = `📊 Légère surperformance globale — pas de ligne spécifique à cibler.`;
+    }
+  }
+
+  const hasChildren = allChildren.length > 0;
+
+  return `
+    <div class="report-group-card report-item--good">
+      <div class="report-item-layout">
+        <div>
+            <div class="report-item-header">
+              <span class="priority-badge badge-good">FORT</span>
+              <div class="report-item-name">${getOpeningNameByPath(fullPath, fenForBoard, repertoires)}</div>
+              <div class="report-item-meta">${group.total} parties · ${winPct}% de victoires</div>
+            </div>
+
+          ${pgnHtml ? `<div class="report-item-line">${pgnHtml}</div>` : ''}
+
+          <div class="report-item-stats">
+            <div class="stat-block">
+              <div class="stat-block-val stat-good">${hPct}%</div>
+              <div class="stat-block-lbl">${renderMetricLabel('Score variante', METRIC_HELP.lineScore)}</div>
+            </div>
+            <div class="stat-block stat-block--gap">
+              <div class="stat-block-val stat-good">+${hGap}%</div>
+              <div class="stat-block-lbl">${renderMetricLabel('Avance', METRIC_HELP.gap)}</div>
+            </div>
+            <div class="stat-block stat-block--loss">
+              <div class="stat-block-val stat-good">+${Math.round(Math.abs(group.lossesAvoided) * 16)} pts</div>
+              <div class="stat-block-lbl">Bonus Elo</div>
+            </div>
+          </div>
+
+          ${wdlBar(group.wins, group.draws, group.losses)}
+
+          <div class="report-group-explanation">${explanation}</div>
+
+          <div class="report-item-footer">
+            ${confidenceDots(group.total)}
+            <span class="conf-label">${group.total >= 100 ? 'Très fiable' : group.total >= 30 ? 'Fiable' : group.total >= 10 ? 'Échantillon moyen' : 'Peu de données'}</span>
+          </div>
+        </div>
+          ${fenForBoard ? `<div class="report-item-board">
+          ${renderFenBoardHtml(fenForBoard, { highlightUci: groupHighlightUci, flipped: params.color === 'black', lightSquare: boardTheme?.light, darkSquare: boardTheme?.dark })}
+        </div>` : ''}
+      </div>
+      ${hasChildren ? `<button class="report-group-toggle" aria-expanded="true">
+        <span class="report-group-arrow">▼</span>
+        <span>${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''}</span>
+      </button>` : ''}
+    </div>`;
+}
+
+// ── Carte ligne critique (compacte : sans board, sans WDL) ─────────────────
+function renderChildCard(item, baselineScore, repertoires, startMove) {
+  const badge = priorityBadge(item);
+  const fullPath = [...item.contextPath, item.playerMove];
+  const pgnHtml = pathToPgn(fullPath, true, startMove) || 'Position sélectionnée';
+  const linePct = (item.score * 100).toFixed(0);
+  const gapPct  = (item.gap * 100).toFixed(0);
+  const gainMiss = Math.round(item.lossesAvoided * 16);
+  const confidenceLabel = item.total >= 100 ? 'Très fiable' : item.total >= 30 ? 'Fiable' : item.total >= 10 ? 'Échantillon moyen' : 'Peu de données';
+
+  return `
+    <div class="report-child-card">
+      <div class="report-child-line">${pgnHtml}</div>
+      <div class="report-child-stats">
+        <span class="priority-badge ${badge.badgeClass}">${badge.label}</span>
+        <span class="report-child-score">${linePct}%</span>
+        <span class="report-child-gap">${item.gap >= 0 ? `−${gapPct}` : `+${Math.abs(item.gap * 100).toFixed(0)}`}%</span>
+        <span class="report-child-losses">${gainMiss} pts</span>
+        <span class="report-child-total">${item.total} parties</span>
+        ${confidenceDots(item.total)}
+        <span class="report-child-conf">${confidenceLabel}</span>
+      </div>
+    </div>`;
+}
+
+// ── Carte ligne "meilleure performance" (compacte : sans board, sans WDL) ──
+function renderChildCardStrengths(item, baselineScore, repertoires, startMove) {
+  const fullPath = [...item.contextPath, item.playerMove];
+  const pgnHtml = pathToPgn(fullPath, true, startMove) || 'Position sélectionnée';
+  const linePct = (item.score * 100).toFixed(0);
+  const gapPct  = (Math.abs(item.gap) * 100).toFixed(0);
+  const gainBonus = Math.round(Math.abs(item.lossesAvoided) * 16);
+  const confidenceLabel = item.total >= 100 ? 'Très fiable' : item.total >= 30 ? 'Fiable' : item.total >= 10 ? 'Échantillon moyen' : 'Peu de données';
+
+  return `
+    <div class="report-child-card">
+      <div class="report-child-line">${pgnHtml}</div>
+      <div class="report-child-stats">
+        <span class="priority-badge badge-good">FORT</span>
+        <span class="report-child-score">${linePct}%</span>
+        <span class="report-child-gap">+${gapPct}%</span>
+        <span class="report-child-losses">+${gainBonus} pts</span>
+        <span class="report-child-total">${item.total} parties</span>
+        ${confidenceDots(item.total)}
+        <span class="report-child-conf">${confidenceLabel}</span>
+      </div>
+    </div>`;
+}
+
 // ── Rendu du rapport ──────────────────────────────────────────────────────────
 function renderReport(data, params) {
+  const boardTheme = loadState(BOARD_THEME_KEY);
   const repertoires = loadRepertoires();
-  const { totalGames, parsedGames: parsedCount, filteredGames, baselineScore, items, truncated, notEnoughData } = data;
+  const { totalGames, parsedGames: parsedCount, filteredGames, baselineScore, items, truncated, focusDepth: effectiveDepth } = data;
   const analyzed = parsedCount !== undefined ? parsedCount : totalGames;
-  const positiveItems = items.filter(i => i.gap > 0.01).sort(compareReportItems);
-  const bestItems     = items.filter(i => i.gap < -0.01).sort((a, b) => a.gap - b.gap).slice(0, 30);
-  const totalAvoidable = positiveItems.reduce((sum, item) => sum + item.lossesAvoided, 0);
-  const topItems = positiveItems.slice(0, 30);
+  const worstItems = items.filter(i => i.gap > 0.01);
+  const bestItems  = items.filter(i => i.gap < -0.01);
+  const totalAvoidable = worstItems.reduce((sum, item) => sum + item.lossesAvoided, 0);
 
   const titleSub = document.getElementById('results-title-sub');
   if (titleSub) titleSub.textContent = summarizeParams(params, data);
+
+  const startMove = getMoveNumberFromFen(data.rootFen);
 
   let html = `
     <div class="report-summary-grid">
@@ -592,19 +821,106 @@ function renderReport(data, params) {
         <div class="rsc-label">${renderMetricLabel('Gain manqué', METRIC_HELP.avoidable)}</div>
       </div>
     </div>
+    ${effectiveDepth ? `<p class="report-scope-note">🔍 Analyse fiable jusqu'au ${data.focusMoveNumber || ''}e coup du joueur (${effectiveDepth} demi-coups).</p>` : ''}
     ${truncated ? `<p class="report-warning">⚠️ Analyse limitée (${totalGames} parties max). Réduisez la période pour plus de précision.</p>` : ''}
-    ${notEnoughData ? `<p class="report-warning report-warning--info">ℹ️ Moins de 10 lignes significatives trouvées (${positiveItems.length} résultat${positiveItems.length !== 1 ? 's' : ''}). Réduisez la profondeur d'analyse dans les filtres pour voir davantage de priorités.</p>` : ''}
   `;
 
-  if (data.positionFiltered && filteredGames > totalGames) {
-    html += `<div class="report-scope-note">${totalGames} parties atteignent la position sélectionnée sur ${filteredGames} parties correspondant aux autres filtres.</div>`;
+  if (data.positionFiltered) {
+    // ── Mode position : chaque item est une carte lourde ──
+    const priorityItems = worstItems
+      .sort((a, b) => a.lossesAvoided - b.lossesAvoided);
+    const strengthItems = bestItems
+      .sort((a, b) => b.lossesAvoided - a.lossesAvoided);
+
+    const hasPriorities = priorityItems.length > 0;
+    const hasStrengths  = strengthItems.length > 0;
+
+    html += `<div class="report-tabs">
+      <button class="report-tab-btn report-tab-btn--active" data-tab="priorities">Priorités d'entraînement</button>
+      <button class="report-tab-btn" data-tab="strengths">Meilleures performances</button>
+    </div>
+    <div class="report-scope-note">⚠ Analyse positionnelle basée sur ${analyzed} parties.</div>`;
+
+    html += `<div id="tab-priorities" class="report-tab-content">`;
+    if (!hasPriorities) {
+      html += `<div class="report-empty"><div style="font-size:2.5rem;margin-bottom:12px;">🎉</div><div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aucune faiblesse détectée dans cette position.</div><div style="color:var(--text-muted);font-size:0.9rem;">Les données disponibles ne permettent pas de dégager des tendances fiables.</div></div>`;
+    } else {
+      priorityItems.forEach(item => {
+        const fakeGroup = {
+          key: [params.startPath, ...item.contextPath, item.playerMove].filter(Boolean).join(' '),
+          children: [item],
+          total: item.total,
+          wins: item.wins,
+          draws: item.draws,
+          losses: item.losses,
+          lossesAvoided: item.lossesAvoided,
+          fen: item.fenAfter,
+          fenUci: item.playerUci,
+          groupScore: item.score,
+          groupGap: item.gap,
+          problematicLines: [item],
+          compensatingLines: [],
+        };
+        html += `<div class="report-group">`;
+        html += renderGroupAsHeavyCard(fakeGroup, baselineScore, params, boardTheme, repertoires, startMove);
+        html += `</div>`;
+      });
+    }
+    html += `</div>`;
+
+    html += `<div id="tab-strengths" class="report-tab-content" style="display:none">`;
+    if (!hasStrengths) {
+      html += `<div class="report-empty"><div style="font-size:2rem;margin-bottom:8px;">🏆</div><div style="font-size:1rem;font-weight:600;">Pas encore assez de données pour identifier vos meilleures lignes.</div><div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont trop homogènes, soit l'échantillon est insuffisant pour dégager des tendances fiables.</div></div>`;
+    } else {
+      strengthItems.forEach(item => {
+        const fakeGroup = {
+          key: [params.startPath, ...item.contextPath, item.playerMove].filter(Boolean).join(' '),
+          children: [item],
+          total: item.total,
+          wins: item.wins,
+          draws: item.draws,
+          losses: item.losses,
+          lossesAvoided: item.lossesAvoided,
+          fen: item.fenAfter,
+          fenUci: item.playerUci,
+          groupScore: item.score,
+          groupGap: item.gap,
+          problematicLines: [],
+          compensatingLines: [item],
+        };
+        html += `<div class="report-group">`;
+        html += renderGroupAsHeavyCardStrengths(fakeGroup, baselineScore, params, boardTheme, repertoires, startMove);
+        html += `</div>`;
+      });
+    }
+    html += `</div>`;
+
+    document.getElementById('view-results').innerHTML = html;
+    attachReportEvents();
+    return;
   }
 
-  if (!topItems.length) {
+  // ── Mode libre : groupes 4 plis avec enfants problématiques / compensatrices ──
+  const allGroups = groupItems(items, baselineScore);
+
+  const priorityGroups = allGroups
+    .filter(g => g.groupGap > 0.05 && g.total >= 10)
+    .sort((a, b) => a.lossesAvoided - b.lossesAvoided) // ascendant : plus négatif (plus mauvais) en premier
+    .slice(0, 3);
+
+  const strengthGroups = allGroups
+    .filter(g => g.groupGap < -0.05 && g.total >= 10)
+    .sort((a, b) => b.lossesAvoided - a.lossesAvoided) // descendant : plus positif (meilleur) en premier
+    .slice(0, 3);
+
+  const hasPriorities = priorityGroups.length > 0;
+  const hasStrengths  = strengthGroups.length > 0;
+
+  if (!hasPriorities && !hasStrengths) {
     html += `<div class="report-empty">
       <div style="font-size:2.5rem;margin-bottom:12px;">🎉</div>
-      <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aucun point faible détecté à cette profondeur.</div>
-      <div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont homogènes sur cette couche d'analyse, soit l'échantillon qui atteint cette position est trop petit.</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aucun point faible détecté.</div>
+      <div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont homogènes, soit l'échantillon est insuffisant pour dégager des tendances fiables.</div>
     </div>`;
     document.getElementById('view-results').innerHTML = html;
     return;
@@ -613,134 +929,97 @@ function renderReport(data, params) {
   html += `<div class="report-tabs">
     <button class="report-tab-btn report-tab-btn--active" data-tab="priorities">Priorités d'entraînement</button>
     <button class="report-tab-btn" data-tab="strengths">Meilleures performances</button>
-  </div>
-  <div id="tab-priorities" class="report-tab-content">`;
+  </div>`;
 
-  topItems.forEach((item, idx) => {
-    const name = getOpeningName(item, repertoires);
-    const badge = priorityBadge(item);
-    const fullPath = [...item.contextPath, item.playerMove];
-    const pgnHtml = pathToPgn(fullPath, true) || 'Position sélectionnée';
-    const linePct = (item.score * 100).toFixed(0);
-    const basePct = (baselineScore * 100).toFixed(0);
-    const gapPct  = (item.gap * 100).toFixed(0);
-    const gainMiss = Math.round(item.lossesAvoided * 16);
-    const confidenceLabel = item.total >= 100 ? 'Très fiable' : item.total >= 30 ? 'Fiable' : item.total >= 10 ? 'Échantillon moyen' : 'Peu de données';
+  // ── Onglet Priorités ──
+  html += `<div id="tab-priorities" class="report-tab-content">`;
 
-    html += `
-      <div class="report-item ${badge.itemClass}">
-        <div class="report-item-layout">
-          <div>
-            <div class="report-item-header">
-              <div class="report-item-rank">#${idx + 1}</div>
-              <span class="priority-badge ${badge.badgeClass}">${badge.label}</span>
-              <div class="report-item-name">${name}</div>
-              <div class="report-item-meta">${item.total} parties · coup ${item.moveNumber || Math.floor((item.depth || 0) / 2) + 1}</div>
-            </div>
+  priorityGroups.forEach((group) => {
+    html += `<div class="report-group">`;
+    html += renderGroupAsHeavyCard(group, baselineScore, params, boardTheme, repertoires, startMove);
 
-            <div class="report-item-line">${pgnHtml}</div>
+    const hasAny = group.problematicLines.length > 0 || group.compensatingLines.length > 0;
+    if (hasAny) {
+      html += `<div class="report-group-body">`;
+      if (group.problematicLines.length > 0) {
+        html += `<div class="report-subsection-label">Lignes problématiques</div>`;
+        group.problematicLines.forEach(child => {
+          html += renderChildCard(child, baselineScore, repertoires, startMove);
+        });
+      }
+      if (group.compensatingLines.length > 0) {
+        html += `<div class="report-subsection-label">Lignes compensatrices</div>`;
+        group.compensatingLines.forEach(child => {
+          html += renderChildCard(child, baselineScore, repertoires, startMove);
+        });
+      }
+      html += `</div>`;
+    } else {
+      html += `<div class="report-group-note">Toute cette variante est problématique. Les sous-lignes ne sont pas significativement pires les unes que les autres.</div>`;
+    }
 
-            <div class="report-item-stats">
-              <div class="stat-block">
-                <div class="stat-block-val ${parseInt(linePct, 10) < parseInt(basePct, 10) ? 'stat-bad' : ''}">${linePct}%</div>
-                <div class="stat-block-lbl">${renderMetricLabel('Score ligne', METRIC_HELP.lineScore)}</div>
-              </div>
-              <div class="stat-block stat-block--gap">
-                <div class="stat-block-val stat-bad">−${gapPct}%</div>
-                <div class="stat-block-lbl">${renderMetricLabel('Écart', METRIC_HELP.gap)}</div>
-              </div>
-              <div class="stat-block stat-block--loss">
-                <div class="stat-block-val stat-bad">${gainMiss} pts elo</div>
-                <div class="stat-block-lbl">${renderMetricLabel('Gain manqué', METRIC_HELP.avoidable)}</div>
-              </div>
-            </div>
-
-            ${wdlBar(item.wins, item.draws, item.losses)}
-
-            <div class="report-item-footer">
-              ${confidenceDots(item.total)}
-              <span class="conf-label">${confidenceLabel}</span>
-              <div class="report-item-actions">
-                <button class="report-btn report-btn--primary" data-fen="${encodeURIComponent(item.fenBefore)}" data-action="open-app">
-                  Explorer
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="report-item-board">
-            ${renderFenBoardHtml(item.fenBefore, { highlightUci: item.playerUci, flipped: params.color === 'black' })}
-          </div>
-        </div>
-      </div>`;
+    html += `</div>`;
   });
+
+  // ── Mentions honorables : 3 pires items individuels (depth > 4) ──
+  const visibleKeys = new Set();
+  priorityGroups.forEach(g => {
+    g.problematicLines.forEach(c => visibleKeys.add(c.playerUci));
+    g.compensatingLines.forEach(c => visibleKeys.add(c.playerUci));
+  });
+  const orphans = items
+    .filter(i => i.depth > 4 && i.gap > 0.01 && !visibleKeys.has(i.playerUci))
+    .sort((a, b) => b.lossesAvoided - a.lossesAvoided)
+    .slice(0, 3);
+  if (orphans.length > 0) {
+    html += `<div class="report-honorable">`;
+    html += `<div class="report-honorable-label">⚠️ Pires lignes individuelles</div>`;
+    html += `<div class="report-honorable-desc">Ces coups vous coûtent le plus de points, bien qu'ils n'appartiennent pas à une ouverture problématique dans son ensemble.</div>`;
+    orphans.forEach(item => {
+      html += renderChildCard(item, baselineScore, repertoires, startMove);
+    });
+    html += `</div>`;
+  }
 
   html += `</div>
   <div id="tab-strengths" class="report-tab-content" style="display:none">`;
-    if (bestItems.length === 0) {
-      html += `<div class="report-empty"><div style="font-size:2rem;margin-bottom:8px;">🏆</div><div style="font-size:1rem;font-weight:600;">Pas encore assez de données pour identifier vos meilleures lignes.</div><pre style='font-size:0.8rem;color:#aaa;background:#222;padding:8px;border-radius:6px;margin-top:10px;'>DEBUG: bestItems.length=${bestItems.length}\n${JSON.stringify(bestItems,null,2)}</pre></div>`;
-    } else {
-    bestItems.forEach((item, idx) => {
-      const name = getOpeningName(item, repertoires);
-      const fullPath = [...item.contextPath, item.playerMove];
-      const pgnHtml = pathToPgn(fullPath, true) || 'Position sélectionnée';
-      const linePct = (item.score * 100).toFixed(0);
-      const basePct = (baselineScore * 100).toFixed(0);
-      const gainBonus = Math.round(Math.abs(item.lossesAvoided) * 16);
-      const overPct  = (Math.abs(item.gap) * 100).toFixed(0);
-      const confidenceLabel = item.total >= 100 ? 'Très fiable' : item.total >= 30 ? 'Fiable' : item.total >= 10 ? 'Échantillon moyen' : 'Peu de données';
 
-      html += `
-        <div class="report-item report-item--good">
-          <div class="report-item-layout">
-            <div>
-              <div class="report-item-header">
-                <div class="report-item-rank">#${idx + 1}</div>
-                <span class="priority-badge badge-good">FORT</span>
-                <div class="report-item-name">${name}</div>
-                <div class="report-item-meta">${item.total} parties · coup ${item.moveNumber || Math.floor((item.depth || 0) / 2) + 1}</div>
-              </div>
+  if (!strengthGroups.length) {
+    html += `<div class="report-empty"><div style="font-size:2rem;margin-bottom:8px;">🏆</div><div style="font-size:1rem;font-weight:600;">Pas encore assez de données pour identifier vos meilleures lignes.</div><div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont trop homogènes, soit l'échantillon est insuffisant pour dégager des tendances fiables.</div></div>`;
+  } else {
+    strengthGroups.forEach((group) => {
+      html += `<div class="report-group">`;
+      html += renderGroupAsHeavyCardStrengths(group, baselineScore, params, boardTheme, repertoires, startMove);
 
-              <div class="report-item-line">${pgnHtml}</div>
+      const hasAny = group.problematicLines.length > 0 || group.compensatingLines.length > 0;
+      if (hasAny) {
+        html += `<div class="report-group-body">`;
+        if (group.problematicLines.length > 0) {
+          html += `<div class="report-subsection-label">Lignes sous-performantes</div>`;
+          group.problematicLines.forEach(child => {
+            html += renderChildCardStrengths(child, baselineScore, repertoires, startMove);
+          });
+        }
+        if (group.compensatingLines.length > 0) {
+          html += `<div class="report-subsection-label">Lignes surperformantes</div>`;
+          group.compensatingLines.forEach(child => {
+            html += renderChildCardStrengths(child, baselineScore, repertoires, startMove);
+          });
+        }
+        html += `</div>`;
+      }
 
-              <div class="report-item-stats">
-                <div class="stat-block">
-                  <div class="stat-block-val stat-good">${linePct}%</div>
-                  <div class="stat-block-lbl">${renderMetricLabel('Score ligne', METRIC_HELP.lineScore)}</div>
-                </div>
-                <div class="stat-block stat-block--gap">
-                  <div class="stat-block-val stat-good">+${overPct}%</div>
-                  <div class="stat-block-lbl">${renderMetricLabel('Avance', METRIC_HELP.gap)}</div>
-                </div>
-                <div class="stat-block stat-block--loss">
-                  <div class="stat-block-val stat-good">+${gainBonus} pts elo</div>
-                  <div class="stat-block-lbl">Bonus Elo</div>
-                </div>
-              </div>
-
-              ${wdlBar(item.wins, item.draws, item.losses)}
-
-              <div class="report-item-footer">
-                ${confidenceDots(item.total)}
-                <span class="conf-label">${confidenceLabel}</span>
-                <div class="report-item-actions">
-                  <button class="report-btn report-btn--primary" data-fen="${encodeURIComponent(item.fenBefore)}" data-action="open-app">
-                    Explorer
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="report-item-board">
-              ${renderFenBoardHtml(item.fenBefore, { highlightUci: item.playerUci, flipped: params.color === 'black' })}
-            </div>
-          </div>
-        </div>`;
+      html += `</div>`;
     });
   }
 
   html += '</div>';
 
   document.getElementById('view-results').innerHTML = html;
+  attachReportEvents();
+}
 
+function attachReportEvents() {
   // Tab switching
   document.querySelectorAll('.report-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -760,52 +1039,29 @@ function renderReport(data, params) {
       window.location.href = 'index.html';
     });
   });
+
+  // Accordéon toggles
+  document.querySelectorAll('.report-group-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', !expanded);
+      btn.querySelector('.report-group-arrow').textContent = expanded ? '▶' : '▼';
+      const body = btn.closest('.report-group').querySelector('.report-group-body');
+      if (body) body.style.display = expanded ? 'none' : '';
+    });
+  });
 }
 
-// ── Barre de chargement simulée ───────────────────────────────────────────────
-let _progressTimer = null;
-
-function startProgress(estimatedSeconds) {
-  const bar = document.getElementById('loading-bar-fill');
-  const label = document.getElementById('loading-step-label');
-  const estEl = document.getElementById('loading-estimate');
-  if (!bar) return;
-
-  bar.style.width = '0%';
-  const steps = [
-    { pct: 18, label: 'Récupération des archives Chess.com…', delay: 1200 },
-    { pct: 40, label: 'Chargement des parties…', delay: Math.min(estimatedSeconds * 300, 18000) },
-    { pct: 65, label: 'Analyse des ouvertures…', delay: Math.min(estimatedSeconds * 400, 25000) },
-    { pct: 82, label: 'Calcul des priorités…', delay: Math.min(estimatedSeconds * 250, 15000) },
-    { pct: 92, label: 'Génération du rapport…', delay: 2000 },
-  ];
-
-  let idx = 0;
-  if (estEl) estEl.textContent = `Estimation : ~${estimatedSeconds}s`;
-
-  function next() {
-    if (idx >= steps.length) return;
-    const step = steps[idx++];
-    bar.style.width = step.pct + '%';
-    if (label) label.textContent = step.label;
-    _progressTimer = setTimeout(next, step.delay);
+// ── Mise à jour de la barre de progression ──────────────────────────────
+function updateLoadingProgress(pct, detail) {
+  const fill = document.getElementById('loading-bar-fill');
+  const step = document.getElementById('loading-step-label');
+  if (fill) {
+    fill.style.transition = 'width 0.3s ease';
+    fill.style.width = Math.min(100, Math.max(0, pct)) + '%';
   }
-
-  next();
-}
-
-function stopProgress(success) {
-  if (_progressTimer) {
-    clearTimeout(_progressTimer);
-    _progressTimer = null;
-  }
-  const bar = document.getElementById('loading-bar-fill');
-  if (bar) {
-    bar.style.width = '100%';
-    bar.style.background = success
-      ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-      : 'linear-gradient(90deg, #ef4444, #f87171)';
-  }
+  if (step) step.textContent = detail;
 }
 
 // ── Vues ──────────────────────────────────────────────────────────────────────
@@ -827,20 +1083,26 @@ function getFormParams() {
   const dtMonth = document.getElementById('rapport-dateto-month').value;
   const eloMin = parseInt(document.getElementById('rapport-elomin').value, 10) || 0;
   const eloMax = parseInt(document.getElementById('rapport-elomax').value, 10) || 3000;
-  const maxDepth = parseInt(document.getElementById('rapport-depth').value, 10) || 10;
   const dateFrom = (dfYear && dfMonth) ? `${dfYear}/${dfMonth}` : '';
   const dateTo = (dtYear && dtMonth) ? `${dtYear}/${dtMonth}` : '';
   const startFen = document.getElementById('rapport-position-enabled')?.checked
     ? document.getElementById('rapport-position-fen-input')?.value.trim() || ''
     : '';
 
-  return { username, color, timeClass, dateFrom, dateTo, eloMin, eloMax, maxDepth, startFen };
+  const startPath = document.getElementById('rapport-position-enabled')?.checked
+    ? document.getElementById('rapport-position-path')?.value || ''
+    : '';
+
+  return { username, color, timeClass, dateFrom, dateTo, eloMin, eloMax, startFen, startPath };
 }
 
-// ── Fetch du rapport ──────────────────────────────────────────────────────────
-async function runAnalysis(params) {
+// ── Fetch du rapport via SSE avec progression temps réel ──────────────────────
+let currentAbortController = null;
+
+async function runAnalysis(params, onProgress, signal) {
   const apiBase = buildApiBase();
-  const url = new URL(`${apiBase}/chesscom/report`);
+  const url = new URL(`${apiBase}/chesscom/report/stream`);
+  console.log('[rapport] runAnalysis URL:', url.toString());
   url.searchParams.set('username', params.username);
   url.searchParams.set('color', params.color);
   url.searchParams.set('timeClass', params.timeClass);
@@ -848,46 +1110,64 @@ async function runAnalysis(params) {
   if (params.dateTo) url.searchParams.set('dateTo', params.dateTo);
   if (params.eloMin > 0) url.searchParams.set('eloMin', params.eloMin);
   if (params.eloMax < 3000) url.searchParams.set('eloMax', params.eloMax);
-  url.searchParams.set('maxDepth', params.maxDepth);
   if (params.startFen) url.searchParams.set('startFen', params.startFen);
 
+  console.log('[rapport] fetch start');
   const res = await fetch(url.toString(), {
     method: 'GET',
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(180000),
+    headers: { Accept: 'text/event-stream' },
+    signal,
   });
+  console.log('[rapport] fetch done, status:', res.status, 'ok:', res.ok);
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `Erreur ${res.status}` }));
     throw new Error(err.error || `Erreur serveur ${res.status}`);
   }
 
-  return res.json();
+  console.log('[rapport] body reader start, type:', typeof res.body);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const raw = line.slice(6);
+        console.log('[rapport] sse event:', raw.substring(0, 150));
+        const data = JSON.parse(raw);
+        if (data.type === 'archive' || data.type === 'phase') {
+          onProgress(data);
+        } else if (data.type === 'complete') {
+          return data.data;
+        } else if (data.type === 'error') {
+          throw new Error(data.error);
+        }
+      }
+    }
+  }
+  throw new Error('Connexion interrompue');
 }
 
-// ── Mise à jour de l'estimation dans le formulaire ───────────────────────────
+// ── Mise à jour de l'estimation (date uniquement) ────────────────────────────
 function updateEstimateLabel() {
   const dfYear = document.getElementById('rapport-datefrom-year').value;
   const dfMonth = document.getElementById('rapport-datefrom-month').value;
   const dtYear = document.getElementById('rapport-dateto-year').value;
   const dtMonth = document.getElementById('rapport-dateto-month').value;
-  const depth = parseInt(document.getElementById('rapport-depth').value, 10) || 10;
   const dateFrom = (dfYear && dfMonth) ? `${dfYear}-${dfMonth}` : '';
   const dateTo = (dtYear && dtMonth) ? `${dtYear}-${dtMonth}` : '';
-  const estSec = estimateDuration(dateFrom, dateTo, depth);
+  const estSec = estimateDuration(dateFrom, dateTo);
 
   const label = document.getElementById('form-estimate-label');
   if (label) {
-    let depthLabel;
-    if (depth <= 6) depthLabel = 'Aperçu';
-    else if (depth <= 8) depthLabel = 'Standard';
-    else if (depth <= 10) depthLabel = 'Approfondi';
-    else depthLabel = 'Exhaustif';
-    label.textContent = `${depthLabel} · ~${estSec}s estimés`;
+    label.textContent = `~${estSec}s estimés`;
   }
-
-  const depthVal = document.getElementById('rapport-depth-val');
-  if (depthVal) depthVal.textContent = `${depth} demi-coups (${Math.ceil(depth / 2)} coups)`;
 }
 
 // ── Initialisation des menus d'années (dynamique) ────────────────────────────
@@ -922,9 +1202,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initPositionEditor();
   showView('view-form');
 
-  const depthSlider = document.getElementById('rapport-depth');
-  if (depthSlider) depthSlider.addEventListener('input', updateEstimateLabel);
-
   ['rapport-datefrom-year', 'rapport-datefrom-month', 'rapport-dateto-year', 'rapport-dateto-month'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', updateEstimateLabel);
@@ -951,29 +1228,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (errEl) errEl.style.display = 'none';
 
-    const dfYear = document.getElementById('rapport-datefrom-year').value;
-    const dfMonth = document.getElementById('rapport-datefrom-month').value;
-    const dtYear = document.getElementById('rapport-dateto-year').value;
-    const dtMonth = document.getElementById('rapport-dateto-month').value;
-    const dateFrom = (dfYear && dfMonth) ? `${dfYear}-${dfMonth}` : '';
-    const dateTo = (dtYear && dtMonth) ? `${dtYear}-${dtMonth}` : '';
-    const estSec = estimateDuration(dateFrom, dateTo, params.maxDepth);
-
+    const fillReset = document.getElementById('loading-bar-fill');
+    if (fillReset) {
+      fillReset.style.transition = 'none';
+      fillReset.style.width = '0%';
+      fillReset.style.background = '';
+    }
     showView('view-loading');
-    startProgress(estSec);
+    updateLoadingProgress(0, 'Connexion au serveur…');
 
     const loadUser = document.getElementById('loading-username');
     if (loadUser) loadUser.textContent = `${params.username} · ${params.color === 'white' ? 'Blancs' : 'Noirs'}`;
 
+    currentAbortController = new AbortController();
+
     try {
-      const data = await runAnalysis(params);
-      stopProgress(true);
+      const data = await runAnalysis(params, (evt) => {
+        if (evt.type === 'archive') {
+          const pct = Math.round((evt.current / evt.total) * 85);
+          const total = evt.cumulative || evt.gamesInArchive;
+          updateLoadingProgress(pct, `${total} partie${total > 1 ? 's' : ''} chargée${total > 1 ? 's' : ''}`);
+        } else if (evt.type === 'phase') {
+          if (evt.phase === 'position-map') {
+            updateLoadingProgress(85, `Construction de l'arbre des positions… (${evt.positions} positions)`);
+          } else if (evt.phase === 'scoring') {
+            const pct = 85 + Math.round((evt.depth / evt.maxDepth) * 13);
+            updateLoadingProgress(pct, `Analyse des variantes… profondeur ${evt.depth}/${evt.maxDepth}`);
+          } else if (evt.phase === 'complete') {
+            updateLoadingProgress(98, 'Génération du rapport…');
+          }
+        }
+      }, currentAbortController.signal);
+
+      console.log('[rapport] data received, items:', data.items?.length);
+      console.log('[rapport] loading openings...');
+      await ensureOpeningsLoaded();
+      console.log('[rapport] openings loaded, updating bar to 100%');
+      updateLoadingProgress(100, 'Terminé ✓');
+      const fill = document.getElementById('loading-bar-fill');
+      if (fill) fill.style.background = 'linear-gradient(90deg, #22c55e, #4ade80)';
       await new Promise(resolve => setTimeout(resolve, 400));
+      console.log('[rapport] switching to results view');
       showView('view-results-wrap');
+      console.log('[rapport] calling renderReport');
       renderReport(data, params);
+      console.log('[rapport] renderReport done');
     } catch (err) {
-      stopProgress(false);
-      await new Promise(resolve => setTimeout(resolve, 300));
+      console.log('[rapport] catch error:', err.name, err.message);
+      if (err.name === 'AbortError') return;
       showView('view-form');
       if (errEl) {
         errEl.textContent = `Erreur : ${err.message}`;
@@ -983,10 +1285,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-loading-cancel')?.addEventListener('click', () => {
-    if (_progressTimer) {
-      clearTimeout(_progressTimer);
-      _progressTimer = null;
-    }
+    if (currentAbortController) currentAbortController.abort();
     showView('view-form');
   });
 
