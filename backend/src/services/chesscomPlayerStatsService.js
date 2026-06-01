@@ -348,7 +348,7 @@ async function fetchAllGames(filters, onProgress, playerUsername, playerColor) {
     const monthGames = await fetchMonthlyGames(archiveUrl);
     await new Promise(r => setTimeout(r, ARCHIVE_FETCH_DELAY_MS)); // respire entre archives
     const valid = filterGames(monthGames, filters);
-    if (onProgress) { onProgress({ current: archiveIdx, total: toFetch.length, gamesInArchive: valid.length }); }
+    if (onProgress) { onProgress({ current: archiveIdx, total: toFetch.length, gamesInArchive: valid.length, cumulative: totalFiltered + valid.length }); }
     for (const g of valid) {
       if (totalFiltered >= GAME_LIMIT) { truncated = true; break; }
       totalFiltered++;
@@ -473,10 +473,10 @@ async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
 // ── Rapport de priorités d'entraînement ──────────────────────────────────────
 // Analyse toutes les parties et retourne un classement des coups/lignes
 // selon leur impact sur le résultat global (formule bayésienne ajustée).
-async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {})  {
+async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {}, onProgress = null)  {
   const { playerColor, playerStartFen = '' } = filters;
 
-  const { parsedGames, totalGames: filteredGames, truncated } = await ensureGamesLoaded(filters);
+  const { parsedGames, totalGames: filteredGames, truncated } = await ensureGamesLoaded(filters, onProgress);
   if (!parsedGames.length) {
     return { totalGames: 0, parsedGames: 0, filteredGames: 0, baselineScore: 0, items: [], truncated: false };
   }
@@ -497,8 +497,14 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {})  
   const rootTurn = rootFenNorm.split(' ')[1] || 'w';
   const targetDepth = getTargetDepth(rootTurn, playerColor, maxDepth);
   let scopedGames = 0;
+  let processedGames = 0;
+  const totalGamesForProgress = parsedGames.length;
 
   for (const { positions, result } of parsedGames) {
+    processedGames++;
+    if (onProgress && (processedGames % 50 === 0 || processedGames === totalGamesForProgress)) {
+      onProgress({ phase: 'position-map', positions: processedGames });
+    }
     const rootIndex = rootFenNorm === INITIAL_FEN_NORM
       ? 0
       : positions.findIndex(position => position.fenNorm === rootFenNorm);
@@ -564,9 +570,14 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {})  
   const visited     = new Set();
 
   const queue = [{ fenNorm: rootFenNorm, path: [], depth: 0, parentTotal: scopedGames }];
+  let lastReportedDepth = 0;
 
   while (queue.length > 0) {
     const { fenNorm, path, depth, parentTotal } = queue.shift();
+    if (depth > lastReportedDepth) {
+      lastReportedDepth = depth;
+      if (onProgress) onProgress({ phase: 'scoring', depth, maxDepth });
+    }
 
     if (visited.has(fenNorm)) continue;
     visited.add(fenNorm);
@@ -591,7 +602,7 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {})  
         const gap            = parseFloat((baselineScore - score).toFixed(3));
         const confidence     = Math.min(1, mv.total / minFreq);
         const priority       = mv.total * gap * confidence;
-        const lossesAvoided  = parseFloat((100 * (mv.total / scopedGames) * gap).toFixed(1));
+        const lossesAvoided  = parseFloat(((mv.wins - mv.losses) * 8 * (mv.total / scopedGames)).toFixed(1));
         const moveNumber     = Math.floor(depth / 2) + 1;
 
         reportItems.push({
@@ -668,6 +679,8 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {})  
 
   // Remettre dans l'ordre priorité pour l'affichage
   finalItems.sort(compareReportItems);
+
+  if (onProgress) onProgress({ phase: 'complete' });
 
   const notEnoughData = finalItems.filter(i => i.gap > 0.01).length < 10;
 

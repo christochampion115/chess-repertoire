@@ -237,7 +237,11 @@ router.get('/report/stream', async (req, res) => {
         playerEloMax,
         playerStartFen: startFen,
       },
-      { maxDepth, minFreq }
+      { maxDepth, minFreq },
+      (progress) => {
+        const evtType = progress.phase ? 'phase' : 'archive';
+        safeWrite(`data: ${JSON.stringify({ type: evtType, ...progress })}\n\n`);
+      }
     );
     safeWrite(`data: ${JSON.stringify({ type: 'complete', data: report })}\n\n`);
   } catch (error) {

@@ -126,13 +126,6 @@ function priorityBadge(item) {
   return { badgeClass: 'badge-minor', itemClass: 'report-item--minor', label: 'MINEUR', rank: 1 };
 }
 
-function compareReportItems(a, b) {
-  return (priorityBadge(b).rank - priorityBadge(a).rank)
-    || (b.priority - a.priority)
-    || (b.gap - a.gap)
-    || (b.total - a.total);
-}
-
 // ── Barre WDL visuelle ────────────────────────────────────────────────────────
 function wdlBar(wins, draws, losses) {
   const total = wins + draws + losses;
@@ -379,6 +372,8 @@ function resetPositionEditor(fen = START_FEN) {
 function syncPositionFenField() {
   const input = document.getElementById('rapport-position-fen-input');
   if (input && positionEditorState.chess) input.value = positionEditorState.chess.fen();
+  const pathField = document.getElementById('rapport-position-path');
+  if (pathField && positionEditorState.chess) pathField.value = positionEditorState.chess.history().join(' ');
 }
 
 function renderPositionBoard() {
@@ -523,16 +518,13 @@ function initPositionEditor() {
   });
 }
 
-// ── Regroupement hiérarchique ────────────────────────────────────────────────
-// Sans filtre : on groupe les items depth >= 4 par les 4 premiers demi-coups.
-// Le groupe est valide si son gap global (baseline - groupScore) > 0.02 et total >= 10.
-// Les lignes critiques sont les items depth >= 6, triées par score croissant.
-// Avec filtre de position : comportement original (depth 0 = header).
-function groupItems(items, positionFiltered, baselineScore) {
-  if (positionFiltered) {
-    return groupItemsLegacy(items, baselineScore);
-  }
-
+// ── Regroupement hiérarchique (mode libre) ───────────────────────────────────
+// Les items sont groupés par leurs 4 premiers demi-coups.
+// Un groupe est affiché si son écart à la baseline globale > 5%.
+// Dans chaque groupe, les enfants sont scindés en :
+//   — lignes problématiques  (score < groupScore, triées par lossesAvoided)
+//   — lignes compensatrices  (score > groupScore, triées par lossesAvoided)
+function groupItems(items, baselineScore) {
   const groups = new Map();
   for (const item of items) {
     if (item.depth < 4) continue;
@@ -552,7 +544,6 @@ function groupItems(items, positionFiltered, baselineScore) {
     g.children.push(item);
   }
 
-  // Reconstruire la FEN de chaque groupe en rejouant les coups de la clé
   for (const g of groups.values()) {
     const moves = g.key.split(' ');
     try {
@@ -564,204 +555,45 @@ function groupItems(items, positionFiltered, baselineScore) {
       g.fen = null;
     }
 
-    // Calculer les métriques du groupe
     const groupScore = g.total > 0 ? (g.wins + 0.5 * g.draws) / g.total : 0;
     g.groupScore = groupScore;
     g.groupGap   = baselineScore - groupScore;
-    g.groupPriority = g.groupGap > 0
-      ? g.groupGap * Math.sqrt(g.total) * (g.total / (g.total + 15))
-      : 0;
 
-    // Lignes critiques = items depth >= 6, triées par score croissant (pires winrates en premier)
-    g.criticalLines = g.children
-      .filter(c => c.depth >= 6)
-      .sort((a, b) => a.score - b.score);
+    // Scinder les enfants : problématiques (< moyenne) / compensatrices (> moyenne)
+    g.problematicLines = g.children
+      .filter(c => c.score < groupScore)
+      .sort((a, b) => b.lossesAvoided - a.lossesAvoided);
+    g.compensatingLines = g.children
+      .filter(c => c.score > groupScore)
+      .sort((a, b) => b.lossesAvoided - a.lossesAvoided);
   }
 
-  // Ne garder que les groupes valides : gap global > 2% et minimum 10 parties
-  return Array.from(groups.values())
-    .filter(g => g.groupGap > 0.02 && g.total >= 10)
-    .sort((a, b) => b.groupPriority - a.groupPriority);
-}
-
-// Version legacy pour le mode avec filtre de position
-function groupItemsLegacy(items, baselineScore) {
-  const groups = new Map();
-  for (const item of items) {
-    if (item.depth === 0) {
-      const key = item.playerMove;
-      if (!groups.has(key)) {
-        groups.set(key, { key, header: null, children: [], total: 0, wins: 0, draws: 0, losses: 0, lossesAvoided: 0, fen: null, fenUci: null });
-      }
-      const g = groups.get(key);
-      g.header = item;
-      g.total  += item.total;
-      g.wins   += item.wins;
-      g.draws  += item.draws;
-      g.losses += item.losses;
-      g.lossesAvoided += item.lossesAvoided;
-    }
-  }
-
-  for (const item of items) {
-    if (item.depth === 0) continue;
-    const key = item.contextPath[0];
-    if (!key) continue;
-    if (!groups.has(key)) {
-      groups.set(key, { key, header: null, children: [], total: 0, wins: 0, draws: 0, losses: 0, lossesAvoided: 0, fen: null, fenUci: null });
-    }
-    const g = groups.get(key);
-    g.total  += item.total;
-    g.wins   += item.wins;
-    g.draws  += item.draws;
-    g.losses += item.losses;
-    g.lossesAvoided += item.lossesAvoided;
-    g.children.push(item);
-  }
-
-  for (const g of groups.values()) {
-    if (g.header) {
-      g.fen    = g.header.fenAfter;
-      g.fenUci = g.header.playerUci;
-    }
-    const groupScore = g.total > 0 ? (g.wins + 0.5 * g.draws) / g.total : 0;
-    g.groupScore = groupScore;
-    g.groupGap   = baselineScore - groupScore;
-    g.groupPriority = g.groupGap > 0
-      ? g.groupGap * Math.sqrt(g.total) * (g.total / (g.total + 15))
-      : 0;
-    g.criticalLines = g.children
-      .filter(c => c.depth >= 6)
-      .sort((a, b) => a.score - b.score);
-  }
-
-  return Array.from(groups.values())
-    .filter(g => g.header && g.header.gap > 0.01)
-    .sort((a, b) => b.groupPriority - a.groupPriority);
-}
-
-// ── Regroupement "meilleures performances" (symétrique de groupItems) ──────
-function groupBestItems(items, baselineScore, positionFiltered) {
-  if (positionFiltered) {
-    return groupBestItemsLegacy(items, baselineScore);
-  }
-
-  const positive = items.filter(i => i.gap < -0.01);
-  const groups = new Map();
-  for (const item of positive) {
-    if (item.depth < 4) continue;
-    const key = item.contextPath.slice(0, 4).join(' ');
-    if (!key) continue;
-    if (!groups.has(key)) {
-      groups.set(key, { key, children: [], total: 0, wins: 0, draws: 0, losses: 0, lossesAvoided: 0, fen: null, fenUci: null });
-    }
-    const g = groups.get(key);
-    g.total  += item.total;
-    g.wins   += item.wins;
-    g.draws  += item.draws;
-    g.losses += item.losses;
-    g.lossesAvoided += item.lossesAvoided;
-    g.children.push(item);
-  }
-
-  for (const g of groups.values()) {
-    const moves = g.key.split(' ');
-    try {
-      const chess = new Chess();
-      for (const m of moves) chess.move(m);
-      g.fen    = chess.fen();
-      g.fenUci = null;
-    } catch (e) {
-      g.fen = null;
-    }
-    const groupScore = g.total > 0 ? (g.wins + 0.5 * g.draws) / g.total : 0;
-    g.groupScore = groupScore;
-    g.groupGap   = baselineScore - groupScore;
-    g.criticalLines = g.children
-      .filter(c => c.depth >= 6)
-      .sort((a, b) => b.score - a.score);
-  }
-
-  return Array.from(groups.values())
-    .filter(g => g.groupGap < -0.02 && g.total >= 10)
-    .sort((a, b) => a.groupGap - b.groupGap);
-}
-
-function groupBestItemsLegacy(items, baselineScore) {
-  const positive = items.filter(i => i.gap < -0.01);
-  const groups = new Map();
-  for (const item of positive) {
-    if (item.depth === 0) {
-      const key = item.playerMove;
-      if (!groups.has(key)) {
-        groups.set(key, { key, header: null, children: [], total: 0, wins: 0, draws: 0, losses: 0, lossesAvoided: 0, fen: null, fenUci: null });
-      }
-      const g = groups.get(key);
-      g.header = item;
-      g.total  += item.total;
-      g.wins   += item.wins;
-      g.draws  += item.draws;
-      g.losses += item.losses;
-      g.lossesAvoided += item.lossesAvoided;
-    }
-  }
-  for (const item of positive) {
-    if (item.depth === 0) continue;
-    const key = item.contextPath[0];
-    if (!key) continue;
-    if (!groups.has(key)) {
-      groups.set(key, { key, header: null, children: [], total: 0, wins: 0, draws: 0, losses: 0, lossesAvoided: 0, fen: null, fenUci: null });
-    }
-    const g = groups.get(key);
-    g.total  += item.total;
-    g.wins   += item.wins;
-    g.draws  += item.draws;
-    g.losses += item.losses;
-    g.lossesAvoided += item.lossesAvoided;
-    g.children.push(item);
-  }
-  for (const g of groups.values()) {
-    if (g.header) {
-      g.fen    = g.header.fenAfter;
-      g.fenUci = g.header.playerUci;
-    }
-    const groupScore = g.total > 0 ? (g.wins + 0.5 * g.draws) / g.total : 0;
-    g.groupScore = groupScore;
-    g.groupGap   = baselineScore - groupScore;
-    g.criticalLines = g.children
-      .filter(c => c.depth >= 6)
-      .sort((a, b) => b.score - a.score);
-  }
-  return Array.from(groups.values())
-    .filter(g => g.header && g.header.gap < -0.01)
-    .sort((a, b) => a.groupGap - b.groupGap);
+  return Array.from(groups.values());
 }
 
 // ── Carte variante large (carte heavy complète : board, WDL, stats) ────────
 function renderGroupAsHeavyCard(group, baselineScore, params, boardTheme, repertoires, startMove) {
-  const h = group.header;
   const hPct = (group.groupScore * 100).toFixed(0);
   const hGapVal = group.groupGap * 100;
   const hGap = hGapVal.toFixed(0);
   const basePct = (baselineScore * 100).toFixed(0);
-  const fullPath = h ? [...h.contextPath, h.playerMove] : (group.key ? group.key.split(' ') : []);
+  const fullPath = group.key ? group.key.split(' ') : [];
   const pgnHtml = pathToPgn(fullPath, false, startMove) || '';
   const lossPct = group.total > 0 ? ((group.losses / group.total) * 100).toFixed(0) : '—';
 
-  // FEN pour le board
-  const fenForBoard       = h ? h.fenAfter : group.fen;
-  const groupHighlightUci = h ? h.playerUci : group.fenUci;
+  const fenForBoard       = group.fen;
+  const groupHighlightUci = group.fenUci;
 
-  // Badge basé sur le gap global du groupe
-  const groupBadge = h ? priorityBadge(h) : { badgeClass: group.groupGap >= 0.08 ? 'badge-critical' : group.groupGap >= 0.06 ? 'badge-important' : 'badge-minor', itemClass: group.groupGap >= 0.08 ? 'report-item--critical' : group.groupGap >= 0.06 ? 'report-item--important' : '', label: group.groupGap >= 0.08 ? 'CRITIQUE' : group.groupGap >= 0.06 ? 'IMPORTANT' : 'MINEUR', rank: group.groupGap >= 0.08 ? 3 : group.groupGap >= 0.06 ? 2 : 1 };
+  const groupBadge = { badgeClass: group.groupGap >= 0.08 ? 'badge-critical' : group.groupGap >= 0.06 ? 'badge-important' : 'badge-minor', itemClass: group.groupGap >= 0.08 ? 'report-item--critical' : group.groupGap >= 0.06 ? 'report-item--important' : '', label: group.groupGap >= 0.08 ? 'CRITIQUE' : group.groupGap >= 0.06 ? 'IMPORTANT' : 'MINEUR', rank: group.groupGap >= 0.08 ? 3 : group.groupGap >= 0.06 ? 2 : 1 };
 
-  // Texte d'explication
+  const allChildren = [...(group.problematicLines || []), ...(group.compensatingLines || [])];
+
   let explanation = '';
-  if (group.criticalLines.length > 0) {
-    const childLossShare = group.criticalLines.reduce((s, c) => s + c.losses, 0);
+  if (allChildren.length > 0) {
+    const childLossShare = allChildren.reduce((s, c) => s + c.losses, 0);
     const ratio = childLossShare / Math.max(1, group.losses);
     if (ratio > 0.7) {
-      explanation = `⚠️ ${(ratio * 100).toFixed(0)}% de vos défaites dans cette ouverture sont concentrées dans ${group.criticalLines.length} ligne${group.criticalLines.length > 1 ? 's' : ''} spécifique${group.criticalLines.length > 1 ? 's' : ''}.`;
+      explanation = `⚠️ ${(ratio * 100).toFixed(0)}% de vos défaites dans cette ouverture sont concentrées dans ${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''} spécifique${allChildren.length > 1 ? 's' : ''}.`;
     } else if (ratio > 0.3) {
       explanation = `📊 ${(ratio * 100).toFixed(0)}% des défaites sont capturées par ces lignes spécifiques — le reste est réparti sur d'autres variantes.`;
     } else {
@@ -777,13 +609,15 @@ function renderGroupAsHeavyCard(group, baselineScore, params, boardTheme, repert
     }
   }
 
+  const hasChildren = allChildren.length > 0;
+
   return `
     <div class="report-group-card report-item ${groupBadge.itemClass}">
       <div class="report-item-layout">
         <div>
             <div class="report-item-header">
               <span class="priority-badge ${groupBadge.badgeClass}">${groupBadge.label}</span>
-              <div class="report-item-name">${h ? getOpeningName(h, repertoires) : getOpeningNameByPath(fullPath, fenForBoard, repertoires)}</div>
+              <div class="report-item-name">${getOpeningNameByPath(fullPath, fenForBoard, repertoires)}</div>
               <div class="report-item-meta">${group.total} parties · ${lossPct}% de défaites</div>
             </div>
 
@@ -817,32 +651,33 @@ function renderGroupAsHeavyCard(group, baselineScore, params, boardTheme, repert
           ${renderFenBoardHtml(fenForBoard, { highlightUci: groupHighlightUci, flipped: params.color === 'black', lightSquare: boardTheme?.light, darkSquare: boardTheme?.dark })}
         </div>` : ''}
       </div>
-      ${group.criticalLines.length > 0 ? `<button class="report-group-toggle" aria-expanded="true">
+      ${hasChildren ? `<button class="report-group-toggle" aria-expanded="true">
         <span class="report-group-arrow">▼</span>
-        <span>${group.criticalLines.length} ligne${group.criticalLines.length > 1 ? 's' : ''} critique${group.criticalLines.length > 1 ? 's' : ''}</span>
+        <span>${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''}</span>
       </button>` : ''}
     </div>`;
 }
 
 // ── Carte variante large "meilleures performances" ─────────────────────────
 function renderGroupAsHeavyCardStrengths(group, baselineScore, params, boardTheme, repertoires, startMove) {
-  const h = group.header;
   const hPct = (group.groupScore * 100).toFixed(0);
   const hGapVal = Math.abs(group.groupGap * 100);
   const hGap = hGapVal.toFixed(0);
   const basePct = (baselineScore * 100).toFixed(0);
-  const fullPath = h ? [...h.contextPath, h.playerMove] : (group.key ? group.key.split(' ') : []);
+  const fullPath = group.key ? group.key.split(' ') : [];
   const pgnHtml = pathToPgn(fullPath, false, startMove) || '';
   const winPct = group.total > 0 ? ((group.wins / group.total) * 100).toFixed(0) : '—';
-  const fenForBoard       = h ? h.fenAfter : group.fen;
-  const groupHighlightUci = h ? h.playerUci : group.fenUci;
+  const fenForBoard       = group.fen;
+  const groupHighlightUci = group.fenUci;
+
+  const allChildren = [...(group.problematicLines || []), ...(group.compensatingLines || [])];
 
   let explanation = '';
-  if (group.criticalLines.length > 0) {
-    const childWinShare = group.criticalLines.reduce((s, c) => s + c.wins, 0);
+  if (allChildren.length > 0) {
+    const childWinShare = allChildren.reduce((s, c) => s + c.wins, 0);
     const ratio = childWinShare / Math.max(1, group.wins);
     if (ratio > 0.7) {
-      explanation = `🏆 ${(ratio * 100).toFixed(0)}% de vos victoires dans ce groupe sont concentrées dans ${group.criticalLines.length} ligne${group.criticalLines.length > 1 ? 's' : ''} spécifique${group.criticalLines.length > 1 ? 's' : ''}.`;
+      explanation = `🏆 ${(ratio * 100).toFixed(0)}% de vos victoires dans ce groupe sont concentrées dans ${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''} spécifique${allChildren.length > 1 ? 's' : ''}.`;
     } else if (ratio > 0.3) {
       explanation = `📊 ${(ratio * 100).toFixed(0)}% des victoires sont capturées par ces lignes spécifiques — le reste est réparti sur d'autres variantes.`;
     } else {
@@ -858,13 +693,15 @@ function renderGroupAsHeavyCardStrengths(group, baselineScore, params, boardThem
     }
   }
 
+  const hasChildren = allChildren.length > 0;
+
   return `
     <div class="report-group-card report-item--good">
       <div class="report-item-layout">
         <div>
             <div class="report-item-header">
               <span class="priority-badge badge-good">FORT</span>
-              <div class="report-item-name">${h ? getOpeningName(h, repertoires) : getOpeningNameByPath(fullPath, fenForBoard, repertoires)}</div>
+              <div class="report-item-name">${getOpeningNameByPath(fullPath, fenForBoard, repertoires)}</div>
               <div class="report-item-meta">${group.total} parties · ${winPct}% de victoires</div>
             </div>
 
@@ -898,9 +735,9 @@ function renderGroupAsHeavyCardStrengths(group, baselineScore, params, boardThem
           ${renderFenBoardHtml(fenForBoard, { highlightUci: groupHighlightUci, flipped: params.color === 'black', lightSquare: boardTheme?.light, darkSquare: boardTheme?.dark })}
         </div>` : ''}
       </div>
-      ${group.criticalLines.length > 0 ? `<button class="report-group-toggle" aria-expanded="true">
+      ${hasChildren ? `<button class="report-group-toggle" aria-expanded="true">
         <span class="report-group-arrow">▼</span>
-        <span>${group.criticalLines.length} meilleure${group.criticalLines.length > 1 ? 's' : ''} ligne${group.criticalLines.length > 1 ? 's' : ''}</span>
+        <span>${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''}</span>
       </button>` : ''}
     </div>`;
 }
@@ -960,7 +797,7 @@ function renderReport(data, params) {
   const repertoires = loadRepertoires();
   const { totalGames, parsedGames: parsedCount, filteredGames, baselineScore, items, truncated, focusDepth: effectiveDepth } = data;
   const analyzed = parsedCount !== undefined ? parsedCount : totalGames;
-  const worstItems = items.filter(i => i.gap > 0.01).sort(compareReportItems);
+  const worstItems = items.filter(i => i.gap > 0.01);
   const bestItems  = items.filter(i => i.gap < -0.01);
   const totalAvoidable = worstItems.reduce((sum, item) => sum + item.lossesAvoided, 0);
 
@@ -988,17 +825,102 @@ function renderReport(data, params) {
     ${truncated ? `<p class="report-warning">⚠️ Analyse limitée (${totalGames} parties max). Réduisez la période pour plus de précision.</p>` : ''}
   `;
 
-  if (data.positionFiltered && filteredGames > totalGames) {
-    html += `<div class="report-scope-note">${totalGames} parties atteignent la position sélectionnée sur ${filteredGames} parties correspondant aux autres filtres.</div>`;
+  if (data.positionFiltered) {
+    // ── Mode position : chaque item est une carte lourde ──
+    const priorityItems = worstItems
+      .sort((a, b) => a.lossesAvoided - b.lossesAvoided);
+    const strengthItems = bestItems
+      .sort((a, b) => b.lossesAvoided - a.lossesAvoided);
+
+    const hasPriorities = priorityItems.length > 0;
+    const hasStrengths  = strengthItems.length > 0;
+
+    html += `<div class="report-tabs">
+      <button class="report-tab-btn report-tab-btn--active" data-tab="priorities">Priorités d'entraînement</button>
+      <button class="report-tab-btn" data-tab="strengths">Meilleures performances</button>
+    </div>
+    <div class="report-scope-note">⚠ Analyse positionnelle basée sur ${analyzed} parties.</div>`;
+
+    html += `<div id="tab-priorities" class="report-tab-content">`;
+    if (!hasPriorities) {
+      html += `<div class="report-empty"><div style="font-size:2.5rem;margin-bottom:12px;">🎉</div><div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aucune faiblesse détectée dans cette position.</div><div style="color:var(--text-muted);font-size:0.9rem;">Les données disponibles ne permettent pas de dégager des tendances fiables.</div></div>`;
+    } else {
+      priorityItems.forEach(item => {
+        const fakeGroup = {
+          key: [params.startPath, ...item.contextPath, item.playerMove].filter(Boolean).join(' '),
+          children: [item],
+          total: item.total,
+          wins: item.wins,
+          draws: item.draws,
+          losses: item.losses,
+          lossesAvoided: item.lossesAvoided,
+          fen: item.fenAfter,
+          fenUci: item.playerUci,
+          groupScore: item.score,
+          groupGap: item.gap,
+          problematicLines: [item],
+          compensatingLines: [],
+        };
+        html += `<div class="report-group">`;
+        html += renderGroupAsHeavyCard(fakeGroup, baselineScore, params, boardTheme, repertoires, startMove);
+        html += `</div>`;
+      });
+    }
+    html += `</div>`;
+
+    html += `<div id="tab-strengths" class="report-tab-content" style="display:none">`;
+    if (!hasStrengths) {
+      html += `<div class="report-empty"><div style="font-size:2rem;margin-bottom:8px;">🏆</div><div style="font-size:1rem;font-weight:600;">Pas encore assez de données pour identifier vos meilleures lignes.</div><div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont trop homogènes, soit l'échantillon est insuffisant pour dégager des tendances fiables.</div></div>`;
+    } else {
+      strengthItems.forEach(item => {
+        const fakeGroup = {
+          key: [params.startPath, ...item.contextPath, item.playerMove].filter(Boolean).join(' '),
+          children: [item],
+          total: item.total,
+          wins: item.wins,
+          draws: item.draws,
+          losses: item.losses,
+          lossesAvoided: item.lossesAvoided,
+          fen: item.fenAfter,
+          fenUci: item.playerUci,
+          groupScore: item.score,
+          groupGap: item.gap,
+          problematicLines: [],
+          compensatingLines: [item],
+        };
+        html += `<div class="report-group">`;
+        html += renderGroupAsHeavyCardStrengths(fakeGroup, baselineScore, params, boardTheme, repertoires, startMove);
+        html += `</div>`;
+      });
+    }
+    html += `</div>`;
+
+    document.getElementById('view-results').innerHTML = html;
+    attachReportEvents();
+    return;
   }
 
-  const groups = groupItems(items, data.positionFiltered, baselineScore);
+  // ── Mode libre : groupes 4 plis avec enfants problématiques / compensatrices ──
+  const allGroups = groupItems(items, baselineScore);
 
-  if (!groups.length) {
+  const priorityGroups = allGroups
+    .filter(g => g.groupGap > 0.05 && g.total >= 10)
+    .sort((a, b) => a.lossesAvoided - b.lossesAvoided) // ascendant : plus négatif (plus mauvais) en premier
+    .slice(0, 3);
+
+  const strengthGroups = allGroups
+    .filter(g => g.groupGap < -0.05 && g.total >= 10)
+    .sort((a, b) => b.lossesAvoided - a.lossesAvoided) // descendant : plus positif (meilleur) en premier
+    .slice(0, 3);
+
+  const hasPriorities = priorityGroups.length > 0;
+  const hasStrengths  = strengthGroups.length > 0;
+
+  if (!hasPriorities && !hasStrengths) {
     html += `<div class="report-empty">
       <div style="font-size:2.5rem;margin-bottom:12px;">🎉</div>
       <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aucun point faible détecté.</div>
-      <div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont homogènes, soit l'échantillon est insuffisant pour détecter des tendances fiables.</div>
+      <div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont homogènes, soit l'échantillon est insuffisant pour dégager des tendances fiables.</div>
     </div>`;
     document.getElementById('view-results').innerHTML = html;
     return;
@@ -1007,18 +929,30 @@ function renderReport(data, params) {
   html += `<div class="report-tabs">
     <button class="report-tab-btn report-tab-btn--active" data-tab="priorities">Priorités d'entraînement</button>
     <button class="report-tab-btn" data-tab="strengths">Meilleures performances</button>
-  </div>
-  <div id="tab-priorities" class="report-tab-content">`;
+  </div>`;
 
-  groups.forEach((group) => {
+  // ── Onglet Priorités ──
+  html += `<div id="tab-priorities" class="report-tab-content">`;
+
+  priorityGroups.forEach((group) => {
     html += `<div class="report-group">`;
     html += renderGroupAsHeavyCard(group, baselineScore, params, boardTheme, repertoires, startMove);
 
-    if (group.criticalLines.length > 0) {
+    const hasAny = group.problematicLines.length > 0 || group.compensatingLines.length > 0;
+    if (hasAny) {
       html += `<div class="report-group-body">`;
-      group.criticalLines.forEach(child => {
-        html += renderChildCard(child, baselineScore, repertoires, startMove);
-      });
+      if (group.problematicLines.length > 0) {
+        html += `<div class="report-subsection-label">Lignes problématiques</div>`;
+        group.problematicLines.forEach(child => {
+          html += renderChildCard(child, baselineScore, repertoires, startMove);
+        });
+      }
+      if (group.compensatingLines.length > 0) {
+        html += `<div class="report-subsection-label">Lignes compensatrices</div>`;
+        group.compensatingLines.forEach(child => {
+          html += renderChildCard(child, baselineScore, repertoires, startMove);
+        });
+      }
       html += `</div>`;
     } else {
       html += `<div class="report-group-note">Toute cette variante est problématique. Les sous-lignes ne sont pas significativement pires les unes que les autres.</div>`;
@@ -1027,23 +961,51 @@ function renderReport(data, params) {
     html += `</div>`;
   });
 
+  // ── Mentions honorables : 3 pires items individuels (depth > 4) ──
+  const visibleKeys = new Set();
+  priorityGroups.forEach(g => {
+    g.problematicLines.forEach(c => visibleKeys.add(c.playerUci));
+    g.compensatingLines.forEach(c => visibleKeys.add(c.playerUci));
+  });
+  const orphans = items
+    .filter(i => i.depth > 4 && i.gap > 0.01 && !visibleKeys.has(i.playerUci))
+    .sort((a, b) => b.lossesAvoided - a.lossesAvoided)
+    .slice(0, 3);
+  if (orphans.length > 0) {
+    html += `<div class="report-honorable">`;
+    html += `<div class="report-honorable-label">⚠️ Pires lignes individuelles</div>`;
+    html += `<div class="report-honorable-desc">Ces coups vous coûtent le plus de points, bien qu'ils n'appartiennent pas à une ouverture problématique dans son ensemble.</div>`;
+    orphans.forEach(item => {
+      html += renderChildCard(item, baselineScore, repertoires, startMove);
+    });
+    html += `</div>`;
+  }
+
   html += `</div>
   <div id="tab-strengths" class="report-tab-content" style="display:none">`;
 
-  const bestGroups = groupBestItems(bestItems, baselineScore, data.positionFiltered);
-
-  if (!bestGroups.length) {
+  if (!strengthGroups.length) {
     html += `<div class="report-empty"><div style="font-size:2rem;margin-bottom:8px;">🏆</div><div style="font-size:1rem;font-weight:600;">Pas encore assez de données pour identifier vos meilleures lignes.</div><div style="color:var(--text-muted);font-size:0.9rem;">Soit vos résultats sont trop homogènes, soit l'échantillon est insuffisant pour dégager des tendances fiables.</div></div>`;
   } else {
-    bestGroups.forEach((group) => {
+    strengthGroups.forEach((group) => {
       html += `<div class="report-group">`;
       html += renderGroupAsHeavyCardStrengths(group, baselineScore, params, boardTheme, repertoires, startMove);
 
-      if (group.criticalLines.length > 0) {
+      const hasAny = group.problematicLines.length > 0 || group.compensatingLines.length > 0;
+      if (hasAny) {
         html += `<div class="report-group-body">`;
-        group.criticalLines.forEach(child => {
-          html += renderChildCardStrengths(child, baselineScore, repertoires, startMove);
-        });
+        if (group.problematicLines.length > 0) {
+          html += `<div class="report-subsection-label">Lignes sous-performantes</div>`;
+          group.problematicLines.forEach(child => {
+            html += renderChildCardStrengths(child, baselineScore, repertoires, startMove);
+          });
+        }
+        if (group.compensatingLines.length > 0) {
+          html += `<div class="report-subsection-label">Lignes surperformantes</div>`;
+          group.compensatingLines.forEach(child => {
+            html += renderChildCardStrengths(child, baselineScore, repertoires, startMove);
+          });
+        }
         html += `</div>`;
       }
 
@@ -1054,7 +1016,10 @@ function renderReport(data, params) {
   html += '</div>';
 
   document.getElementById('view-results').innerHTML = html;
+  attachReportEvents();
+}
 
+function attachReportEvents() {
   // Tab switching
   document.querySelectorAll('.report-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1124,7 +1089,11 @@ function getFormParams() {
     ? document.getElementById('rapport-position-fen-input')?.value.trim() || ''
     : '';
 
-  return { username, color, timeClass, dateFrom, dateTo, eloMin, eloMax, startFen };
+  const startPath = document.getElementById('rapport-position-enabled')?.checked
+    ? document.getElementById('rapport-position-path')?.value || ''
+    : '';
+
+  return { username, color, timeClass, dateFrom, dateTo, eloMin, eloMax, startFen, startPath };
 }
 
 // ── Fetch du rapport via SSE avec progression temps réel ──────────────────────
@@ -1277,7 +1246,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await runAnalysis(params, (evt) => {
         if (evt.type === 'archive') {
           const pct = Math.round((evt.current / evt.total) * 85);
-          updateLoadingProgress(pct, `Mois ${evt.current}/${evt.total} : ${evt.gamesInArchive} partie${evt.gamesInArchive > 1 ? 's' : ''}`);
+          const total = evt.cumulative || evt.gamesInArchive;
+          updateLoadingProgress(pct, `${total} partie${total > 1 ? 's' : ''} chargée${total > 1 ? 's' : ''}`);
         } else if (evt.type === 'phase') {
           if (evt.phase === 'position-map') {
             updateLoadingProgress(85, `Construction de l'arbre des positions… (${evt.positions} positions)`);

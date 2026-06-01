@@ -537,6 +537,36 @@
     }
 
     /* ── Carte ligne critique (enfant compact) ───────────────────────────── */
+    /* ── Sous-section enfants (problématiques / compensatrices) ─────────── */
+    .report-subsection-label {
+      padding: 10px 16px 4px 28px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    /* ── Mentions honorables (items orphelins) ──────────────────────────── */
+    .report-honorable {
+      margin-top: 24px;
+      padding: 12px 16px;
+      border-top: 2px dashed var(--border-color);
+    }
+    .report-honorable-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .report-honorable-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      opacity: 0.6;
+      margin-bottom: 12px;
+    }
+
     .report-group-body {
       border-top: none;
       background: rgba(15,23,42,0.5);
@@ -1312,6 +1342,7 @@
 
                 <label class="form-label" for="rapport-position-fen-input">FEN générée</label>
                 <input type="text" id="rapport-position-fen-input" class="form-input position-fen-input" autocomplete="off" spellcheck="false" readonly />
+                <input type="hidden" id="rapport-position-path" value="" />
               </div>
             </div>
           </div>
