@@ -6,7 +6,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { nodeMap, expandPathToCurrentNode } from './repertoire';
-import { apiRequest } from '@/bridge/api';
+import { apiRequest } from '@/services/api';
 import type { RepertoireNode } from '@/types/repertoire';
 import type { Color, Square } from '@/types/chess';
 import type { SurvivalReport, SurvivalMistake, TrainingMode, MedalTier } from '@/types/training';

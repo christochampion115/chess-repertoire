@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { nodeMap, batchSetFolderId, cleanupOrphanedFolders } from '@/services/repertoire';
-import { loadState, saveState } from '@/bridge/storage';
+import { loadState, saveState } from '@/services/storage';
 import { syncUserSettings } from '@/services/authService';
 import type { RepertoireNode } from '@/types/repertoire';
 import { ModalBox } from './ModalBox';

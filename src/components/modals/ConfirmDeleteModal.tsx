@@ -1,7 +1,7 @@
 import { useUiStore } from '@/stores/uiStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { nodeMap, confirmDelete } from '@/services/repertoire';
-import { countTotalChildren } from '@/bridge/arbre';
+import { countTotalChildren } from '@/services/arbre';
 import { ModalBox } from './ModalBox';
 
 export function ConfirmDeleteModal() {

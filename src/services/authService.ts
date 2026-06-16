@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { apiRequest } from '@/bridge/api';
-import { loadState } from '@/bridge/storage';
+import { apiRequest } from '@/services/api';
+import { loadState } from '@/services/storage';
 import { useAuthStore } from '@/stores/authStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import type { RepertoireNode } from '@/types/repertoire';

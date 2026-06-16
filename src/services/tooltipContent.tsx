@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { MiniBoard } from '@/components/common/MiniBoard';
-import { fetchLichessStats } from '@/bridge/stats';
+import { fetchLichessStats } from '@/services/stats';
 import { useChessStore } from '@/stores/chessStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { formatCp, formatMate, formatNumberShort } from '@/utils/format';

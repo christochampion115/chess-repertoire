@@ -4,8 +4,7 @@ import { useStatsStore } from '@/stores/statsStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { ModalBox } from './ModalBox';
-import { state } from '@/bridge/state';
-import { fetchPlayerStats, fetchPlayerStatsBatch } from '@/bridge/stats';
+import { fetchPlayerStats, fetchPlayerStatsBatch } from '@/services/stats';
 import { resetFreePlay } from '@/services/repertoire';
 import type { LichessStats } from '@/types/stats';
 import type { Color } from '@/types/chess';
@@ -99,24 +98,22 @@ export function PlayerStatsModal() {
       // Reposition board to start
       const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       resetFreePlay(START_FEN, color as Color);
-      state.lastStatsRequestKey = '';
+      const store = useStatsStore.getState();
+      store.setLastStatsRequestKey('');
 
       const fen = START_FEN;
       const normFen = fen.split(' ').slice(0, 3).join(' ');
       const cacheKey = `${normFen}|player|${trimmedUser}|${color}|${timeClass}|${dateFrom}-${dateTo}|${playerEloMin}-${playerEloMax}`;
 
       // Check front-end cache first
-      if (state.statsCache?.has(cacheKey)) {
+      if (store.statsCache[cacheKey] !== undefined) {
         cancelAnimationFrame(rafRef.current);
-        Object.assign(state.statsFilters, newFilters, { currentDatabase: 'player', eloPanelOpen: false });
-        state.lichessStats = state.statsCache.get(cacheKey);
-        state.lastStatsRequestKey = cacheKey;
-        state.statsSelectedUci = '';
-        const s = useStatsStore.getState();
-        s.setData(state.statsCache.get(cacheKey) as LichessStats | null);
-        s.setSelectedUci('');
-        s.setFilters({ currentDatabase: 'player', ...newFilters });
-        s.setLoading(false);
+        store.setFilters({ currentDatabase: 'player', ...newFilters, eloPanelOpen: false });
+        store.setLichessStats(store.statsCache[cacheKey]);
+        store.setLastStatsRequestKey(cacheKey);
+        store.setSelectedUci('');
+        store.setData(store.statsCache[cacheKey] as LichessStats | null);
+        store.setLoading(false);
         closeModal();
         return;
       }
@@ -138,13 +135,13 @@ export function PlayerStatsModal() {
       }
       allFens.delete(fen);
       if (allFens.size > 0) {
+        const s = useStatsStore.getState();
         await Promise.race([
           fetchPlayerStatsBatch([...allFens], newFilters).then((result: Record<string, unknown>) => {
-            if (!state.statsCache) state.statsCache = new Map();
-            for (const [f, s] of Object.entries(result)) {
+            for (const [f, st] of Object.entries(result)) {
               const nf = f.split(' ').slice(0, 3).join(' ');
               const bKey = `${nf}|player|${trimmedUser}|${color}|${timeClass}|${dateFrom}-${dateTo}|${playerEloMin}-${playerEloMax}`;
-              if (!state.statsCache.has(bKey)) state.statsCache.set(bKey, s);
+              if (s.statsCache[bKey] === undefined) s.statsCache[bKey] = st;
             }
           }).catch(() => {}),
           new Promise((r) => setTimeout(r, 30000)),
@@ -155,18 +152,14 @@ export function PlayerStatsModal() {
       setLoadingPhase('done');
       await new Promise((r) => setTimeout(r, 400));
 
-      Object.assign(state.statsFilters, newFilters, { currentDatabase: 'player', eloPanelOpen: false });
-      state.lichessStats = stats;
-      state.lastStatsRequestKey = cacheKey;
-      state.statsSelectedUci = '';
-      if (!state.statsCache) state.statsCache = new Map();
-      state.statsCache.set(cacheKey, stats);
-
-      const store = useStatsStore.getState();
-      store.setData(stats as LichessStats | null);
-      store.setSelectedUci('');
-      store.setFilters({ currentDatabase: 'player', ...newFilters });
-      store.setLoading(false);
+      const store2 = useStatsStore.getState();
+      store2.setFilters({ currentDatabase: 'player', ...newFilters, eloPanelOpen: false });
+      store2.setLichessStats(stats);
+      store2.setLastStatsRequestKey(cacheKey);
+      store2.setSelectedUci('');
+      store2.setStatsCacheEntry(cacheKey, stats);
+      store2.setData(stats as LichessStats | null);
+      store2.setLoading(false);
 
       closeModal();
     } catch (err: unknown) {

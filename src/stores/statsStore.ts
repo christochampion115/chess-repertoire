@@ -12,6 +12,9 @@ interface StatsState {
   eloMiniLoading: boolean;
   eloMiniLoaderUntil: number;
   filters: StatsFilters;
+  statsCache: Record<string, unknown>;
+  lastStatsRequestKey: string;
+  lichessStats: unknown;
 }
 
 interface StatsActions {
@@ -24,6 +27,9 @@ interface StatsActions {
   setEloMiniLoading: (loading: boolean, until?: number) => void;
   setFilter: <K extends keyof StatsFilters>(key: K, value: StatsFilters[K]) => void;
   setFilters: (filters: Partial<StatsFilters>) => void;
+  setStatsCacheEntry: (key: string, value: unknown) => void;
+  setLastStatsRequestKey: (key: string) => void;
+  setLichessStats: (stats: unknown) => void;
   reset: () => void;
 }
 
@@ -56,6 +62,9 @@ export const useStatsStore = create<StatsState & StatsActions>()(
   eloMiniLoading: false,
   eloMiniLoaderUntil: 0,
   filters: { ...DEFAULT_FILTERS },
+  statsCache: {},
+  lastStatsRequestKey: '',
+  lichessStats: null,
 
   setData: (data) => set({ data }),
   setLoading: (loading) => set({ loading }),
@@ -69,6 +78,10 @@ export const useStatsStore = create<StatsState & StatsActions>()(
     set((s) => ({ filters: { ...s.filters, [key]: value } })),
   setFilters: (patch) =>
     set((s) => ({ filters: { ...s.filters, ...patch } })),
+  setStatsCacheEntry: (key, value) =>
+    set((s) => ({ statsCache: { ...s.statsCache, [key]: value } })),
+  setLastStatsRequestKey: (key) => set({ lastStatsRequestKey: key }),
+  setLichessStats: (stats) => set({ lichessStats: stats }),
   reset: () => set({ data: null, loading: false, error: null, selectedUci: '' }),
     }),
     {

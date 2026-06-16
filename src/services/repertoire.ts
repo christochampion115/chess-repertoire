@@ -11,7 +11,7 @@ import {
   deleteRepertoireFromBackend,
   syncUserSettings,
 } from '../services/authService';
-import { loadState, saveState } from '../bridge/storage';
+import { loadState, saveState } from '../services/storage';
 
 const FOLDERS_KEY = 'alphaChess.repFolders';
 export const nodeMap = new Map<string, RepertoireNode>();
