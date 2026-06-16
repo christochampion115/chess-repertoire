@@ -300,6 +300,9 @@ function loadLocalRepertoiresIntoState(selectionSnapshot = null) {
   sanitizeAllRepertoires();
   restoreWorkspaceSelection(selection);
 
+  // Notifier le store TS que les répertoires vanilla ont changé
+  eventBus.emit('repertoiresUpdated');
+
   return state.repertoires.length > 0;
 }
 
@@ -524,6 +527,10 @@ function applyRemoteRepertoires(repertoires) {
   state.repertoires = state.repertoires.filter(rep => !rep.isExample);
   restoreWorkspaceSelection(selection);
   persistLocalRepertoires();
+
+  // Notifier le store TS que les répertoires vanilla ont changé
+  eventBus.emit('repertoiresUpdated');
+
   window.DEBUG_MODE && console.log('[DEBUG]', { step: 'applyRemoteRepertoires:done', loadedCount: state.repertoires.length, needingSyncCount: repertoiresNeedingSync.size, activeRepIndex: state.activeRepIndex, currentNodeId: state.currentNode?.id });
 
   for (const repertoireId of repertoiresNeedingSync) {

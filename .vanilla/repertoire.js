@@ -194,6 +194,10 @@ function importPgnVariationTree(moves, parent) {
       continue;
     }
 
+    // Bug 5 – Stop à la première transposition : le nœud ↩ est une feuille,
+    // ses continuations appartiennent au nœud source.
+    if (nextNode.isTransposition) break;
+
     // Bug 2 – Importer le commentaire associé au coup
     const rawComment = (move.commentAfter || move.commentMove || '').trim();
     if (rawComment) nextNode.comment = rawComment;
@@ -524,6 +528,7 @@ export function initExampleData() {
   state.currentNode = state.freePlayRoot;
   state.chess.reset();
   eventBus.emit('render');
+  eventBus.emit('repertoiresUpdated');
 }
 
 export function confirmRenameRep() {

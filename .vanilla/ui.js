@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { renderBoard, ANNOTATION_STYLE } from './board.js';
 import { eventBus } from './events.js';
+import { modalBridge } from './modalBridge.js';
 import { renderArbre, countTotalChildren, getPathString } from './arbre.js';
 import {
   handleSquareClick,
@@ -9,6 +10,7 @@ import {
   confirmRepertoireCreation,
   confirmRenameRep,
   confirmDelete as confirmDeleteMove,
+  selectSymbol,
 } from './repertoire.js';
 import { fetchLichessStats, fetchPlayerStats, fetchPlayerStatsBatch } from './stats.js';
 import { loginWithCredentials, signupWithCredentials, logoutSession, scheduleRepertoireSync, syncUserSettings, isReadOnlyMode } from './auth.js';
@@ -1522,7 +1524,8 @@ function handleTreeContext(event, node) {
 }
 
 export function hideMenus() {
-  state.ctxMenuEl.style.display = 'none';
+  const ctxMenuEl = state.ctxMenuEl || document.getElementById('ctx-menu');
+  if (ctxMenuEl) ctxMenuEl.style.display = 'none';
   state.contextMenuMove = null;
 }
 
@@ -1640,7 +1643,8 @@ export function openFreePlayAtFen(fen) {
 export function closeModals() {
   pendingTrainingInterruptAction = null;
   state.varNameConflictConfirmed = false;
-  state.modalOverlayEl.style.display = 'none';
+  const overlayEl = state.modalOverlayEl || document.getElementById('modal-overlay');
+  if (overlayEl) overlayEl.style.display = 'none';
   document.querySelectorAll('.modal-box').forEach(modal => {
     modal.style.display = 'none';
   });
@@ -1652,6 +1656,7 @@ export function toggleMonitorMenu(event) {
 }
 
 function openNewRepModalUnsafe() {
+  if (modalBridge.open('new-repertoire')) return;
   eventBus.emit('hideMenus');
   state.modalOverlayEl.style.display = 'flex';
   document.getElementById('modal-new-rep').style.display = 'block';
@@ -1755,25 +1760,20 @@ function setRepCreationMode(mode) {
 }
 
 function guardTrainingInterruption({
-  title = 'Interrompre l’entraînement en cours ?',
+  title = 'Interrompre l\'entraînement en cours ?',
   message,
   onConfirm,
 }) {
   if (!state.trainingActive) {
-    onConfirm();
+    if (typeof onConfirm === 'function') onConfirm();
     return;
   }
-
+  if (modalBridge.open('training-interrupt', { title, message, onConfirm })) {
+    return;
+  }
   pendingTrainingInterruptAction = onConfirm;
-
   const titleEl = document.getElementById('modal-training-interrupt-title');
   const bodyEl = document.getElementById('modal-training-interrupt-body');
-  if (titleEl) titleEl.textContent = title;
-  if (bodyEl) {
-    bodyEl.innerHTML = `L’entraînement en cours (<b>${state.trainingLabel || 'sans nom'}</b>) sera terminé.<br>${message}`;
-  }
-
-  state.modalOverlayEl.style.display = 'flex';
   document.getElementById('modal-training-interrupt').style.display = 'block';
 }
 
@@ -1786,6 +1786,8 @@ export function openNewRepModal(event) {
   });
 }
 export function openBoardThemeMenu() {
+  if (modalBridge.open('board-theme')) return;
+
     // Nettoyer les anciennes modales dynamiques
     state.dynamicModals.innerHTML = '';
 
@@ -1865,6 +1867,7 @@ export function openBoardThemeMenu() {
 
 
 export function openRenameRepModal() {
+  if (modalBridge.open('rename', { itemId: state.repertoires[state.activeRepIndex]?.id })) return;
   eventBus.emit('hideMenus');
   const rep = state.repertoires[state.activeRepIndex];
   state.modalOverlayEl.style.display = 'flex';
@@ -1885,6 +1888,7 @@ export function openRenameRepModal() {
 }
 
 export function openNameVarModal() {
+  if (modalBridge.open('name-variant', { nodeId: state.menuTarget?.id })) return;
   eventBus.emit('hideMenus');
   state.varNameConflictConfirmed = false;
   state.modalOverlayEl.style.display = 'flex';
@@ -1908,6 +1912,7 @@ export function openNameVarModal() {
 }
 
 export function openCommentModal() {
+  if (modalBridge.open('comment', { nodeId: state.menuTarget?.id })) return;
   eventBus.emit('hideMenus');
   state.modalOverlayEl.style.display = 'flex';
   document.getElementById('modal-comment').style.display = 'block';
@@ -1924,6 +1929,7 @@ export function confirmComment() {
 
 export function openDeleteClick() {
   eventBus.emit('hideMenus');
+  if (modalBridge.open('delete-confirm', { itemId: state.menuTarget?.id, deleteType: state.deleteTargetIdx !== -1 ? 'repertoire' : 'move' })) return;
   if (state.deleteTargetIdx !== -1) {
     const rep = state.repertoires[state.deleteTargetIdx];
     const totalMoves = countTotalChildren(rep);
@@ -2033,6 +2039,7 @@ export function openFolderCtxMenu(event, fid, isRepFolder) {
 }
 
 function openRenameFolderModal(fid) {
+  if (modalBridge.open('rename-folder', { folderId: fid })) return;
   const folders = loadFolders();
   const current = folders[fid];
   if (current === undefined) return;
@@ -2152,6 +2159,7 @@ function deleteFolderAndContents(fid, isRepFolder) {
  */
 export function openFolderGroupModal() {
   hideMenus();
+  if (modalBridge.open('folder-group')) return;
   const target = state.menuTarget;
   if (!target) return;
 
@@ -2414,9 +2422,64 @@ export function handleRightClick(event, type, target = null, index = -1) {
   const isMoveContext = type === 'stats_move' || type === 'analysis_move';
 
   state.menuTarget = target || state.currentNode;
+  // Sync vers le store TS pour que confirmDelete/selectSymbol trouvent la cible
+  eventBus.emit('menuTargetChanged', { id: state.menuTarget?.id ?? null });
   state.contextMenuMove = isMoveContext ? target : null;
   state.deleteTargetIdx = index;
   state.pendingDeleteType = type;
+  state.contextMenuSource = type;
+
+  const isRepRoot = type === 'repertoire_item';
+  const isRepSub = type === 'repertoire_subitem';
+  const isNode = type === 'monitor' || type === 'arbre' || type === 'board' || isRepSub;
+  const isNotRoot = state.menuTarget && state.menuTarget.parent;
+  const showAnnotations = !isRepRoot && !isMoveContext;
+  const showDelete = !isMoveContext && (isRepRoot || (isNode && isNotRoot));
+
+  const items = [];
+  if (isRepRoot) {
+    items.push({ label: 'Renommer', onClick: () => { openRenameRepModal(state.menuTarget.id); } });
+  }
+  if (isRepRoot || isRepSub) {
+    items.push({ label: 'Ouvrir dans l\'arbre', onClick: () => { openCurrentNodeInTree(); } });
+    items.push({ label: 'Groupe/Dossier', onClick: () => { openFolderGroupModal(); } });
+  }
+  if (isRepSub) {
+    items.push({ label: 'Retirer du répertoire', onClick: () => { removeVariantFromRepertoire(); hideMenus(); } });
+  }
+  if (showDelete) {
+    items.push({ label: isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup', onClick: () => { openDeleteClick(); } });
+  }
+  if (isNode && isNotRoot && !isMoveContext) {
+    items.push({ label: 'Nommer la variante', onClick: () => { openNameVarModal(); } });
+  }
+  if (state.activeRepIndex !== -1 && !isMoveContext) {
+    items.push({ label: 'Commentaire', onClick: () => { openCommentModal(); } });
+  }
+  if (isMoveContext) {
+    items.push({ label: 'Ajouter à l\'arbre', onClick: () => { addSelectedMoveToTree(); } });
+    items.push({ label: 'Explorer en free-play', onClick: () => { exploreInFreePlay(); } });
+  }
+  if (showAnnotations) {
+    items.push({ divider: true });
+    items.push({ isLabel: true, label: 'Annotations' });
+    const symbols = [
+      { label: 'Bon coup', sym: '!' },
+      { label: 'Coup faible', sym: '?' },
+      { label: 'Coup brillant', sym: '!!' },
+      { label: 'Gaffe', sym: '??' },
+      { label: 'Intéressant', sym: '!?' },
+      { label: 'Douteux', sym: '?!' },
+    ];
+    symbols.forEach(({ label, sym }) => {
+      items.push({
+        label: `${sym}  ${label}`,
+        onClick: () => { selectSymbol(sym); },
+      });
+    });
+  }
+  if (modalBridge.openContextMenu({ x: event.clientX, y: event.clientY, items })) return;
+
   state.contextMenuSource = type;
 
   const menu = state.ctxMenuEl;
@@ -2434,11 +2497,6 @@ export function handleRightClick(event, type, target = null, index = -1) {
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
 
-  const isRepRoot = type === 'repertoire_item';
-  const isRepSub = type === 'repertoire_subitem';
-  const isNode = type === 'monitor' || type === 'arbre' || type === 'board' || isRepSub;
-  const isNotRoot = state.menuTarget && state.menuTarget.parent;
-
   const renameEl = menu.querySelector('.opt-rename-rep');
   const nameVarEl = menu.querySelector('.opt-name-var');
   const addTreeEl = menu.querySelector('.opt-add-tree');
@@ -2454,7 +2512,7 @@ export function handleRightClick(event, type, target = null, index = -1) {
   if (removeFromRepEl) removeFromRepEl.style.display = isRepSub ? 'block' : 'none';
   if (deleteEl) {
     deleteEl.textContent = isRepRoot ? 'Supprimer le répertoire' : 'Supprimer ce coup';
-    deleteEl.style.display = isMoveContext ? 'none' : (isRepRoot || (isNode && isNotRoot) ? 'block' : 'none');
+    deleteEl.style.display = showDelete ? 'block' : 'none';
   }
   if (nameVarEl) nameVarEl.style.display = isMoveContext ? 'none' : (isNode && isNotRoot ? 'block' : 'none');
   if (commentEl) commentEl.style.display = isMoveContext ? 'none' : (state.activeRepIndex !== -1 ? 'block' : 'none');
@@ -2464,7 +2522,7 @@ export function handleRightClick(event, type, target = null, index = -1) {
   if (exploreFreeEl) exploreFreeEl.style.display = isMoveContext ? 'block' : 'none';
 
   const annotSection = menu.querySelector('.ctx-annot-section');
-  if (annotSection) annotSection.style.display = (isRepRoot || isMoveContext) ? 'none' : 'block';
+  if (annotSection) annotSection.style.display = showAnnotations ? 'block' : 'none';
 }
 
 export function selectCol(color) {
@@ -3333,7 +3391,7 @@ function buildTrainingLabel(node, repColor) {
   return varName ? `${repName} › ${varName}` : repName;
 }
 
-function showTrainingConfirmModal(node, repColor) {
+export function showTrainingConfirmModal(node, repColor) {
   pendingTrainingNode = node;
   pendingTrainingColor = repColor;
   pendingTrainingMissingNodes = collectMissingReplyNodes(node, repColor);
@@ -3546,11 +3604,13 @@ function showTrainingDefeatModal() {
 }
 
 export function showStopTrainingModal() {
+  if (modalBridge.open('training-stop')) return;
   document.getElementById('modal-overlay').style.display = 'flex';
   document.getElementById('modal-training-stop').style.display = 'block';
 }
 
 export function openMedalsModal() {
+  if (modalBridge.open('medals')) return;
   const overlay = document.getElementById('modal-overlay');
   const modal = document.getElementById('modal-medals');
   if (!overlay || !modal) return;
@@ -4463,6 +4523,7 @@ export function confirmGuestMode() {
 let currentAccountMode = 'login'; // 'login' ou 'signup'
 
 export function openAccountModal(mode = 'login') {
+  if (modalBridge.open('account')) return;
   currentAccountMode = mode;
   // Initialiser le modal selon le mode demandé
   initializeAccountModal();
@@ -4591,6 +4652,7 @@ export function updateAccountUI() {
 
 /** Ouvre la modale d'authentification sur le panneau de bienvenue. */
 export function openAuthModal() {
+  if (modalBridge.open('auth')) return;
   showAuthPanel('welcome');
   document.getElementById('auth-error').textContent = '';
   document.getElementById('auth-username-input').value = '';
@@ -4703,6 +4765,7 @@ export async function logoutAccount() {
 
 /** Ouvre la modale profil et pré-remplit les champs avec les données du compte. */
 export function openProfileModal() {
+  if (modalBridge.open('profile')) return;
   const user = state.auth.user;
   if (!user) return;
 
