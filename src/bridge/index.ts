@@ -12,10 +12,8 @@ export {
 } from './auth';
 export {
   closeModals,
-  handleRightClick,
   openAccountModal,
   showTrainingConfirmModal,
-  render,
 } from './ui';
 export { countTotalChildren } from './arbre';
 export { fetchLichessStats, fetchPlayerStats, fetchPlayerStatsBatch } from './stats';

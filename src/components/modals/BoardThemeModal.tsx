@@ -1,6 +1,6 @@
 import { useUiStore } from '@/stores/uiStore';
 import { useChessStore } from '@/stores/chessStore';
-import { syncUserSettings } from '@/bridge/auth';
+import { syncUserSettings } from '@/services/authService';
 import { ModalBox } from './ModalBox';
 
 const THEMES = [

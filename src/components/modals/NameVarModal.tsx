@@ -3,7 +3,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { nodeMap, findNodeWithVarName, nameVariantNode, batchSetFolderId } from '@/services/repertoire';
 import { loadState, saveState } from '@/bridge/storage';
-import { syncUserSettings } from '@/bridge/auth';
+import { syncUserSettings } from '@/services/authService';
 import { type RepertoireNode } from '@/types/repertoire';
 import { ModalBox } from './ModalBox';
 

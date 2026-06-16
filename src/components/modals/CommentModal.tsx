@@ -1,25 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useUiStore } from '@/stores/uiStore';
+import { useRepertoireStore } from '@/stores/repertoireStore';
+import { nodeMap } from '@/services/repertoire';
 import { ModalBox } from './ModalBox';
 
 export function CommentModal() {
   const closeModal = useUiStore((s) => s.closeModal);
+  const menuTargetId = useRepertoireStore((s) => s.menuTargetId);
   const [comment, setComment] = useState('');
 
   useEffect(() => {
-    (async () => {
-      const { state } = await import('@/jsBridge');
-      setComment(state.menuTarget?.comment || '');
-    })();
-  }, []);
+    const node = menuTargetId ? nodeMap.get(menuTargetId) : undefined;
+    setComment(node?.comment ?? '');
+  }, [menuTargetId]);
 
-  const handleSave = async () => {
-    const { state, eventBus } = await import('@/jsBridge');
-    if (state.menuTarget) {
-      state.menuTarget.comment = comment;
+  const handleSave = () => {
+    if (menuTargetId) {
+      const node = nodeMap.get(menuTargetId);
+      if (node) {
+        node.comment = comment;
+        const { version } = useRepertoireStore.getState();
+        useRepertoireStore.setState({ version: version + 1 });
+      }
     }
     closeModal();
-    eventBus.emit('render');
   };
 
   return (

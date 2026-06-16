@@ -4,7 +4,7 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import * as repertoireService from '@/services/repertoire';
-import { bootstrapSession } from '@/bridge/auth';
+import { bootstrapSession } from '@/services/authService';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { RightPanel } from '@/components/layout/RightPanel';
 import { SplashScreen } from '@/components/layout/SplashScreen';

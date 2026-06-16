@@ -1,9 +1,9 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { useRepertoireStore } from '@/stores/repertoireStore';
+import { useUiStore } from '@/stores/uiStore';
 import type { RepertoireNode } from '@/types/repertoire';
 import * as repertoireService from '@/services/repertoire';
 import { buildContextMenu } from '@/services/contextMenu';
-import { showTrainingConfirmModal } from '@/bridge/ui';
 import { prepareTraining, setPendingTrainingMode, getMedalDisplayMeta } from '@/services/training';
 import { ANNOTATION_STYLE } from '@/utils/annotationStyle';
 
@@ -79,7 +79,7 @@ function VariantItem({
     e.stopPropagation();
     prepareTraining(node, repColor);
     setPendingTrainingMode('vertical');
-    showTrainingConfirmModal(node);
+    useUiStore.getState().openModal({ type: 'training-confirm', rootId: node.id, mode: 'vertical' });
   }, [node, repColor]);
 
   const handleToggle = useCallback((e: React.MouseEvent) => {
@@ -264,7 +264,7 @@ function RepItem({
     e.stopPropagation();
     prepareTraining(rep, rep.color ?? 'w');
     setPendingTrainingMode('vertical');
-    showTrainingConfirmModal(rep);
+    useUiStore.getState().openModal({ type: 'training-confirm', rootId: rep.id, mode: 'vertical' });
   }, [rep]);
 
   return (

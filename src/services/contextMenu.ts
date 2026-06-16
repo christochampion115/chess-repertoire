@@ -16,7 +16,7 @@ import {
   removeFolderGroup,
   cleanupOrphanedFolders,
 } from '@/services/repertoire';
-import { scheduleRepertoireSync } from '@/bridge/auth';
+import { scheduleRepertoireSync } from '@/services/authService';
 
 type ContextMenuType =
   | 'arbre'

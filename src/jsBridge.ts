@@ -13,11 +13,9 @@ export {
   logoutSession,
   isReadOnlyMode,
   closeModals,
-  handleRightClick,
   openAccountModal,
   showTrainingConfirmModal,
   countTotalChildren,
-  render,
   fetchPlayerStats,
   fetchPlayerStatsBatch,
 } from './bridge';

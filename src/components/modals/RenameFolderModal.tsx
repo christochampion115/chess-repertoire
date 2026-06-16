@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
+import { syncUserSettings } from '@/services/authService';
 import { ModalBox } from './ModalBox';
 
 export function RenameFolderModal() {
@@ -23,7 +24,7 @@ export function RenameFolderModal() {
     folders[modal.folderId] = trimmed;
     store.setRepFolders(folders);
     closeModal();
-    import('@/jsBridge').then(({ syncUserSettings }) => syncUserSettings());
+    syncUserSettings();
   };
 
   return (

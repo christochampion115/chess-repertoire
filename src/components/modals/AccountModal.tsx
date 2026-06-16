@@ -1,24 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useUiStore } from '@/stores/uiStore';
+import { syncUserSettings } from '@/services/authService';
 import { ModalBox } from './ModalBox';
 
 export function AccountModal() {
   const closeModal = useUiStore((s) => s.closeModal);
   const [username, setUsername] = useState('');
 
-const USERNAME_KEY = 'alphaChess.username';
+  const USERNAME_KEY = 'alphaChess.username';
 
   useEffect(() => {
-    (async () => {
-      const { loadState } = await import('@/jsBridge');
-      setUsername(loadState(USERNAME_KEY) || '');
-    })();
+    try {
+      const saved = localStorage.getItem(USERNAME_KEY);
+      if (saved) setUsername(JSON.parse(saved));
+    } catch { /* ignore */ }
   }, []);
 
-  const handleSave = async () => {
-    const { saveState, state, syncUserSettings } = await import('@/jsBridge');
-    saveState(USERNAME_KEY, username.trim());
-    state.username = username.trim();
+  const handleSave = () => {
+    try {
+      localStorage.setItem(USERNAME_KEY, JSON.stringify(username.trim()));
+    } catch { /* ignore */ }
     syncUserSettings();
     closeModal();
   };

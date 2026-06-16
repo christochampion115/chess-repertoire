@@ -1,24 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
 import { ModalBox } from './ModalBox';
 
 export function ProfileModal() {
   const closeModal = useUiStore((s) => s.closeModal);
-  const [profile, setProfile] = useState<{ username?: string; rating?: number } | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const { state } = await import('@/jsBridge');
-      setProfile(state.lichessProfile || null);
-    })();
-  }, []);
+  const user = useAuthStore((s) => s.user);
 
   return (
     <ModalBox title="Profil">
-      {profile ? (
+      {user ? (
         <>
-          <p><strong>Pseudo :</strong> {profile.username}</p>
-          {profile.rating != null && <p><strong>Classement :</strong> {profile.rating}</p>}
+          <p><strong>Pseudo :</strong> {user.username}</p>
         </>
       ) : (
         <p>Connectez-vous pour voir votre profil.</p>

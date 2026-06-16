@@ -16,7 +16,7 @@ import {
   initNodeMap,
   _incrementVersion,
 } from '@/services/repertoire';
-import { scheduleRepertoireSync } from '../bridge/auth';
+import { scheduleRepertoireSync } from './authService';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 
 // Déclaration de type minimal pour les moves du parser

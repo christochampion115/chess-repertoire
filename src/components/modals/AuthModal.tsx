@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { ModalBox } from './ModalBox';
-import { loginWithCredentials, signupWithCredentials } from '@/bridge/auth';
+import { loginWithCredentials, signupWithCredentials } from '@/services/authService';
 
 export function AuthModal() {
   const closeModal = useUiStore((s) => s.closeModal);

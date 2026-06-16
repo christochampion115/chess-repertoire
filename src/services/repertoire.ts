@@ -10,7 +10,7 @@ import {
   registerCreatedRepertoire,
   deleteRepertoireFromBackend,
   syncUserSettings,
-} from '../bridge/auth';
+} from '../services/authService';
 import { loadState, saveState } from '../bridge/storage';
 
 const FOLDERS_KEY = 'alphaChess.repFolders';

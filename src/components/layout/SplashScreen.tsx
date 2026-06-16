@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { loginWithCredentials, signupWithCredentials } from '@/bridge/auth';
+import { loginWithCredentials, signupWithCredentials } from '@/services/authService';
 
 type SplashStep = 'welcome' | 'login' | 'signup' | 'guest';
 

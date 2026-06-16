@@ -5,7 +5,6 @@ import { useChessStore } from '@/stores/chessStore';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { ModalBox } from './ModalBox';
 import { state } from '@/bridge/state';
-import { render } from '@/bridge/ui';
 import { fetchPlayerStats, fetchPlayerStatsBatch } from '@/bridge/stats';
 import { resetFreePlay } from '@/services/repertoire';
 import type { LichessStats } from '@/types/stats';
@@ -101,7 +100,6 @@ export function PlayerStatsModal() {
       const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       resetFreePlay(START_FEN, color as Color);
       state.lastStatsRequestKey = '';
-      render();
 
       const fen = START_FEN;
       const normFen = fen.split(' ').slice(0, 3).join(' ');
@@ -120,7 +118,6 @@ export function PlayerStatsModal() {
         s.setFilters({ currentDatabase: 'player', ...newFilters });
         s.setLoading(false);
         closeModal();
-        render();
         return;
       }
 
@@ -172,7 +169,6 @@ export function PlayerStatsModal() {
       store.setLoading(false);
 
       closeModal();
-      render();
     } catch (err: unknown) {
       cancelAnimationFrame(rafRef.current);
       if (abortCtrl.signal.aborted) return;
