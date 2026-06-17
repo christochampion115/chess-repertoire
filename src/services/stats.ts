@@ -138,19 +138,16 @@ function normalizeBaseUrl(url: string) {
 
 function buildProxyCandidates(apiPath = '/api/lichess/stats') {
   const candidates: string[] = [];
-  const configuredProxy = normalizeBaseUrl((window as any).LICHESS_STATS_PROXY_URL as string);
   const configuredApi = normalizeBaseUrl(import.meta.env.VITE_API_URL ?? '');
+
+  if (configuredApi) {
+    candidates.push(`${configuredApi}${apiPath.replace(/^\/api/, '')}`);
+  }
   if (window.location && /^https?:$/.test(window.location.protocol)) {
     candidates.push(`${window.location.origin}${apiPath}`);
   }
   candidates.push(`http://localhost:4000${apiPath}`);
   candidates.push(`http://127.0.0.1:4000${apiPath}`);
-  if (configuredProxy && apiPath === '/api/lichess/stats') {
-    candidates.push(configuredProxy);
-  }
-  if (configuredApi) {
-    candidates.push(`${configuredApi}${apiPath.replace(/^\/api/, '')}`);
-  }
   return Array.from(new Set(candidates.map(normalizeBaseUrl).filter(Boolean)));
 }
 
