@@ -139,7 +139,7 @@ function normalizeBaseUrl(url: string) {
 function buildProxyCandidates(apiPath = '/api/lichess/stats') {
   const candidates: string[] = [];
   const configuredProxy = normalizeBaseUrl((window as any).LICHESS_STATS_PROXY_URL as string);
-  const configuredApi = normalizeBaseUrl((window as any).ALPHA_CHESS_API_URL as string);
+  const configuredApi = normalizeBaseUrl(import.meta.env.VITE_API_URL ?? '');
   if (window.location && /^https?:$/.test(window.location.protocol)) {
     candidates.push(`${window.location.origin}${apiPath}`);
   }

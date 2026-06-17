@@ -8,7 +8,7 @@ function normalizeBaseUrl(url: string): string {
 function buildApiCandidates(): string[] {
   const candidates: string[] = [];
   const preferred = normalizeBaseUrl(preferredApiBaseUrl);
-  const configured = normalizeBaseUrl((window as any).ALPHA_CHESS_API_URL as string);
+  const configured = normalizeBaseUrl(import.meta.env.VITE_API_URL ?? '');
 
   if (preferred) candidates.push(preferred);
   if (configured) candidates.push(configured);
