@@ -10,21 +10,5 @@
       ]
     }
   ],
-  "overrides": [
-    {
-      "source": "**/*.js",
-      "headers": {
-        "Content-Type": "application/javascript; charset=utf-8"
-      }
-    },
-    {
-      "source": "**/*.css",
-      "headers": {
-        "Content-Type": "text/css; charset=utf-8"
-      }
-    }
-  ],
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
   "framework": "vite"
 }
