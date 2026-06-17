@@ -12,12 +12,13 @@ function buildApiCandidates(): string[] {
 
   if (preferred) candidates.push(preferred);
   if (configured) candidates.push(configured);
-  candidates.push('http://localhost:4000/api');
-  candidates.push('http://127.0.0.1:4000/api');
 
   if (window.location && /^https?:$/.test(window.location.protocol)) {
     candidates.push(`${window.location.origin}/api`);
   }
+
+  candidates.push('http://localhost:4000/api');
+  candidates.push('http://127.0.0.1:4000/api');
 
   return Array.from(new Set(candidates.map(normalizeBaseUrl).filter(Boolean)));
 }

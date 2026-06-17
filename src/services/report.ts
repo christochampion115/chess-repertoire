@@ -7,6 +7,9 @@ function normalizeBaseUrl(url: string): string {
 function buildApiBase(): string {
   const configured = normalizeBaseUrl((window as Record<string, string>).ALPHA_CHESS_API_URL ?? '');
   if (configured) return configured;
+  if (window.location && /^https?:$/.test(window.location.protocol)) {
+    return `${window.location.origin}/api`;
+  }
   return 'http://localhost:4000/api';
 }
 
