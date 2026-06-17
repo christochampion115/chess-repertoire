@@ -124,11 +124,8 @@ export function LichessTooltipContent({ fen, uci, stats }: LichessTooltipContent
   const counterMoves = useCountermoves(fen, uci);
   const boardTheme = useBoardTheme();
   const boardFlipped = useBoardFlipped();
-  const chess = useChessStore((s) => s.chess);
-  const sideToMove = chess.turn();
-
-  // flipped en fonction du trait : si c'est aux Noirs de jouer, flipped = true
-  const flipped = sideToMove === 'b' ? !boardFlipped : boardFlipped;
+  const flipped = boardFlipped;
+  console.log('[DEBUG LichessTooltip] boardFlipped:', boardFlipped);
 
   const totalAllMoves = useMemo(() => {
     if (!counterMoves) return 0;
@@ -201,10 +198,8 @@ export function EngineTooltipContent({ uci, san, fen }: EngineTooltipContentProp
   const isEnabled = useAnalysisStore((s) => s.isEnabled);
   const boardTheme = useBoardTheme();
   const boardFlipped = useBoardFlipped();
-  const chess = useChessStore((s) => s.chess);
-  const sideToMove = chess.turn();
-
-  const flipped = sideToMove === 'b' ? !boardFlipped : boardFlipped;
+  const flipped = boardFlipped;
+  console.log('[DEBUG EngineTooltip] boardFlipped:', boardFlipped);
 
   const annotation = annotations[uci];
 
@@ -317,10 +312,8 @@ export function AnalysisMiniBoardTooltip({ fen, uci, san }: AnalysisMiniBoardToo
   const afterFen = useMemo(() => fen ? fenAfterMove(fen, uci) : '', [fen, uci]);
   const boardTheme = useBoardTheme();
   const boardFlipped = useBoardFlipped();
-  const chess = useChessStore((s) => s.chess);
-  const sideToMove = chess.turn();
-
-  const flipped = sideToMove === 'b' ? !boardFlipped : boardFlipped;
+  const flipped = boardFlipped;
+  console.log('[DEBUG AnalysisMiniBoardTooltip] boardFlipped:', boardFlipped);
 
   return (
     <div>

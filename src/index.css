@@ -70,6 +70,15 @@ body {
   display: flex;
   align-items: center;
   gap: 9px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  border-radius: 5px;
+  padding: 2px 4px;
+  margin-left: -4px;
+}
+
+.brand-group:hover {
+  opacity: 0.82;
 }
 
 .brand-logo {
@@ -1646,18 +1655,6 @@ body {
 
 .ctrl-btn.danger:hover {
   background: rgba(251, 113, 133, 0.18);
-}
-
-.ctx-menu {
-  position: fixed;
-  background: var(--menu-bg);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 5px;
-  width: 240px;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3);
-  z-index: 9999;
-  display: none;
-  padding: 8px 0;
 }
 
 .menu-item {
@@ -3564,7 +3561,7 @@ body {
 
 /* ─── Context Menu React ─────────────────────────────────────────────────── */
 .ctx-menu {
-  position: fixed;
+  position: absolute;
   z-index: 10000;
   background: var(--menu-bg);
   border: 1px solid var(--border-strong);

@@ -603,7 +603,18 @@ export function navBack(): void {
   if (!node || !node.parentId) return;
   const newRedo = [...(redoStack ?? []), currentNodeId];
   useRepertoireStore.setState({ currentNodeId: node.parentId, redoStack: newRedo });
-  _updateChessPosition(nodeMap.get(node.parentId)!.fen);
+  const parentFen = nodeMap.get(node.parentId)!.fen;
+  if (node.parentId && node.san) {
+    const parentNode = nodeMap.get(node.parentId);
+    if (parentNode?.fen) {
+      const tmp = new Chess(parentNode.fen);
+      try {
+        const m = tmp.move(node.san);
+        if (m) useChessStore.getState().setPendingAnimation({ fromSq: m.to, toSq: m.from });
+      } catch {}
+    }
+  }
+  _updateChessPosition(parentFen);
 }
 
 export function navForward(): void {
@@ -615,6 +626,16 @@ export function navForward(): void {
   useRepertoireStore.setState({ currentNodeId: nodeId, redoStack: newRedo });
   const node = nodeMap.get(nodeId);
   if (node) {
+    if (node.parentId && node.san) {
+      const parentNode = nodeMap.get(node.parentId);
+      if (parentNode?.fen) {
+        const tmp = new Chess(parentNode.fen);
+        try {
+          const m = tmp.move(node.san);
+          if (m) useChessStore.getState().setPendingAnimation({ fromSq: m.from, toSq: m.to });
+        } catch {}
+      }
+    }
     _updateChessPosition(node.fen);
   }
 }

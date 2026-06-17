@@ -71,8 +71,16 @@ export function buildContextMenu(
   event.preventDefault();
   event.stopPropagation();
 
+  const uiStore = useUiStore.getState();
+  const prevMenu = uiStore.ctxMenu;
+  uiStore.closeCtxMenu();
+  if (
+    prevMenu &&
+    prevMenu.targetId === (target as any)?.id &&
+    prevMenu.source === type
+  ) return;
+
   const repStore = useRepertoireStore.getState();
-  const uiStore  = useUiStore.getState();
 
   const isMoveContext = type === 'stats_move' || type === 'analysis_move';
 
@@ -134,7 +142,7 @@ export function buildContextMenu(
   }
 
   // ---- Annoter (tous les nœuds sauf dossiers et move-context) ----
-  if (!isFolder && !isMoveContext) {
+  if (!isFolder && !isMoveContext && isNotRoot) {
     items.push({
       label: 'Annoter',
       onClick: () => {

@@ -144,6 +144,9 @@ export function useDragPiece() {
       pieceEl: imgEl,
     };
 
+    document.removeEventListener('pointermove', handleMove);
+    document.removeEventListener('pointerup', handleUp);
+    document.removeEventListener('pointercancel', handleCancel);
     document.addEventListener('pointermove', handleMove);
     document.addEventListener('pointerup', handleUp);
     document.addEventListener('pointercancel', handleCancel);

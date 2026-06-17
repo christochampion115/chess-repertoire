@@ -23,6 +23,7 @@ export function StatsTooltip({ x, y, children, onClose, onMouseEnter }: StatsToo
     el.style.left = `${clampedX}px`;
     el.style.top = `${clampedY}px`;
     el.style.maxWidth = `${maxW}px`;
+    el.style.visibility = 'visible';
   }, [x, y]);
 
   return (
@@ -35,6 +36,7 @@ export function StatsTooltip({ x, y, children, onClose, onMouseEnter }: StatsToo
         top: 0,
         zIndex: 10000,
         pointerEvents: 'auto',
+        visibility: 'hidden',
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onClose}
