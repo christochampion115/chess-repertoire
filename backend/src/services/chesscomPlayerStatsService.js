@@ -6,7 +6,7 @@ const CHESS_COM_API = 'https://api.chess.com/pub';
 const GAME_LIMIT             = 10000; // max parties filtrées (garde-fou)
 const ARCHIVE_FETCH_DELAY_MS = 80;    // délai inter-archive pour éviter les 429
 const CACHE_TTL_MS  = 20 * 60 * 1000; // 20 min
-const GAMES_CACHE_MAX  = 30;  // entrées max dans gamesCache (LRU)
+const GAMES_CACHE_MAX  = 5;   // entrées max dans gamesCache (LRU simple)
 const RESULT_CACHE_MAX = 500; // entrées max dans resultCache
 
 // ── HTTP (même pattern que lichessStatsService) ───────────────────────────────
@@ -206,43 +206,7 @@ function aggregateMoves(matches) {
     .sort((a, b) => b.frequency - a.frequency);
 }
 
-function severityRankForItem(item) {
-  if (item.priority >= 5 && item.gap >= 0.10) return 3;
-  if (item.priority >= 2 || item.gap >= 0.08) return 2;
-  return 1;
-}
 
-function compareReportItems(a, b) {
-  return (severityRankForItem(b) - severityRankForItem(a))
-    || (b.priority - a.priority)
-    || (b.gap - a.gap)
-    || (b.total - a.total);
-}
-
-function turnAtDepth(rootTurn, depth) {
-  if (depth % 2 === 0) return rootTurn;
-  return rootTurn === 'w' ? 'b' : 'w';
-}
-
-function isPlayerTurnAtDepth(rootTurn, playerColor, depth) {
-  const turn = turnAtDepth(rootTurn, depth);
-  return (playerColor === 'white' && turn === 'w') || (playerColor === 'black' && turn === 'b');
-}
-
-function getTargetDepth(rootTurn, playerColor, maxDepth) {
-  for (let depth = Math.max(0, maxDepth - 1); depth >= 0; depth--) {
-    if (isPlayerTurnAtDepth(rootTurn, playerColor, depth)) return depth;
-  }
-  return 0;
-}
-
-function countPlayerTurnsThroughDepth(rootTurn, playerColor, depth) {
-  let count = 0;
-  for (let i = 0; i <= depth; i++) {
-    if (isPlayerTurnAtDepth(rootTurn, playerColor, i)) count++;
-  }
-  return count;
-}
 
 // ── Cache deux niveaux (in-memory, session seulement) ─────────────────────────
 // gamesCache  : clé filtres sans FEN → parties filtrées pré-chargées
@@ -254,23 +218,11 @@ function cacheGet(cache, key) {
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.ts > CACHE_TTL_MS) { cache.delete(key); return null; }
-  entry.ts = Date.now(); // LRU : marquer la dernière utilisation
   return entry;
 }
 
 function cacheSet(cache, key, data, maxSize) {
-  if (cache.size >= maxSize) {
-    // Trouver l'entrée la moins récemment utilisée (ts le plus petit)
-    let oldestKey = null;
-    let oldestTs = Infinity;
-    for (const [k, v] of cache) {
-      if (v.ts < oldestTs) {
-        oldestTs = v.ts;
-        oldestKey = k;
-      }
-    }
-    if (oldestKey) cache.delete(oldestKey);
-  }
+  if (cache.size >= maxSize) cache.delete(cache.keys().next().value); // LRU : retire le plus ancien
   cache.set(key, { ...data, ts: Date.now() });
 }
 
@@ -278,57 +230,25 @@ function makeGamesCacheKey(filters) {
   const { playerUsername, playerColor, playerTimeClass = 'all',
           playerDateFrom = '', playerDateTo = '',
           playerEloMin = 0, playerEloMax = 3000 } = filters;
-  const key = [
+  return [
     playerUsername.toLowerCase(), playerColor, playerTimeClass,
     `${playerDateFrom}-${playerDateTo}`, `${playerEloMin}-${playerEloMax}`
   ].join('|');
-  console.log(`[cache] makeGamesCacheKey  user="${playerUsername}" color="${playerColor}" timeClass="${playerTimeClass}" dateFrom="${playerDateFrom}" dateTo="${playerDateTo}" eloMin=${playerEloMin} eloMax=${playerEloMax}  =>  "${key}"`);
-  return key;
 }
 
 // ── Orchestrateur principal ───────────────────────────────────────────────────
 
-// Lock de déduplication : empêche deux téléchargements identiques en parallèle.
-const pendingGamesFetches = new Map();
-
 // Helper partagé : garantit que les parties sont dans gamesCache.
 // Retour instantané si déjà chargées, sinon fetch depuis Chess.com.
-// onProgress({ current, total, gamesInArchive }) appelé après chaque archive téléchargée.
 async function ensureGamesLoaded(filters, onProgress = null) {
   const { playerUsername, playerColor } = filters;
   const gamesCacheKey = makeGamesCacheKey(filters);
-
-  // Cache mémoire
   const cached = cacheGet(gamesCache, gamesCacheKey);
   if (cached) {
-    console.log(`[cache] HIT  gamesCache  ${gamesCacheKey}`);
+    if (onProgress) onProgress({ current: 1, total: 1, gamesInArchive: cached.totalGames ?? 0 });
     return cached;
   }
 
-  // Déduplication : si un téléchargement est déjà en cours pour ces mêmes filtres, attendre
-  const existing = pendingGamesFetches.get(gamesCacheKey);
-  if (existing) {
-    console.log(`[cache] WAIT gamesCache  ${gamesCacheKey}  (rejoint un téléchargement en cours)`);
-    return existing;
-  }
-
-  console.log(`[cache] MISS gamesCache  ${gamesCacheKey}  → téléchargement`);
-  console.time(`fetchAllGames:${gamesCacheKey}`);
-  const promise = fetchAllGames(filters, onProgress, playerUsername, playerColor);
-  pendingGamesFetches.set(gamesCacheKey, promise);
-
-  try {
-    const result = await promise;
-    console.timeEnd(`fetchAllGames:${gamesCacheKey}`);
-    cacheSet(gamesCache, gamesCacheKey, result, GAMES_CACHE_MAX);
-    return result;
-  } finally {
-    pendingGamesFetches.delete(gamesCacheKey);
-  }
-}
-
-// Cœur du téléchargement : séquence archives → filtrage → parsing.
-async function fetchAllGames(filters, onProgress, playerUsername, playerColor) {
   const archives = await getPlayerArchives(playerUsername);
   const toFetch  = filterArchiveUrls(
     archives,
@@ -348,7 +268,7 @@ async function fetchAllGames(filters, onProgress, playerUsername, playerColor) {
     const monthGames = await fetchMonthlyGames(archiveUrl);
     await new Promise(r => setTimeout(r, ARCHIVE_FETCH_DELAY_MS)); // respire entre archives
     const valid = filterGames(monthGames, filters);
-    if (onProgress) { onProgress({ current: archiveIdx, total: toFetch.length, gamesInArchive: valid.length, cumulative: totalFiltered + valid.length }); }
+    if (onProgress) onProgress({ current: archiveIdx, total: toFetch.length, gamesInArchive: valid.length });
     for (const g of valid) {
       if (totalFiltered >= GAME_LIMIT) { truncated = true; break; }
       totalFiltered++;
@@ -364,12 +284,13 @@ async function fetchAllGames(filters, onProgress, playerUsername, playerColor) {
 
   // totalFiltered = parties qui ont passé les filtres (couleur/cadence/elo)
   // parsedGames.length peut être inférieur : parties sans PGN ou parsing échoué
-  return { parsedGames, totalGames: totalFiltered, truncated };
+  const gamesData = { parsedGames, totalGames: totalFiltered, truncated };
+  cacheSet(gamesCache, gamesCacheKey, gamesData, GAMES_CACHE_MAX);
+  return gamesData;
 }
 
 // Requête simple : stats pour un seul FEN.
-// onProgress propagé à ensureGamesLoaded pour le suivi des archives.
-async function getChesscomPlayerStats(fen, filters, onProgress = null) {
+async function getChesscomPlayerStats(fen, filters) {
   const { playerUsername, playerColor } = filters;
   if (!playerUsername || !playerColor) {
     throw Object.assign(new Error('username et color requis'), { status: 400 });
@@ -379,12 +300,9 @@ async function getChesscomPlayerStats(fen, filters, onProgress = null) {
   const gamesCacheKey  = makeGamesCacheKey(filters);
   const resultCacheKey = `${gamesCacheKey}|${targetFenNorm}`;
 
-  console.log(`[cache] getChesscomPlayerStats  fen="${fen}"  targetFenNorm="${targetFenNorm}"  resultCacheKey="${resultCacheKey}"`);
-
   // Niveau 2 : résultat déjà calculé pour ce FEN exact
   const cachedResult = cacheGet(resultCache, resultCacheKey);
   if (cachedResult) {
-    console.log(`[cache] HIT  resultCache  ${resultCacheKey}`);
     return {
       moves: cachedResult.moves,
       totalGames: cachedResult.totalGames,
@@ -394,10 +312,8 @@ async function getChesscomPlayerStats(fen, filters, onProgress = null) {
     };
   }
 
-  console.log(`[cache] MISS resultCache  ${resultCacheKey}  → scan mémoire`);
-  console.time(`scan:${targetFenNorm}`);
   // Niveau 1 + fetch si besoin
-  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters, onProgress);
+  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters);
 
   // Scan mémoire uniquement — aucun appel chess.js
   const matches = [];
@@ -405,9 +321,6 @@ async function getChesscomPlayerStats(fen, filters, onProgress = null) {
     const pos = pg.positions.find(p => p.fenNorm === targetFenNorm);
     if (pos) matches.push({ san: pos.san, uci: pos.uci, result: pg.result, oppRating: pg.opponentElo });
   }
-
-  console.timeEnd(`scan:${targetFenNorm}`);
-  console.log(`[cache] scan  ${targetFenNorm}  → ${matches.length} match(es) sur ${parsedGames.length} parties`);
 
   const moves   = aggregateMoves(matches);
   const message = truncated
@@ -420,7 +333,7 @@ async function getChesscomPlayerStats(fen, filters, onProgress = null) {
 
 // Requête batch : traite un tableau de FENs en une seule passe mémoire.
 // Les parties sont attendues déjà en cache (appelé après getChesscomPlayerStats).
-async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
+async function getChesscomPlayerStatsBatch(fens, filters) {
   const { playerUsername, playerColor } = filters;
   if (!playerUsername || !playerColor) {
     throw Object.assign(new Error('username et color requis'), { status: 400 });
@@ -428,30 +341,19 @@ async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
   if (!Array.isArray(fens) || fens.length === 0) return {};
 
   const gamesCacheKey                          = makeGamesCacheKey(filters);
-  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters, onProgress);
+  const { parsedGames, totalGames, truncated } = await ensureGamesLoaded(filters);
   const message = truncated
     ? `Analyse limitée à ${GAME_LIMIT} parties. Affinez la période ou la cadence pour plus de précision.`
     : '';
 
-  const results      = {};
-  const totalFens    = fens.length;
-  let processedCount = 0;
-
-  for (let i = 0; i < totalFens; i++) {
-    // Céder l'event-loop toutes les 50 FENs pour ne pas bloquer les autres requêtes
-    if (i > 0 && i % 50 === 0) {
-      await new Promise(resolve => setImmediate(resolve));
-      if (onProgress) onProgress({ current: i, total: totalFens });
-    }
-
-    const fen = fens[i];
+  const results = {};
+  for (const fen of fens) {
     const fenNorm        = normalizeFen(fen);
     const resultCacheKey = `${gamesCacheKey}|${fenNorm}`;
 
     const cached = cacheGet(resultCache, resultCacheKey);
     if (cached) {
       results[fen] = { moves: cached.moves, totalGames: cached.totalGames, truncated: cached.truncated, fallback: false, message: cached.message };
-      processedCount++;
       continue;
     }
 
@@ -463,23 +365,17 @@ async function getChesscomPlayerStatsBatch(fens, filters, onProgress = null) {
     const moves = aggregateMoves(matches);
     cacheSet(resultCache, resultCacheKey, { moves, totalGames, truncated, message }, RESULT_CACHE_MAX);
     results[fen] = { moves, totalGames, truncated: truncated || false, fallback: false, message };
-    processedCount++;
   }
-
-  console.log(`[batch] ${processedCount}/${totalFens} FENs scannés — ${Object.keys(results).length} résultats`);
   return results;
 }
 
-// ── Rapport de priorités d'entraînement ──────────────────────────────────────
-// Analyse toutes les parties et retourne un classement des coups/lignes
-// selon leur impact sur le résultat global (formule bayésienne ajustée).
-async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {}, onProgress = null)  {
+// ── Rapport de priorités d'entraînement (simplifié) ─────────────────────────
+// Charge toutes les parties → positionMap → items (tous les coups joueur) →
+// groupe par depth=5 (3e coup joueur) → top 5-10 groupes → enfants critiques.
+async function getChesscomReport(filters, { minFreq = 3 } = {}, onProgress = null)  {
   const { playerColor, playerStartFen = '' } = filters;
 
   const { parsedGames, totalGames: filteredGames, truncated } = await ensureGamesLoaded(filters, onProgress);
-  if (!parsedGames.length) {
-    return { totalGames: 0, parsedGames: 0, filteredGames: 0, baselineScore: 0, items: [], truncated: false };
-  }
 
   // ── Phase 1 : construction de la carte des positions ──────────────────────
   // positionMap[fenNorm] = {
@@ -495,16 +391,23 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {}, o
   );
   const rootFenNorm = playerStartFen ? normalizeFen(playerStartFen) : INITIAL_FEN_NORM;
   const rootTurn = rootFenNorm.split(' ')[1] || 'w';
-  const targetDepth = getTargetDepth(rootTurn, playerColor, maxDepth);
+  const MAX_DEPTH = 10;
   let scopedGames = 0;
-  let processedGames = 0;
-  const totalGamesForProgress = parsedGames.length;
+
+  if (!parsedGames.length) {
+    return {
+      totalGames: 0,
+      parsedGames: 0,
+      filteredGames,
+      truncated: truncated || false,
+      baselineScore: 0,
+      items: [],
+      rootFen: rootFenNorm,
+      positionFiltered: !!playerStartFen,
+    };
+  }
 
   for (const { positions, result } of parsedGames) {
-    processedGames++;
-    if (onProgress && (processedGames % 50 === 0 || processedGames === totalGamesForProgress)) {
-      onProgress({ phase: 'position-map', positions: processedGames });
-    }
     const rootIndex = rootFenNorm === INITIAL_FEN_NORM
       ? 0
       : positions.findIndex(position => position.fenNorm === rootFenNorm);
@@ -519,13 +422,13 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {}, o
     else if (result !== '1-0' && result !== '0-1')        { gameDraw = true; totalScore += 0.5; }
 
     const seenFens = new Set();
-    for (let relDepth = 0; (rootIndex + relDepth) < positions.length && relDepth < maxDepth; relDepth++) {
+    for (let relDepth = 0; (rootIndex + relDepth) < positions.length && relDepth < MAX_DEPTH; relDepth++) {
       const current = positions[rootIndex + relDepth];
       const next = positions[rootIndex + relDepth + 1] || null;
       const { fenNorm, san, uci } = current;
       const fenAfterNorm = next ? next.fenNorm : null;
 
-      if (seenFens.has(fenNorm)) continue; // transposition : ignore dans cette partie
+      if (seenFens.has(fenNorm)) continue;
       seenFens.add(fenNorm);
 
       if (!positionMap.has(fenNorm)) {
@@ -555,8 +458,6 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {}, o
       truncated: truncated || false,
       baselineScore: 0,
       items: [],
-      focusDepth: targetDepth,
-      focusMoveNumber: countPlayerTurnsThroughDepth(rootTurn, playerColor, targetDepth),
       rootFen: rootFenNorm,
       positionFiltered: !!playerStartFen,
     };
@@ -564,138 +465,180 @@ async function getChesscomReport(filters, { maxDepth = 10, minFreq = 3 } = {}, o
 
   const baselineScore = totalScore / scopedGames;
 
-  // ── Phase 2 : BFS + scoring de priorité ──────────────────────────────────
-  const MIN_RATIO = 0.04; // une variante doit représenter >= 4 % du nœud parent
+  // ── Phase 2 : BFS — collecte des coups joueur à toutes les profondeurs ──
+  // Chaque item = un coup du joueur depuis une position donnée.
+  // gap signé = baselineScore - score (négatif = mieux que la moyenne).
+  // impactElo  = 100 × freq × (16 × score − 8)
+  //   score=0.5 (50%) → 0 (neutre), score > 0.5 → impactElo > 0 (bon),
+  //   score < 0.5 → impactElo < 0 (perte d'Elo sur 100 parties).
   const reportItems = [];
   const visited     = new Set();
 
-  const queue = [{ fenNorm: rootFenNorm, path: [], depth: 0, parentTotal: scopedGames }];
-  let lastReportedDepth = 0;
+  const queue = [{ fenNorm: rootFenNorm, path: [], depth: 0 }];
 
   while (queue.length > 0) {
-    const { fenNorm, path, depth, parentTotal } = queue.shift();
-    if (depth > lastReportedDepth) {
-      lastReportedDepth = depth;
-      if (onProgress) onProgress({ phase: 'scoring', depth, maxDepth });
-    }
+    const { fenNorm, path, depth } = queue.shift();
 
     if (visited.has(fenNorm)) continue;
     visited.add(fenNorm);
 
-    if (depth >= maxDepth) continue;
+    if (depth >= MAX_DEPTH) continue;
 
     const pos = positionMap.get(fenNorm);
-    if (!pos)                                        continue;
-    if (pos.total < minFreq)                         continue;
-    if (depth > 0 && pos.total < parentTotal * MIN_RATIO) continue;
+    if (!pos)                  continue;
+    if (pos.total < minFreq)   continue;
 
-    const colorToMove  = fenNorm.split(' ')[1]; // 'w' ou 'b'
+    const colorToMove  = fenNorm.split(' ')[1];
     const isPlayerTurn = (playerColor === 'white' && colorToMove === 'w') ||
                          (playerColor === 'black' && colorToMove === 'b');
 
     for (const [san, mv] of pos.moves) {
-      if (mv.total < minFreq)                         continue;
-      if (mv.total < pos.total * MIN_RATIO)           continue;
+      if (mv.total < minFreq) continue;
 
-      if (isPlayerTurn && depth >= 1 && depth <= targetDepth) {
-        const score          = (mv.wins + 0.5 * mv.draws) / mv.total;
-        const gap            = parseFloat((baselineScore - score).toFixed(3));
-        const confidence     = Math.min(1, mv.total / minFreq);
-        const priority       = mv.total * gap * confidence;
-        const lossesAvoided  = parseFloat(((mv.wins - mv.losses) * 8 * (mv.total / scopedGames)).toFixed(1));
-        const moveNumber     = Math.floor(depth / 2) + 1;
+      if (isPlayerTurn && depth >= 1) {
+        const score     = (mv.wins + 0.5 * mv.draws) / mv.total;
+        const gap       = baselineScore - score; // signé (négatif = meilleur)
+        const impactElo = 100 * (mv.total / scopedGames) * (16 * score - 8);
+        const moveNumber = Math.floor(depth / 2) + 1;
 
         reportItems.push({
-          contextPath  : [...path],
-          playerMove   : san,
-          playerUci    : mv.uci,
-          fenBefore    : fenNorm,
-          fenAfter     : mv.fenAfterNorm,
+          contextPath: [...path],
+          playerMove: san,
+          playerUci: mv.uci,
+          fenBefore: fenNorm,
+          fenAfter: mv.fenAfterNorm,
           depth,
           moveNumber,
-          total        : mv.total,
-          wins         : mv.wins,
-          draws        : mv.draws,
-          losses       : mv.losses,
-          score        : parseFloat(score.toFixed(3)),
-          gap          : parseFloat(gap.toFixed(3)),
-          priority     : parseFloat(priority.toFixed(2)),
-          lossesAvoided,
-          posTotal     : pos.total,
-          targetDepth,
+          total: mv.total,
+          wins: mv.wins,
+          draws: mv.draws,
+          losses: mv.losses,
+          score: parseFloat(score.toFixed(3)),
+          gap: parseFloat(gap.toFixed(3)),
+          impactElo: parseFloat(impactElo.toFixed(2)),
+          posTotal: pos.total,
         });
       }
 
-      // Continuer l'exploration dans tous les cas (y compris tour adversaire)
       if (mv.fenAfterNorm && !visited.has(mv.fenAfterNorm)) {
         queue.push({
-          fenNorm    : mv.fenAfterNorm,
-          path       : [...path, san],
-          depth      : depth + 1,
-          parentTotal: mv.total,
+          fenNorm: mv.fenAfterNorm,
+          path: [...path, san],
+          depth: depth + 1,
         });
       }
     }
   }
 
-  reportItems.sort(compareReportItems);
+  // Tri global par impactElo (pire → meilleur)
+  reportItems.sort((a, b) => a.impactElo - b.impactElo);
 
-  // ── Phase 3 : déduplication par profondeur ────────────────────────────────
-  // On préfère les items profonds (lignes spécifiques) aux items peu profonds
-  // (parents) quand ils font partie de la même ligne.
-  // Les items positifs (gap > 0) et négatifs (gap < 0) sont dédupliqués
-  // séparément pour éviter qu'une mauvaise sous-ligne n'efface une bonne ligne parente.
+  // ── Phase 3 : Groupement (free mode) ou plat (position mode) ────────────
+  if (!playerStartFen) {
+    // Grouper par depth du 3e coup joueur
+    const targetLength = playerColor === 'white' ? 4 : 5;
+    const groupsByFen = new Map(); // fenBefore → aggregate
 
-  // Vérifie si `longer` commence par `shorter` (comparaison de tableaux de SAN).
-  function pathStartsWith(longer, shorter) {
-    if (longer.length <= shorter.length) return false;
-    for (let i = 0; i < shorter.length; i++) {
-      if (longer[i] !== shorter[i]) return false;
-    }
-    return true;
-  }
-
-  function deduplicateGroup(items) {
-    const sorted = items.slice().sort((a, b) =>
-      (b.depth - a.depth) || compareReportItems(a, b)
-    );
-    const result = [];
-    const selectedPaths = [];
-    for (const item of sorted) {
-      const itemPath = [...item.contextPath, item.playerMove];
-      const dominated = selectedPaths.some(sel => pathStartsWith(sel, itemPath));
-      if (!dominated) {
-        result.push(item);
-        selectedPaths.push(itemPath);
+    for (const item of reportItems) {
+      if (item.contextPath.length !== targetLength) continue;
+      const fen = item.fenBefore || item.fenAfter;
+      if (!groupsByFen.has(fen)) {
+        groupsByFen.set(fen, {
+          key: [...item.contextPath, item.playerMove].join(' '),
+          total: 0, wins: 0, draws: 0, losses: 0,
+          contextPath: item.contextPath,
+          playerMove: item.playerMove,
+          fen,
+        });
       }
-      if (result.length >= 200) break;
+      const g = groupsByFen.get(fen);
+      g.total  += item.total;
+      g.wins   += item.wins;
+      g.draws  += item.draws;
+      g.losses += item.losses;
     }
-    return result;
+
+    const groups = Array.from(groupsByFen.values()).map(g => {
+      const score = g.total > 0 ? (g.wins + 0.5 * g.draws) / g.total : 0;
+      const gap   = baselineScore - score;
+      const impactElo = 100 * (g.total / scopedGames) * (16 * score - 8);
+      return {
+        key: g.key,
+        children: [],
+        total: g.total,
+        wins: g.wins,
+        draws: g.draws,
+        losses: g.losses,
+        impactElo: parseFloat(impactElo.toFixed(2)),
+        fen: g.fen,
+        groupScore: parseFloat(score.toFixed(3)),
+        groupGap: parseFloat(gap.toFixed(3)),
+        problematicLines: [],
+        compensatingLines: [],
+      };
+    });
+
+    groups.sort((a, b) => a.impactElo - b.impactElo);
+
+    // Au moins 5, au max 10
+    const count = Math.min(10, Math.max(5, groups.length));
+    const selected = groups.slice(0, count);
+
+    // Enfants critiques pour chaque groupe
+    const selectedKeys = new Set(selected.map(g => g.key));
+    for (const group of selected) {
+      const children = reportItems.filter(item => {
+        const itemKey = [...item.contextPath, item.playerMove].join(' ');
+        return itemKey.startsWith(group.key + ' ') && itemKey !== group.key;
+      });
+      group.children = children;
+      group.problematicLines = children
+        .filter(c => c.impactElo < 0)
+        .sort((a, b) => a.impactElo - b.impactElo);
+      group.compensatingLines = children
+        .filter(c => c.impactElo >= 0)
+        .sort((a, b) => b.impactElo - a.impactElo);
+    }
+
+    // Mentions honorables : lignes orphelines hors des groupes retenus
+    const coveredKeys = new Set(selectedKeys);
+    for (const g of selected) {
+      for (const c of g.children) {
+        coveredKeys.add([...c.contextPath, c.playerMove].join(' '));
+      }
+    }
+    const honorables = reportItems
+      .filter(item => {
+        const itemKey = [...item.contextPath, item.playerMove].join(' ');
+        return !coveredKeys.has(itemKey) && item.contextPath.length !== targetLength;
+      })
+      .sort((a, b) => a.impactElo - b.impactElo)
+      .slice(0, 5);
+
+    return {
+      totalGames: scopedGames,
+      parsedGames: scopedGames,
+      filteredGames,
+      truncated: truncated || false,
+      baselineScore: parseFloat(baselineScore.toFixed(3)),
+      rootFen: rootFenNorm,
+      positionFiltered: false,
+      items: reportItems.slice(0, 500),
+      groups: selected,
+      honorables,
+    };
   }
 
-  const dedupBad  = deduplicateGroup(reportItems.filter(i => i.gap >  0));
-  const dedupGood = deduplicateGroup(reportItems.filter(i => i.gap <= 0));
-  const finalItems = [...dedupBad, ...dedupGood];
-
-  // Remettre dans l'ordre priorité pour l'affichage
-  finalItems.sort(compareReportItems);
-
-  if (onProgress) onProgress({ phase: 'complete' });
-
-  const notEnoughData = finalItems.filter(i => i.gap > 0.01).length < 10;
-
+  // ── Mode position : plat, pas de groupement ──
   return {
-    totalGames   : scopedGames,
-    parsedGames  : scopedGames,
+    totalGames: scopedGames,
+    parsedGames: scopedGames,
     filteredGames,
-    truncated    : truncated || false,
+    truncated: truncated || false,
     baselineScore: parseFloat(baselineScore.toFixed(3)),
-    focusDepth   : targetDepth,
-    focusMoveNumber: countPlayerTurnsThroughDepth(rootTurn, playerColor, targetDepth),
-    rootFen      : rootFenNorm,
-    positionFiltered: !!playerStartFen,
-    notEnoughData,
-    items        : finalItems.slice(0, 200),
+    rootFen: rootFenNorm,
+    positionFiltered: true,
+    items: reportItems.slice(0, 500),
   };
 }
 

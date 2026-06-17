@@ -163,9 +163,7 @@ router.get('/report', async (req, res) => {
   const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0, Math.min(3000, eloMinRaw)) : 0;
   const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0, Math.min(3000, eloMaxRaw)) : 3000;
 
-  const maxDepthRaw = Number.parseInt(req.query.maxDepth, 10);
   const minFreqRaw  = Number.parseInt(req.query.minFreq,  10);
-  const maxDepth    = Number.isFinite(maxDepthRaw) ? Math.max(4, Math.min(14, maxDepthRaw)) : 10;
   const minFreq     = Number.isFinite(minFreqRaw)  ? Math.max(2, Math.min(30, minFreqRaw))  : 5;
 
   try {
@@ -180,7 +178,7 @@ router.get('/report', async (req, res) => {
         playerEloMax,
         playerStartFen: startFen,
       },
-      { maxDepth, minFreq }
+      { minFreq }
     );
     res.json(report);
   } catch (error) {
@@ -208,9 +206,7 @@ router.get('/report/stream', async (req, res) => {
   const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0, Math.min(3000, eloMinRaw)) : 0;
   const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0, Math.min(3000, eloMaxRaw)) : 3000;
 
-  const maxDepthRaw = Number.parseInt(req.query.maxDepth, 10);
   const minFreqRaw  = Number.parseInt(req.query.minFreq,  10);
-  const maxDepth    = Number.isFinite(maxDepthRaw) ? Math.max(4, Math.min(14, maxDepthRaw)) : 10;
   const minFreq     = Number.isFinite(minFreqRaw)  ? Math.max(2, Math.min(30, minFreqRaw))  : 5;
 
   res.writeHead(200, {
@@ -237,11 +233,8 @@ router.get('/report/stream', async (req, res) => {
         playerEloMax,
         playerStartFen: startFen,
       },
-      { maxDepth, minFreq },
-      (progress) => {
-        const evtType = progress.phase ? 'phase' : 'archive';
-        safeWrite(`data: ${JSON.stringify({ type: evtType, ...progress })}\n\n`);
-      }
+      { minFreq },
+      (progress) => safeWrite(`data: ${JSON.stringify({ type: 'archive', ...progress })}\n\n`)
     );
     safeWrite(`data: ${JSON.stringify({ type: 'complete', data: report })}\n\n`);
   } catch (error) {
