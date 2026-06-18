@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Chess } from 'chess.js';
 import { Monitor } from '@/components/monitor/Monitor';
 import { AnalysisPanel } from '@/components/analysis/AnalysisPanel';
@@ -14,7 +14,7 @@ import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useStatsStore } from '@/stores/statsStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import * as repertoireService from '@/services/repertoire';
-import { buildContextMenu } from '@/services/contextMenu';
+import { nodeMap, getVariantPath } from '@/services/repertoire';
 
 function uciLineToSan(fen: string, uciLine: string): { bestMoveSan: string; pvSan: string } {
   const ucis = uciLine.split(/\s+/).filter(Boolean);
@@ -55,39 +55,45 @@ export const RightPanel = React.memo(function RightPanel() {
   const [showSettings, setShowSettings] = useState(false);
   const trainingPhase  = useTrainingStore((s) => s.phase);
   const trainingMode   = useTrainingStore((s) => s.mode);
+  const trainingRoot   = useTrainingStore((s) => s.root);
   const isTraining = trainingPhase !== 'idle';
   const isSurvival = isTraining && trainingMode === 'survival';
+  const currentNodeId  = useRepertoireStore((s) => s.currentNodeId);
 
-  const monitorTitle = activeRepIndex >= 0
-    ? (repertoires[activeRepIndex]?.name ?? 'Répertoire')
-    : 'Jeu Libre';
+  const monitorInfo = useMemo(() => {
+    if (activeRepIndex < 0 || !repertoires[activeRepIndex]) {
+      return { repName: 'Jeu Libre', varPath: [] as string[] };
+    }
+    if (isTraining && trainingRoot) {
+      return getVariantPath(trainingRoot);
+    }
+    if (currentNodeId) {
+      const node = nodeMap.get(currentNodeId);
+      if (node) return getVariantPath(node);
+    }
+    return { repName: repertoires[activeRepIndex]?.name ?? 'Répertoire', varPath: [] as string[] };
+  }, [activeRepIndex, repertoires, isTraining, trainingRoot, currentNodeId]);
 
   return (
     <>
     <div className="game-monitor" id="monitor-box">
 
-        {/* ── Burger menu (masqué pendant l'entraînement) ── */}
-        {!isTraining && (
-        <div
-          className="monitor-menu-trigger"
-          id="monitor-menu-trigger"
-          onClick={(e) => buildContextMenu(e, 'monitor')}
-        >
-          <div className="burger-bar" />
-          <div className="burger-bar" />
-          <div className="burger-bar" />
-        </div>
-        )}
-
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="monitor-header">
           <div>
-            <div className="monitor-title" id="mon-title">{monitorTitle}</div>
+            <div className="monitor-title" id="mon-title">
+              <span className="monitor-title-name">{monitorInfo.repName}</span>
+              {monitorInfo.varPath.length > 0 && (
+                <div className="monitor-title-vars">
+                  {monitorInfo.varPath.join(', ')}
+                </div>
+              )}
+            </div>
           </div>
           {!isTraining && (activeRepIndex >= 0 ? (
-            <button className="btn-free-play" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>JEU LIBRE</button>
+            <button className="btn-switch-freeplay" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>Passer en jeu libre</button>
           ) : (
-            <button className="btn-create-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>CRÉER RÉP.</button>
+            <button className="btn-open-new-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
           ))}
         </div>
 

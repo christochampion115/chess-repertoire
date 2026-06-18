@@ -6,6 +6,7 @@ import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { BoardThemeModal } from './BoardThemeModal';
 import { RenameFolderModal } from './RenameFolderModal';
 import { FolderGroupModal } from './FolderGroupModal';
+import { HomeTrainingModal } from './HomeTrainingModal';
 import { TrainingConfirmModal } from './TrainingConfirmModal';
 import { TrainingInterruptModal } from './TrainingInterruptModal';
 import { TrainingStopModal } from './TrainingStopModal';
@@ -28,6 +29,7 @@ const modalComponents: Record<string, React.FC> = {
   'board-theme': BoardThemeModal,
   'rename-folder': RenameFolderModal,
   'folder-group': FolderGroupModal,
+  'home-training': HomeTrainingModal,
   'training-confirm': TrainingConfirmModal,
   'training-interrupt': TrainingInterruptModal,
   'training-stop': TrainingStopModal,

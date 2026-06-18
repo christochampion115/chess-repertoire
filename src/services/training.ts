@@ -420,8 +420,6 @@ export function confirmTrainingStart(): void {
   navigateToNodeFen(node);
   useRepertoireStore.setState({ redoStack: [] });
   useChessStore.setState({ boardFlipped: repColor === 'b' });
-  useUiStore.getState().closeModal();
-
   if (mode === 'express' || mode === 'randomizer') {
     showNextTrainingTarget();
     return;
