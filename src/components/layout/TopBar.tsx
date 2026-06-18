@@ -18,33 +18,31 @@ const NAV_TABS = [
  */
 export const TopBar = React.memo(function TopBar() {
   const user      = useAuthStore((s) => s.user);
-  const logout    = useAuthStore((s) => s.logout);
   const openModal = useUiStore((s) => s.openModal);
   const navigate  = useNavigate();
-  const guardActiveOperation = useCallback((title: string, message: string, onConfirm: () => void) => {
-    const reportView = useReportStore.getState().view;
-    if (reportView === 'loading') {
-      openModal({
-        type: 'training-interrupt',
-        title,
-        message,
-        onConfirm: () => {
-          useReportStore.getState().cancelReport();
-          onConfirm();
-        },
-      });
-    } else {
-      guardTrainingInterruption(title, message, onConfirm);
-    }
-  }, [openModal]);
-
   const goHome  = useCallback(() => {
+    const reportView = useReportStore.getState().view;
+    const guardActiveOperation = (title: string, message: string, onConfirm: () => void) => {
+      if (reportView === 'loading') {
+        openModal({
+          type: 'training-interrupt',
+          title,
+          message,
+          onConfirm: () => {
+            useReportStore.getState().cancelReport();
+            onConfirm();
+          },
+        });
+      } else {
+        guardTrainingInterruption(title, message, onConfirm);
+      }
+    };
     guardActiveOperation(
       'Retour à l\'accueil',
       'Un entraînement ou un rapport est en cours. Voulez-vous l\'interrompre ?',
       () => navigate('/')
     );
-  }, [navigate, guardActiveOperation]);
+  }, [navigate, openModal]);
 
   return (
     <header className="top-bar">
@@ -77,7 +75,7 @@ export const TopBar = React.memo(function TopBar() {
         <button className="top-action">Contact</button>
         <button className="top-action">Abonnement</button>
 
-        <div className="top-account" style={{ cursor: 'pointer' }}>
+        <div className="top-account" style={{ cursor: 'pointer' }} onClick={() => user && openModal({ type: 'profile' })}>
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <div className="account-avatar">
@@ -85,9 +83,7 @@ export const TopBar = React.memo(function TopBar() {
               </div>
               <div className="account-details">
                 <div className="account-name">{user.username}</div>
-                <div className="account-status" style={{ cursor: 'pointer' }} onClick={() => guardActiveOperation('Déconnexion', 'Un entraînement ou un rapport est en cours. Voulez-vous l\'interrompre ?', () => logout())}>
-                  Déconnexion
-                </div>
+                <div className="account-status">Connecté</div>
               </div>
             </div>
           ) : (

@@ -35,6 +35,16 @@ interface CandidateMove {
   san?: string;
 }
 
+function getCompareKey(type: string, target: RepertoireNode | CandidateMove | null, folderId?: string): string {
+  if (type === 'stats_move' || type === 'analysis_move')
+    return `${type}:${(target as CandidateMove)?.uci ?? ''}`;
+  if (type === 'repertoire_folder' || type === 'variant_folder')
+    return `${type}:${folderId ?? ''}`;
+  if (type === 'board' || type === 'monitor')
+    return type;
+  return `${type}:${(target as RepertoireNode)?.id ?? ''}`;
+}
+
 function _isTopLevelVariant(nodeId: string): boolean {
   const { repertoires } = useRepertoireStore.getState();
   let current = nodeMap.get(nodeId);
@@ -72,13 +82,10 @@ export function buildContextMenu(
   event.stopPropagation();
 
   const uiStore = useUiStore.getState();
+  const compareKey = getCompareKey(type, target, folderId);
   const prevMenu = uiStore.ctxMenu;
   uiStore.closeCtxMenu();
-  if (
-    prevMenu &&
-    prevMenu.targetId === (target as any)?.id &&
-    prevMenu.source === type
-  ) return;
+  if (prevMenu && prevMenu.compareKey === compareKey && prevMenu.source === type) return;
 
   const repStore = useRepertoireStore.getState();
 
@@ -91,6 +98,7 @@ export function buildContextMenu(
   repStore.setMenuTargetId(menuTarget?.id ?? null);
   repStore.setDeleteTarget(index, type);
 
+  const isFreePlay = repStore.activeRepIndex === -1;
   const isRepRoot  = type === 'repertoire_item';
   const isRepSub   = type === 'repertoire_subitem';
   const isRepFld   = type === 'repertoire_folder';
@@ -126,6 +134,7 @@ export function buildContextMenu(
       items,
       targetId: menuTarget?.id,
       source: type,
+      compareKey,
     });
     return;
   }
@@ -163,15 +172,25 @@ export function buildContextMenu(
     });
   }
 
-  // ---- Nommer / Renommer la variante (node, not root) ----
+  // ---- Créer répertoire (free play) / Nommer variante (repertoire) ----
   if (isNode && isNotRoot && !isMoveContext) {
-    items.push({
-      label: menuTarget?.varName ? 'Renommer la variante' : 'Nommer la variante',
-      onClick: () => {
-        uiStore.closeCtxMenu();
-        uiStore.openModal({ type: 'name-variant', nodeId: menuTarget?.id ?? '' });
-      },
-    });
+    if (isFreePlay) {
+      items.push({
+        label: 'Créer un répertoire',
+        onClick: () => {
+          uiStore.closeCtxMenu();
+          uiStore.openModal({ type: 'new-repertoire' });
+        },
+      });
+    } else {
+      items.push({
+        label: menuTarget?.varName ? 'Renommer la variante' : 'Nommer la variante',
+        onClick: () => {
+          uiStore.closeCtxMenu();
+          uiStore.openModal({ type: 'name-variant', nodeId: menuTarget?.id ?? '' });
+        },
+      });
+    }
   }
 
   // ---- Folder ops : rep (always) / subitem (top-level only) ----
@@ -242,6 +261,19 @@ export function buildContextMenu(
     });
   }
 
+  // ---- Fallback free play : si aucun item mais mode libre, proposer répertoire ----
+  if (items.length === 0 && isFreePlay) {
+    items.push({
+      label: 'Créer un répertoire',
+      onClick: () => {
+        uiStore.closeCtxMenu();
+        uiStore.openModal({ type: 'new-repertoire' });
+      },
+    });
+  }
+
+  if (items.length === 0) return;
+
   uiStore.openCtxMenu({
     x: (event as MouseEvent).clientX,
     y: (event as MouseEvent).clientY,
@@ -250,6 +282,7 @@ export function buildContextMenu(
     targetNode: menuTarget ?? undefined,
     source: type,
     contextMenuMove: isMoveContext ? (target ?? undefined) : undefined,
+    compareKey,
   });
 
   if (index !== -1) {

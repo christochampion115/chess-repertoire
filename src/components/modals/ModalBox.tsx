@@ -38,7 +38,15 @@ export function ModalBox({ title, children, onClose, width, id }: ModalBoxProps)
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3>{title}</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ marginBottom: 0 }}>{title}</h3>
+          <button
+            onClick={handleClose}
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.3rem', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.7 }}
+          >
+            ×
+          </button>
+        </div>
         <div className="modal-body">
           {children}
         </div>

@@ -76,25 +76,31 @@ export function AuthModal() {
         {error && <div style={{ color: '#fb7185', fontSize: '0.85rem' }}>{error}</div>}
       </div>
       <div className="modal-actions">
-        <button className="ctrl-btn" onClick={closeModal}>Annuler</button>
         <button
           className="ctrl-btn ctrl-btn--primary"
           disabled={isSubmitting}
           onClick={handleSubmit}
+          style={mode === 'login' ? { marginLeft: 'auto' } : undefined}
         >
           {isSubmitting
             ? (mode === 'login' ? 'Connexion...' : 'Création...')
             : (mode === 'login' ? 'Se connecter' : 'Créer le compte')}
         </button>
       </div>
-      <div style={{ marginTop: 12, textAlign: 'center' }}>
-        <button
-          className="ctrl-btn"
-          style={{ fontSize: '0.8rem' }}
-          onClick={switchMode}
-        >
-          {mode === 'login' ? 'Créer un compte' : 'Déjà un compte ? Se connecter'}
-        </button>
+      <div style={{ marginTop: 12, textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+        {mode === 'login' ? (
+          <>Pas encore de compte ?{' '}
+            <span onClick={switchMode} style={{ cursor: 'pointer', color: 'var(--text-strong)', textDecoration: 'underline' }}>
+              Créer un compte
+            </span>
+          </>
+        ) : (
+          <>Déjà un compte ?{' '}
+            <span onClick={switchMode} style={{ cursor: 'pointer', color: 'var(--text-strong)', textDecoration: 'underline' }}>
+              Se connecter
+            </span>
+          </>
+        )}
       </div>
     </ModalBox>
   );
