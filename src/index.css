@@ -18,6 +18,7 @@
   --accent-blue-soft: rgba(122, 174, 203, 0.18);
   --accent: #8fb7d1;
   --danger: #fb7185;
+  --success: #4ade80;
   --danger-soft: rgba(251, 113, 133, 0.14);
   --shadow: 0 24px 80px rgba(8, 15, 28, 0.35);
   --shadow-soft: 0 16px 40px rgba(8, 15, 28, 0.24);
@@ -1729,9 +1730,6 @@ body {
   color: #e8f3fb;
 }
 
-#modal-training-confirm .modal-body,
-#modal-training-interrupt .modal-body,
-#modal-training-stop .modal-body,
 #modal-training-done .modal-body,
 #modal-training-defeat .modal-body {
   color: #b8c9dc;
@@ -1781,11 +1779,14 @@ body {
 
 .survival-mistake-moves {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   font-size: 0.74rem;
   color: var(--text-muted);
   margin-bottom: 6px;
+}
+
+.survival-mistake-moves .sep {
+  color: var(--border-color);
 }
 
 .survival-defeat-empty {
@@ -2116,6 +2117,49 @@ body {
 .training-mode-option[data-selected='true'] {
   background: rgba(122, 174, 203, 0.16);
   border-color: rgba(122, 174, 203, 0.5);
+}
+
+/* ── Training Confirm Modal - warning sections ── */
+.training-warning-header {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.training-line-link {
+  font-size: 0.82rem;
+  color: var(--accent-blue);
+  cursor: pointer;
+  padding: 2px 0;
+  transition: opacity 0.15s;
+}
+
+.training-line-link:hover {
+  opacity: 0.75;
+}
+
+.training-line-more {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.training-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.training-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
 .training-mode-option-label {

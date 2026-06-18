@@ -534,6 +534,21 @@ export function navigateToNode(nodeId: string): void {
   const node = nodeMap.get(nodeId);
   if (!node) return;
 
+  // Si en jeu libre, basculer automatiquement vers le répertoire propriétaire du nœud
+  const repState = useRepertoireStore.getState();
+  if (repState.activeRepIndex === -1) {
+    let root: RepertoireNode | undefined = node;
+    while (root?.parentId) {
+      root = nodeMap.get(root.parentId);
+    }
+    if (root) {
+      const repIdx = repState.repertoires.findIndex(r => r.id === root.id);
+      if (repIdx !== -1) {
+        repState.setActiveRepIndex(repIdx);
+      }
+    }
+  }
+
   // Redirect si transposition : aller vers le nœud source (qui a les continuations)
   if (node.isTransposition && node.sourceNodeId) {
     const src = nodeMap.get(node.sourceNodeId);

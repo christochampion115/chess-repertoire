@@ -61,6 +61,7 @@ export function TrainingDefeatModal() {
               </div>
               <div className="survival-mistake-moves">
                 <span>Joué: <b style={{ color: 'var(--danger)' }}>{m.playedSan}</b></span>
+                <span className="sep">·</span>
                 <span>Attendu: <b style={{ color: 'var(--success)' }}>{m.expectedSan}</b></span>
               </div>
               <MiniBoard fen={m.fen} squareSize={16} flipped={repColor === 'b'} />
