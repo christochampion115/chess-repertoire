@@ -11,16 +11,16 @@ export function App() {
   return (
     <BrowserRouter>
       <TooltipProvider>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', position: 'relative' }}>
           <TopBar />
           <Routes>
             <Route path="/" element={<ViewHome />} />
             <Route path="/app" element={<AppLayout />} />
             <Route path="/rapport" element={<ReportPage />} />
           </Routes>
+          <ModalPortal />
+          <ContextMenu />
         </div>
-        <ModalPortal />
-        <ContextMenu />
       </TooltipProvider>
     </BrowserRouter>
   );

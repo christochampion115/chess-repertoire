@@ -109,7 +109,7 @@ export const CandidatesSection = React.memo(function CandidatesSection() {
                     uci={move.uci}
                     stats={data as LichessStats | null}
                   />
-                ))}
+                ), 500)}
                 onLeave={() => hideTooltip()}
                 onEvalDotHover={(x, y) => showTooltip(x, y, (
                   <EngineTooltipContent
@@ -117,7 +117,7 @@ export const CandidatesSection = React.memo(function CandidatesSection() {
                     san={move.san}
                     fen={fen}
                   />
-                ))}
+                ), 500)}
                 onEvalDotLeave={() => hideTooltip()}
               />
             );

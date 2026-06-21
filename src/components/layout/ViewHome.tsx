@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUiStore } from '@/stores/uiStore';
 
 export const ViewHome = React.memo(function ViewHome() {
   const navigate = useNavigate();
+  const openModal = useUiStore((s) => s.openModal);
 
   return (
     <div id="view-home">
@@ -34,7 +36,7 @@ export const ViewHome = React.memo(function ViewHome() {
             <span className="feature-card-link">Commencer →</span>
           </div>
 
-          <div className="feature-card feature-card--active" role="button" tabIndex={0} onClick={() => navigate('/app')}>
+          <div className="feature-card feature-card--active" role="button" tabIndex={0} onClick={() => openModal({ type: 'home-training' })}>
             <div className="feature-card-icon">⚔</div>
             <h3 className="feature-card-title">Entraînement</h3>
             <p className="feature-card-desc">

@@ -3,11 +3,14 @@ import { retrySurvivalTraining, getNextRewardHint, countMoves, getMedalIcon, get
 import { nodeMap } from '@/services/repertoire';
 import { ModalBox } from './ModalBox';
 import { MiniBoard } from '@/components/common/MiniBoard';
+import { useTrainingStore } from '@/stores/trainingStore';
 import type { MedalTier, SurvivalReport } from '@/types/training';
 
 export function TrainingDefeatModal() {
   const modal = useUiStore((s) => s.activeModal);
   const closeModal = useUiStore((s) => s.closeModal);
+  const repColor = useTrainingStore((s) => s.repColor);
+  console.log('[DEBUG TrainingDefeatModal] repColor:', repColor, 'flipped:', repColor === 'b');
 
   const nextReward = (() => {
     if (modal?.type !== 'training-defeat') return null;
@@ -58,9 +61,10 @@ export function TrainingDefeatModal() {
               </div>
               <div className="survival-mistake-moves">
                 <span>Joué: <b style={{ color: 'var(--danger)' }}>{m.playedSan}</b></span>
+                <span className="sep">·</span>
                 <span>Attendu: <b style={{ color: 'var(--success)' }}>{m.expectedSan}</b></span>
               </div>
-              <MiniBoard fen={m.fen} squareSize={16} />
+              <MiniBoard fen={m.fen} squareSize={16} flipped={repColor === 'b'} />
             </div>
           ))}
         </div>

@@ -58,27 +58,27 @@ export function TrainingConfirmModal() {
         {/* Lignes sans réponse */}
         {info.missingNodes.length > 0 && (
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: '0.9em', color: '#666' }}>
-              <b>⚠️ Il manque une réponse {info.color === 'w' ? 'blanche' : 'noire'} sur {info.missingNodes.length} ligne(s) :</b>
+            <div className="training-warning-header">
+              ⚠ Il manque une réponse {info.color === 'w' ? 'blanche' : 'noire'} sur {info.missingNodes.length} ligne(s) :
             </div>
             <div style={{ marginTop: 4 }}>
               {info.missingNodes.slice(0, 3).map((n) => (
                 <div
                   key={n.id}
-                  style={{ fontSize: '0.85em', color: '#4a9eff', cursor: 'pointer', textDecoration: 'underline', padding: '1px 0' }}
+                  className="training-line-link"
                   onClick={() => handleNavigateTo(n.id)}
-                  title="Cliquer pour accéder à cette ligne"
+                  title="Accéder à cette ligne"
                 >
                   • {getPathString(n.id) || n.san}
                 </div>
               ))}
             </div>
             {info.missingNodes.length > 3 && (
-              <div style={{ fontSize: '0.85em', color: '#888', marginTop: 4 }}>
+              <div className="training-line-more">
                 …et {info.missingNodes.length - 3} autre(s) ligne(s).
               </div>
             )}
-            <div style={{ fontSize: '0.85em', color: '#999', marginTop: 4, fontStyle: 'italic' }}>
+            <div className="training-hint">
               Ces lignes seront ignorées pendant l'entraînement.
             </div>
           </div>
@@ -87,30 +87,32 @@ export function TrainingConfirmModal() {
         {/* Transpositions hors-variante */}
         {info.outOfScopeTranspos.length > 0 && (
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: '0.9em', color: '#666' }}>
-              <b>↔️ {info.outOfScopeTranspos.length} transposition(s) vers une autre variante :</b>
+            <div className="training-warning-header">
+              ↔ {info.outOfScopeTranspos.length} transposition(s) vers une autre variante :
             </div>
-            <div style={{ fontSize: '0.85em', color: '#888', marginTop: 4 }}>
+            <div style={{ marginTop: 4 }}>
               {info.outOfScopeTranspos.slice(0, 3).map((n) => (
                 <div
                   key={n.id}
-                  style={{ fontSize: '0.85em', color: '#4a9eff', cursor: 'pointer', textDecoration: 'underline', padding: '1px 0' }}
+                  className="training-line-link"
                   onClick={() => handleNavigateTo(n.id)}
-                  title="Cliquer pour accéder à cette ligne"
-                >• {getPathString(n.id) || n.san}</div>
+                  title="Accéder à cette ligne"
+                >
+                  • {getPathString(n.id) || n.san}
+                </div>
               ))}
             </div>
             {info.outOfScopeTranspos.length > 3 && (
-              <div style={{ fontSize: '0.85em', color: '#888', marginTop: 4 }}>
+              <div className="training-line-more">
                 …et {info.outOfScopeTranspos.length - 3} autre(s).
               </div>
             )}
             {mode === 'survival' ? (
-              <div style={{ fontSize: '0.85em', color: '#999', marginTop: 4, fontStyle: 'italic' }}>
+              <div className="training-hint">
                 Ces lignes sont ignorées en mode Survie.
               </div>
             ) : (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: '0.85em', color: '#bbb', cursor: 'pointer' }}>
+              <label className="training-checkbox-label">
                 <input type="checkbox" checked={includeOutOfScope} onChange={(e) => handleIncludeChange(e.target.checked)} />
                 Inclure ces lignes dans l'entraînement
               </label>
@@ -118,58 +120,38 @@ export function TrainingConfirmModal() {
           </div>
         )}
 
-        {/* Mode selector — Survival (full-width) */}
-        <div style={{ fontSize: '0.95em', color: '#ccc', marginBottom: 8 }}>
+        {/* Mode selector title */}
+        <div className="training-mode-title">
           Choisissez un mode d'entraînement :
         </div>
 
         {/* Survival — full width */}
-        {(() => {
-          const m = TRAINING_MODES.survival;
-          return (
-            <button
-              type="button"
-              onClick={() => handleModeChange('survival')}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px 12px',
-                marginBottom: 8,
-                border: mode === 'survival' ? '2px solid #fbbf24' : '1px solid #444',
-                borderRadius: 6,
-                background: mode === 'survival' ? 'rgba(251,191,36,0.1)' : 'transparent',
-                color: '#ddd',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: '0.95em' }}>{m.label}</div>
-              <div style={{ fontSize: '0.8em', color: '#888', marginTop: 2 }}>{m.description}</div>
-            </button>
-          );
-        })()}
+        <div className="training-mode-survival-wrap">
+          <button
+            type="button"
+            className={'training-mode-option training-mode-option-survival' + (mode === 'survival' ? ' active' : '')}
+            onClick={() => handleModeChange('survival')}
+            data-selected={mode === 'survival' ? 'true' : undefined}
+          >
+            <div style={{ fontWeight: 600, fontSize: '0.85em' }}>{TRAINING_MODES.survival.label}</div>
+            <div style={{ fontSize: '0.75em', color: 'var(--text-muted)', marginTop: 2 }}>{TRAINING_MODES.survival.description}</div>
+          </button>
+        </div>
 
         {/* Other modes — grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="training-mode-options">
           {(['horizontal', 'vertical', 'express', 'randomizer'] as TrainingMode[]).map((modeId) => {
             const m = TRAINING_MODES[modeId];
             return (
               <button
                 key={modeId}
                 type="button"
+                className={'training-mode-option' + (mode === modeId ? ' active' : '')}
                 onClick={() => handleModeChange(modeId)}
-                style={{
-                  padding: '8px 10px',
-                  border: mode === modeId ? '2px solid #4a9eff' : '1px solid #444',
-                  borderRadius: 6,
-                  background: mode === modeId ? 'rgba(74,158,255,0.1)' : 'transparent',
-                  color: '#ddd',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
+                data-selected={mode === modeId ? 'true' : undefined}
               >
-                <div style={{ fontWeight: 600, fontSize: '0.85em' }}>{m.label}</div>
-                <div style={{ fontSize: '0.75em', color: '#888', marginTop: 2 }}>{m.description}</div>
+                <div style={{ fontWeight: 600, fontSize: '0.82em' }}>{m.label}</div>
+                <div style={{ fontSize: '0.72em', color: 'var(--text-muted)', marginTop: 2 }}>{m.description}</div>
               </button>
             );
           })}

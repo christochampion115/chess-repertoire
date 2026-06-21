@@ -83,15 +83,15 @@ export const StatsRow = React.memo(function StatsRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '52px 34px 44px 1fr 44px',
+          gridTemplateColumns: '40px 30px 36px 1fr 30px',
           alignItems: 'center',
-          gap: '4px',
-          paddingRight: '4px',
+          gap: '1px',
+          paddingRight: '2px',
         }}
       >
         <div className="move" style={{ fontWeight: 'bold' }}>{move.san}</div>
         <div className="freq">{freqPct}%</div>
-        <div className="count">{formatNumberShort(total)}</div>
+        <div className="count" style={{ paddingLeft: '3px' }}>{formatNumberShort(total)}</div>
 
         {/* Win/draw/loss bars */}
         <div className="bars">

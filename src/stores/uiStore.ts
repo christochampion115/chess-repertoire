@@ -23,6 +23,8 @@ export interface CtxMenuState {
   source?: string;
   /** Coup candidat pour addSelectedMoveToTree / exploreInFreePlay */
   contextMenuMove?: unknown;
+  /** Clé unique pour le toggle ouverture/fermeture */
+  compareKey?: string;
 }
 
 export interface CtxMenuActions {

@@ -67,8 +67,9 @@ export function MiniBoard({
         height: boardSize + 2,
       }}
     >
-      {squares.map((pieceChar, idx) => {
+      {squares.map((_, idx) => {
         const realIdx = flipped ? 63 - idx : idx;
+        const pieceChar = squares[realIdx];
         const rank = Math.floor(realIdx / 8);
         const file = realIdx % 8;
         const isLight = (rank + file) % 2 === 0;

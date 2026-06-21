@@ -277,6 +277,52 @@ export function getMovePath(currentNodeId: string): RepertoireNode[] {
   return path;
 }
 
+/**
+ * Remonte depuis un nœud jusqu'à la racine du répertoire et collecte
+ * la chaîne des noms de variantes (varName) rencontrés.
+ *
+ * Si le nœud de départ est la racine d'un arbre élagué (pruned), descend
+ * d'abord la chaîne à enfant unique pour trouver la variante réelle.
+ */
+export function getVariantPath(node: RepertoireNode): { repName: string; varPath: string[] } {
+  const varPath: string[] = [];
+  let cur: RepertoireNode | undefined = node;
+  let root: RepertoireNode | undefined;
+
+  // 1. Remonter vers la racine
+  while (cur) {
+    if (cur.varName) varPath.unshift(cur.varName);
+    if (!cur.parentId) { root = cur; break; }
+    cur = nodeMap.get(cur.parentId);
+  }
+
+  if (varPath.length > 0) {
+    return { repName: root?.name ?? 'Répertoire', varPath };
+  }
+
+  // 2. Aucun varName trouvé en remontant → peut-être une racine élaguée
+  if (!node.varName && node.children.length === 1) {
+    let leaf: RepertoireNode | undefined;
+    cur = node;
+    while (cur.children.length === 1) {
+      cur = cur.children[0];
+      if (cur.varName) leaf = cur;
+    }
+    if (leaf) {
+      varPath.length = 0;
+      cur = leaf;
+      while (cur) {
+        if (cur.varName) varPath.unshift(cur.varName);
+        if (!cur.parentId) { root = cur; break; }
+        cur = nodeMap.get(cur.parentId);
+      }
+      return { repName: root?.name ?? 'Répertoire', varPath };
+    }
+  }
+
+  return { repName: root?.name ?? 'Répertoire', varPath: [] };
+}
+
 export function createNewRepertoire(
   name: string,
   color: 'w' | 'b',
@@ -534,6 +580,21 @@ export function navigateToNode(nodeId: string): void {
   const node = nodeMap.get(nodeId);
   if (!node) return;
 
+  // Si en jeu libre, basculer automatiquement vers le répertoire propriétaire du nœud
+  const repState = useRepertoireStore.getState();
+  if (repState.activeRepIndex === -1) {
+    let root: RepertoireNode | undefined = node;
+    while (root?.parentId) {
+      root = nodeMap.get(root.parentId);
+    }
+    if (root) {
+      const repIdx = repState.repertoires.findIndex(r => r.id === root.id);
+      if (repIdx !== -1) {
+        repState.setActiveRepIndex(repIdx);
+      }
+    }
+  }
+
   // Redirect si transposition : aller vers le nœud source (qui a les continuations)
   if (node.isTransposition && node.sourceNodeId) {
     const src = nodeMap.get(node.sourceNodeId);
@@ -603,7 +664,18 @@ export function navBack(): void {
   if (!node || !node.parentId) return;
   const newRedo = [...(redoStack ?? []), currentNodeId];
   useRepertoireStore.setState({ currentNodeId: node.parentId, redoStack: newRedo });
-  _updateChessPosition(nodeMap.get(node.parentId)!.fen);
+  const parentFen = nodeMap.get(node.parentId)!.fen;
+  if (node.parentId && node.san) {
+    const parentNode = nodeMap.get(node.parentId);
+    if (parentNode?.fen) {
+      const tmp = new Chess(parentNode.fen);
+      try {
+        const m = tmp.move(node.san);
+        if (m) useChessStore.getState().setPendingAnimation({ fromSq: m.to, toSq: m.from });
+      } catch {}
+    }
+  }
+  _updateChessPosition(parentFen);
 }
 
 export function navForward(): void {
@@ -615,6 +687,16 @@ export function navForward(): void {
   useRepertoireStore.setState({ currentNodeId: nodeId, redoStack: newRedo });
   const node = nodeMap.get(nodeId);
   if (node) {
+    if (node.parentId && node.san) {
+      const parentNode = nodeMap.get(node.parentId);
+      if (parentNode?.fen) {
+        const tmp = new Chess(parentNode.fen);
+        try {
+          const m = tmp.move(node.san);
+          if (m) useChessStore.getState().setPendingAnimation({ fromSq: m.from, toSq: m.to });
+        } catch {}
+      }
+    }
     _updateChessPosition(node.fen);
   }
 }

@@ -33,6 +33,8 @@ export function useBoardAnimation() {
     const dx = fromRect.left - toRect.left;
     const dy = fromRect.top - toRect.top;
 
+    let cancelled = false;
+
     pieceImg.classList.add('piece-moving');
     pieceImg.style.transition = 'none';
     pieceImg.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -43,10 +45,19 @@ export function useBoardAnimation() {
     pieceImg.style.transform = 'translate(0, 0)';
 
     pieceImg.addEventListener('transitionend', () => {
+      if (cancelled) return;
       pieceImg.style.transition = '';
       pieceImg.style.transform = '';
       pieceImg.classList.remove('piece-moving');
       setPendingAnimation(null);
     }, { once: true });
+
+    return () => {
+      cancelled = true;
+      pieceImg.style.transition = '';
+      pieceImg.style.transform = '';
+      pieceImg.classList.remove('piece-moving');
+      setPendingAnimation(null);
+    };
   }, [pendingAnimation, skipNextAnimation, setPendingAnimation, setSkipNextAnimation]);
 }

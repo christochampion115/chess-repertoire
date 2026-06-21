@@ -21,6 +21,19 @@ function collectVariantFolderIds(root: RepertoireNode): Set<string> {
   return ids;
 }
 
+function isTopLevelVariant(nodeId: string): boolean {
+  const { repertoires } = useRepertoireStore.getState();
+  let current = nodeMap.get(nodeId);
+  while (current?.parentId) {
+    const parent = nodeMap.get(current.parentId);
+    if (!parent) break;
+    if (parent.varName) return false;
+    if (repertoires.some(r => r.id === parent.id)) return true;
+    current = parent;
+  }
+  return true;
+}
+
 function findRootRep(store: ReturnType<typeof useRepertoireStore.getState>, nodeId: string): RepertoireNode | null {
   const isInTree = (n: RepertoireNode): boolean => {
     if (n.id === nodeId) return true;
@@ -80,7 +93,7 @@ export function NameVarModal() {
     setHint('');
     nameVariantNode(modal.nodeId, trimmed);
 
-    if (selectedFolderId !== '__none__') {
+    if (isTopLevelVariant(modal.nodeId) && selectedFolderId !== '__none__') {
       let fid = selectedFolderId;
       if (fid === '__new__') {
         const fname = folderName.trim();
@@ -106,8 +119,12 @@ export function NameVarModal() {
     closeModal();
   };
 
+  const isTopLevel = modal?.type === 'name-variant'
+    ? isTopLevelVariant(modal.nodeId)
+    : false;
+
   const availableFolders = (() => {
-    if (modal?.type !== 'name-variant' || !modal.nodeId) return [];
+    if (!isTopLevel || modal?.type !== 'name-variant' || !modal.nodeId) return [];
     const root = findRootRep(useRepertoireStore.getState(), modal.nodeId);
     if (!root) return [];
     const usedIds = collectVariantFolderIds(root);
@@ -133,34 +150,38 @@ export function NameVarModal() {
         style={{ marginBottom: 10 }}
       />
 
-      <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-        Dossier (optionnel)
-      </label>
-      <select
-        value={selectedFolderId}
-        onChange={(e) => {
-          const val = e.target.value;
-          setSelectedFolderId(val);
-          if (val !== '__new__' && val !== '__none__') {
-            setFolderName(repFolders[val] || '');
-          }
-        }}
-        style={{ padding: '6px 8px', width: '100%', marginBottom: selectedFolderId === '__new__' ? 6 : 0 }}
-      >
-        <option value="__none__">— Aucun dossier —</option>
-        {availableFolders.map((f) => (
-          <option key={f.id} value={f.id}>{f.name}</option>
-        ))}
-        <option value="__new__">+ Nouveau dossier…</option>
-      </select>
-      {selectedFolderId === '__new__' && (
-        <input
-          type="text"
-          placeholder="Nom du nouveau dossier"
-          value={folderName}
-          onChange={(e) => setFolderName(e.target.value)}
-          style={{ padding: '6px 8px', width: '100%' }}
-        />
+      {isTopLevel && (
+        <>
+          <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            Dossier (optionnel)
+          </label>
+          <select
+            value={selectedFolderId}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedFolderId(val);
+              if (val !== '__new__' && val !== '__none__') {
+                setFolderName(repFolders[val] || '');
+              }
+            }}
+            style={{ padding: '6px 8px', width: '100%', marginBottom: selectedFolderId === '__new__' ? 6 : 0 }}
+          >
+            <option value="__none__">— Aucun dossier —</option>
+            {availableFolders.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+            <option value="__new__">+ Nouveau dossier…</option>
+          </select>
+          {selectedFolderId === '__new__' && (
+            <input
+              type="text"
+              placeholder="Nom du nouveau dossier"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              style={{ padding: '6px 8px', width: '100%' }}
+            />
+          )}
+        </>
       )}
 
       <div className="modal-actions" style={{ marginTop: 12 }}>

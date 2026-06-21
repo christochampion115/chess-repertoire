@@ -25,6 +25,7 @@ export type ActiveModal =
   | { type: 'account' }
   | { type: 'folder-group' }
   | { type: 'annotation' }
+  | { type: 'patch-notes' }
   | null;
 
 export interface OpenPanels {

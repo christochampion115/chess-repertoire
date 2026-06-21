@@ -7,6 +7,7 @@ import { ReportConfidence } from './ReportConfidence';
 import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { ReportChildCard } from './ReportChildCard';
 import { useRepertoireStore } from '@/stores/repertoireStore';
+import { useReportStore } from '@/stores/reportStore';
 
 interface ReportGroupCardProps {
   group: ReportGroup;
@@ -24,6 +25,8 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   const [expanded, setExpanded] = useState(true);
   const startMove = getMoveNumberFromFen(rootFen);
   const repertoires = useRepertoireStore((s) => s.repertoires);
+  const reportColor = useReportStore((s) => s.params.color);
+  console.log('[DEBUG ReportGroupCard] reportColor:', reportColor, 'flipped:', reportColor === 'black');
   const repInfo = useMemo(() => repertoires.map((r) => ({ name: r.name, fen: r.fen })), [repertoires]);
 
   const openInApp = useCallback(() => {
@@ -187,7 +190,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
 
           {group.fen && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <ReportMiniBoard fen={group.fen} highlightUci={group.fenUci ?? undefined} size={20} />
+              <ReportMiniBoard fen={group.fen} highlightUci={group.fenUci ?? undefined} size={20} flipped={reportColor === 'black'} />
               <button
                 type="button"
                 onClick={openInApp}

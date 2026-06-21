@@ -6,6 +6,7 @@ import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { BoardThemeModal } from './BoardThemeModal';
 import { RenameFolderModal } from './RenameFolderModal';
 import { FolderGroupModal } from './FolderGroupModal';
+import { HomeTrainingModal } from './HomeTrainingModal';
 import { TrainingConfirmModal } from './TrainingConfirmModal';
 import { TrainingInterruptModal } from './TrainingInterruptModal';
 import { TrainingStopModal } from './TrainingStopModal';
@@ -18,6 +19,7 @@ import { ProfileModal } from './ProfileModal';
 import { PlayerStatsModal } from './PlayerStatsModal';
 import { MedalsModal } from './MedalsModal';
 import { AnnotationModal } from './AnnotationModal';
+import { PatchNotesModal } from './PatchNotesModal';
 
 const modalComponents: Record<string, React.FC> = {
   'new-repertoire': NewRepModal,
@@ -28,6 +30,7 @@ const modalComponents: Record<string, React.FC> = {
   'board-theme': BoardThemeModal,
   'rename-folder': RenameFolderModal,
   'folder-group': FolderGroupModal,
+  'home-training': HomeTrainingModal,
   'training-confirm': TrainingConfirmModal,
   'training-interrupt': TrainingInterruptModal,
   'training-stop': TrainingStopModal,
@@ -40,6 +43,7 @@ const modalComponents: Record<string, React.FC> = {
   'player-stats': PlayerStatsModal,
   'medals': MedalsModal,
   'annotation': AnnotationModal,
+  'patch-notes': PatchNotesModal,
 };
 
 export function ModalPortal() {

@@ -35,7 +35,7 @@ export const AnalysisRow = React.memo(function AnalysisRow({
         uci={line.uci}
         san={bestMoveSan}
       />
-    ), 0);
+    ), 500);
   }, [fen, line.uci, bestMoveSan, showTooltip]);
 
   const handleMouseLeave = useCallback(() => {
