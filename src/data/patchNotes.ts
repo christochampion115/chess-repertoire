@@ -8,6 +8,39 @@ export interface PatchNoteEntry {
 
 export const PATCH_NOTES: PatchNoteEntry[] = [
   {
+    id: 'v2.0.0',
+    date: '21/06/2026',
+    title: 'Migration TypeScript & correction de bugs',
+    excerpt: 'Refonte en profondeur de l\'application, avec une première vague importante de corrections de bugs et d\'améliorations de l\'interface.',
+    content: `Cette mise à jour marque la migration complète de l'application vers une architecture plus moderne et plus fiable. En voici les principales corrections :
+
+**Général**
+• Correction d'un bug où surligner un texte hors d'une modale la fermait intempestivement.
+• Le bouton retour à l'accueil est désormais bien cliquable sur toute sa zone.
+• Les mini-boards s'affichent désormais dans le sens de la couleur sélectionnée.
+• Les menus clic-droit ne débordent plus des bords de l'écran et restent correctement positionnés même après un scroll. Un nouveau clic droit les referme.
+• Suppression de la double barre de défilement sur l'application.
+• Les menus au survol s'affichent désormais sans flash intempestif.
+
+**Comptes**
+• La modale de création de compte est maintenant stable et fonctionnelle.
+• Correction de la disparition de la modale des paramètres de compte.
+
+**Échiquier**
+• La navigation dans l'échiquier (flèches directionnelles et boutons) déclenche désormais l'animation de déplacement des pièces.
+• Impossible d'annoter la position de départ (coup 0) — l'annotation n'a plus d'effet.
+
+**Répertoires**
+• La fonctionnalité "Ajouter à un dossier" propose désormais les dossiers au bon niveau dans l'arborescence.
+• En mode "Jeu libre", les actions de nommage de variante proposent désormais de créer un répertoire plutôt que d'aboutir à une impasse.
+
+**Moniteur & Entraînement**
+• L'affichage des variantes dans le moniteur est maintenant fonctionnel (mode libre et mode entraînement).
+
+**Accueil**
+• Le bouton "Entraînement" depuis la page d'accueil déclenche désormais bien la modale de sélection d'entraînement.`,
+  },
+  {
     id: 'v1.2.0',
     date: '21/06/2026',
     title: 'Notes de mise à jour & interface repensée',
