@@ -19,6 +19,7 @@ import { ProfileModal } from './ProfileModal';
 import { PlayerStatsModal } from './PlayerStatsModal';
 import { MedalsModal } from './MedalsModal';
 import { AnnotationModal } from './AnnotationModal';
+import { PatchNotesModal } from './PatchNotesModal';
 
 const modalComponents: Record<string, React.FC> = {
   'new-repertoire': NewRepModal,
@@ -42,6 +43,7 @@ const modalComponents: Record<string, React.FC> = {
   'player-stats': PlayerStatsModal,
   'medals': MedalsModal,
   'annotation': AnnotationModal,
+  'patch-notes': PatchNotesModal,
 };
 
 export function ModalPortal() {

@@ -35,7 +35,7 @@
 
 html {
   overflow-x: auto;
-  scrollbar-gutter: stable;
+  overflow-y: scroll;
   scrollbar-color: rgba(255,255,255,0.2) #0b1523;
 }
 html::-webkit-scrollbar-track {
@@ -61,7 +61,6 @@ body {
   margin: 0;
   padding: 24px;
   user-select: none;
-  overflow-y: auto;
 }
 
 .top-bar {
@@ -277,9 +276,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 16px;
   width: 100%;
+}
+.monitor-header > div:first-child {
+  overflow: hidden;
+  min-width: 0;
 }
 
 .btn-switch-freeplay {
@@ -287,14 +289,14 @@ body {
   color: var(--text-main);
   border: 1px solid var(--soft-border);
   border-radius: 5px;
-  padding: 10px 16px;
-  font-size: 0.8rem;
+  padding: 7px 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 8px 18px rgba(0,0,0,0.16);
   transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
   flex-shrink: 0;
-  min-width: 120px;
+  min-width: 100px;
   text-align: center;
 }
 .btn-switch-freeplay:hover {
@@ -307,14 +309,14 @@ body {
   color: var(--text-main);
   border: 1px solid var(--soft-border);
   border-radius: 5px;
-  padding: 10px 16px;
-  font-size: 0.8rem;
+  padding: 7px 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 8px 18px rgba(0,0,0,0.16);
   transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
   flex-shrink: 0;
-  min-width: 120px;
+  min-width: 100px;
   text-align: center;
 }
 .btn-open-new-rep:hover {
@@ -2174,6 +2176,146 @@ body {
   flex-wrap: wrap;
 }
 
+/* Patch Notes */
+.patch-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.patch-note-card {
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+}
+
+.patch-note-card:hover {
+  background: rgba(122, 174, 203, 0.06);
+  border-color: rgba(122, 174, 203, 0.25);
+  transform: translateX(3px);
+}
+
+.patch-note-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.patch-note-date {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.patch-note-version {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--accent-blue);
+  background: rgba(122, 174, 203, 0.1);
+  padding: 1px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.patch-note-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  margin-bottom: 4px;
+}
+
+.patch-note-excerpt {
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Détail d'une note */
+.patch-note-back {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+  margin-bottom: 14px;
+}
+
+.patch-note-back:hover {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-main);
+}
+
+.patch-note-detail-header {
+  margin-bottom: 16px;
+}
+
+.patch-note-detail-date {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.patch-note-detail-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+.patch-note-detail-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.patch-note-text {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-main);
+  margin: 0 0 6px 0;
+}
+
+.patch-note-bullet {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  margin: 2px 0;
+  padding-left: 14px;
+  position: relative;
+}
+
+.patch-note-bullet::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+
+.patch-note-section-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  margin: 14px 0 6px 0;
+}
+
 .modal-profile {
   max-width: 520px;
   width: min(100%, 520px);
@@ -3033,16 +3175,19 @@ body {
   gap: 4px;
   padding: 8px 4px;
   border-bottom: 1px solid #ddd;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .stats-row > div:last-child {
   display: grid;
-  grid-template-columns: 52px 34px 44px 1fr 44px;
+  grid-template-columns: 40px 30px 36px 1fr 30px;
   align-items: center;
-  gap: 6px;
-  padding-right: 4px;
+  gap: 1px;
+  padding-right: 2px;
   overflow: hidden;
+}
+.stats-row > div:last-child > .count {
+  padding-right: 1px;
 }
 
 
@@ -3059,8 +3204,12 @@ body {
   margin-right: 3px; /* plus compact */
 }
 
-.count {
+.freq {
   font-size: 12px;
+}
+
+.count {
+  font-size: 11px;
   color: #adadad;
 }
 
@@ -3079,6 +3228,7 @@ body {
 
 /* Colonne 5 : elo */
 .elo {
+  font-size: 11px;
   text-align: right;
   color: #adadad;
 }

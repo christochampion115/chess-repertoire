@@ -70,10 +70,7 @@ export const TopBar = React.memo(function TopBar() {
       {/* Actions et compte */}
       <div className="top-actions">
         <button className="top-action" onClick={() => openModal({ type: 'medals' })}>Médailles</button>
-        <button className="top-action">Paramètres</button>
-        <button className="top-action">Aide</button>
-        <button className="top-action">Contact</button>
-        <button className="top-action">Abonnement</button>
+        <button className="top-action" onClick={() => openModal({ type: 'patch-notes' })}>Notes de mise à jour</button>
 
         <div className="top-account" style={{ cursor: 'pointer' }} onClick={() => user && openModal({ type: 'profile' })}>
           {user ? (
