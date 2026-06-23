@@ -1,7 +1,17 @@
 'use strict';
 
 const express = require('express');
-const { getChesscomPlayerStats, getChesscomPlayerStatsBatch, getChesscomReport } = require('../services/chesscomPlayerStatsService');
+const {
+  getChesscomPlayerStats,
+  getChesscomPlayerStatsBatch,
+  getChesscomReport,
+  computeAndStoreAllPositions,
+  makeGamesCacheKey,
+  normalizeFen,
+} = require('../services/chesscomPlayerStatsService');
+const authMiddleware = require('../middleware/authMiddleware');
+const { optionalAuthMiddleware } = require('../middleware/authMiddleware');
+const db = require('../db');
 
 const router = express.Router();
 
@@ -9,40 +19,50 @@ const ALLOWED_COLORS      = new Set(['white', 'black']);
 const ALLOWED_TIMECLASSES = new Set(['all', 'bullet', 'blitz', 'rapid', 'daily', 'classical']);
 const BATCH_MAX_FENS      = 500;
 
-router.get('/stats', async (req, res) => {
-  const fen      = typeof req.query.fen      === 'string' ? req.query.fen.trim()      : '';
-  const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
-  const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
+// Helper : parse les filtres communs depuis req.query (sans fen).
+function parseFiltersFromQuery(query) {
+  const username = typeof query.username === 'string' ? query.username.trim() : '';
+  const color    = typeof query.color    === 'string' ? query.color.trim()    : '';
+  if (!username)                        return { error: 'Paramètre username requis', status: 400 };
+  if (!ALLOWED_COLORS.has(color))       return { error: 'Paramètre color invalide (white|black)', status: 400 };
+  const timeClass    = ALLOWED_TIMECLASSES.has(query.timeClass) ? query.timeClass : 'all';
+  const dateFrom     = typeof query.dateFrom === 'string' ? query.dateFrom.trim() : '';
+  const dateTo       = typeof query.dateTo   === 'string' ? query.dateTo.trim()   : '';
+  const eloMinRaw    = Number.parseInt(query.eloMin, 10);
+  const eloMaxRaw    = Number.parseInt(query.eloMax, 10);
+  const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0, Math.min(3000, eloMinRaw)) : 0;
+  const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0, Math.min(3000, eloMaxRaw)) : 3000;
+  return {
+    playerUsername:  username,
+    playerColor:     color,
+    playerTimeClass: timeClass,
+    playerDateFrom:  dateFrom,
+    playerDateTo:    dateTo,
+    playerEloMin,
+    playerEloMax,
+  };
+}
 
-  if (!fen)      return res.status(400).json({ error: 'Paramètre fen requis' });
-  if (!username) return res.status(400).json({ error: 'Paramètre username requis' });
-  if (!ALLOWED_COLORS.has(color))
-    return res.status(400).json({ error: 'Paramètre color invalide (white|black)' });
+router.get('/stats', optionalAuthMiddleware, async (req, res) => {
+  const fen = typeof req.query.fen === 'string' ? req.query.fen.trim() : '';
+  if (!fen) return res.status(400).json({ error: 'Paramètre fen requis' });
 
-  const timeClass = ALLOWED_TIMECLASSES.has(req.query.timeClass) ? req.query.timeClass : 'all';
-  const dateFrom  = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
-  const dateTo    = typeof req.query.dateTo   === 'string' ? req.query.dateTo.trim()   : '';
-
-  const eloMinRaw = Number.parseInt(req.query.eloMin, 10);
-  const eloMaxRaw = Number.parseInt(req.query.eloMax, 10);
-  const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0,    Math.min(3000, eloMinRaw)) : 0;
-  const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0,    Math.min(3000, eloMaxRaw)) : 3000;
+  const filters = parseFiltersFromQuery(req.query);
+  if (filters.error) return res.status(filters.status).json({ error: filters.error });
 
   try {
-    const stats = await getChesscomPlayerStats(fen, {
-      playerUsername:  username,
-      playerColor:     color,
-      playerTimeClass: timeClass,
-      playerDateFrom:  dateFrom,
-      playerDateTo:    dateTo,
-      playerEloMin,
-      playerEloMax
-    });
+    // DB-first : si l'utilisateur est connecté, chercher en base avant tout
+    if (req.user) {
+      const cacheKey  = makeGamesCacheKey(filters);
+      const fenNorm   = normalizeFen(fen);
+      const cached    = await db.getPlayerStatFromCache(req.user.id, cacheKey, fenNorm);
+      if (cached) return res.json(JSON.parse(cached.data));
+    }
+    const stats = await getChesscomPlayerStats(fen, filters);
     res.json(stats);
   } catch (error) {
     console.error('[chesscom proxy] fetch error', error);
-    const statusCode = error.status || 502;
-    res.status(statusCode).json({ error: error.message || 'Erreur Chess.com proxy' });
+    res.status(error.status || 502).json({ error: error.message || 'Erreur Chess.com proxy' });
   }
 });
 
@@ -51,24 +71,12 @@ router.get('/stats', async (req, res) => {
 //   data: {"type":"archive","current":3,"total":15,"gamesInArchive":45}
 //   data: {"type":"complete","data":{moves:[],totalGames:500,…}}
 //   data: {"type":"error","error":"…"}
-router.get('/stats/stream', async (req, res) => {
-  const fen      = typeof req.query.fen      === 'string' ? req.query.fen.trim()      : '';
-  const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
-  const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
+router.get('/stats/stream', optionalAuthMiddleware, async (req, res) => {
+  const fen = typeof req.query.fen === 'string' ? req.query.fen.trim() : '';
+  if (!fen) return res.status(400).json({ error: 'Paramètre fen requis' });
 
-  if (!fen)      return res.status(400).json({ error: 'Paramètre fen requis' });
-  if (!username) return res.status(400).json({ error: 'Paramètre username requis' });
-  if (!ALLOWED_COLORS.has(color))
-    return res.status(400).json({ error: 'Paramètre color invalide (white|black)' });
-
-  const timeClass = ALLOWED_TIMECLASSES.has(req.query.timeClass) ? req.query.timeClass : 'all';
-  const dateFrom  = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
-  const dateTo    = typeof req.query.dateTo   === 'string' ? req.query.dateTo.trim()   : '';
-
-  const eloMinRaw = Number.parseInt(req.query.eloMin, 10);
-  const eloMaxRaw = Number.parseInt(req.query.eloMax, 10);
-  const playerEloMin = Number.isFinite(eloMinRaw) ? Math.max(0, Math.min(3000, eloMinRaw)) : 0;
-  const playerEloMax = Number.isFinite(eloMaxRaw) ? Math.max(0, Math.min(3000, eloMaxRaw)) : 3000;
+  const filters = parseFiltersFromQuery(req.query);
+  if (filters.error) return res.status(filters.status).json({ error: filters.error });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -79,25 +87,73 @@ router.get('/stats/stream', async (req, res) => {
 
   let isClosed = false;
   req.on('close', () => { isClosed = true; });
-
   const safeWrite = (data) => { if (!isClosed) res.write(data); };
 
   try {
-    const stats = await getChesscomPlayerStats(fen, {
-      playerUsername:  username,
-      playerColor:     color,
-      playerTimeClass: timeClass,
-      playerDateFrom:  dateFrom,
-      playerDateTo:    dateTo,
-      playerEloMin,
-      playerEloMax
-    }, (progress) => {
+    // DB-first : si l'utilisateur est connecté, retour immédiat depuis la base
+    if (req.user) {
+      const cacheKey = makeGamesCacheKey(filters);
+      const fenNorm  = normalizeFen(fen);
+      const cached   = await db.getPlayerStatFromCache(req.user.id, cacheKey, fenNorm);
+      if (cached) {
+        safeWrite(`data: ${JSON.stringify({ type: 'complete', data: JSON.parse(cached.data) })}\n\n`);
+        if (!isClosed) res.end();
+        return;
+      }
+    }
+    const stats = await getChesscomPlayerStats(fen, filters, (progress) => {
       safeWrite(`data: ${JSON.stringify({ type: 'archive', ...progress })}\n\n`);
     });
     safeWrite(`data: ${JSON.stringify({ type: 'complete', data: stats })}\n\n`);
   } catch (error) {
     console.error('[chesscom stream] error', error);
     safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur Chess.com proxy' })}\n\n`);
+  }
+  if (!isClosed) res.end();
+});
+
+// SSE : précalcul INTÉGRAL de toutes les positions d'un joueur + stockage DB.
+// Requiert un compte connecté. Événements :
+//   data: {"type":"archive","current":3,"total":15,"gamesInArchive":45}
+//   data: {"type":"positions","current":200,"total":1000}
+//   data: {"type":"complete","cacheKey":"…","totalPositions":1000,"totalGames":5000}
+//   data: {"type":"error","error":"…"}
+router.get('/stats/load/stream', authMiddleware, async (req, res) => {
+  const filters = parseFiltersFromQuery(req.query);
+  if (filters.error) return res.status(filters.status).json({ error: filters.error });
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  let isClosed = false;
+  req.on('close', () => { isClosed = true; });
+  const safeWrite = (data) => { if (!isClosed) res.write(data); };
+
+  try {
+    const onArchiveProgress = (progress) => {
+      safeWrite(`data: ${JSON.stringify({ type: 'archive', ...progress })}\n\n`);
+    };
+    const onPositionProgress = ({ current, total }) => {
+      safeWrite(`data: ${JSON.stringify({ type: 'positions', current, total })}\n\n`);
+    };
+
+    // Injecter onArchiveProgress dans ensureGamesLoaded via les filtres
+    // en surchargeant getChesscomPlayerStats avec le callback de progression.
+    // On passe par computeAndStoreAllPositions qui appelle ensureGamesLoaded.
+    const result = await computeAndStoreAllPositions(
+      { ...filters, _onArchiveProgress: onArchiveProgress },
+      req.user.id,
+      onPositionProgress,
+      db
+    );
+    safeWrite(`data: ${JSON.stringify({ type: 'complete', ...result })}\n\n`);
+  } catch (error) {
+    console.error('[chesscom load/stream] error', error);
+    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur Chess.com load' })}\n\n`);
   }
   if (!isClosed) res.end();
 });

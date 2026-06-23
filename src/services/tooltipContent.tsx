@@ -149,6 +149,7 @@ export function LichessTooltipContent({ fen, uci, stats }: LichessTooltipContent
 
       <MiniBoard
         fen={afterFen}
+        highlightUci={uci}
         flipped={flipped}
         squareSize={22}
         lightSquare={boardTheme.light}

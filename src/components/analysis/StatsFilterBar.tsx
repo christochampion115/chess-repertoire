@@ -3,6 +3,8 @@ import { useStatsStore } from '@/stores/statsStore';
 import { useUiStore } from '@/stores/uiStore';
 import { scheduleStatsReload } from '@/services/stats';
 import type { StatsSortBy } from '@/types/stats';
+import { useAuthStore } from '@/stores/authStore';
+import type { SavedPlayerStats } from '@/types/stats';
 
 const ELO_MIN = 0;
 const ELO_MAX = 3000;
@@ -49,7 +51,12 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
   const eloLoading = useStatsStore((s) => s.eloMiniLoading);
   const openModal  = useUiStore((s) => s.openModal);
 
+  const savedPlayerStats = useStatsStore((s) => s.savedPlayerStats);
+  const token            = useAuthStore((s) => s.token);
+  const isAuthenticated  = !!token;
+
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [playerDropdownOpen, setPlayerDropdownOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
   const isLichess  = filters.currentDatabase === 'lichess';
@@ -63,18 +70,20 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
 
   // Ferme les menus en cliquant à l'extérieur
   useEffect(() => {
-    if (!sortMenuOpen && !filters.eloPanelOpen) return;
+    if (!sortMenuOpen && !filters.eloPanelOpen && !playerDropdownOpen) return;
     function onOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setSortMenuOpen(false);
+        setPlayerDropdownOpen(false);
         if (filters.eloPanelOpen) setFilter('eloPanelOpen', false);
       }
     }
     document.addEventListener('click', onOutside);
     return () => document.removeEventListener('click', onOutside);
-  }, [sortMenuOpen, filters.eloPanelOpen, setFilter]);
+  }, [sortMenuOpen, filters.eloPanelOpen, playerDropdownOpen, setFilter]);
 
   function switchToLichess() {
+    setPlayerDropdownOpen(false);
     if (!isLichess) {
       setFilters({ currentDatabase: 'lichess' });
       scheduleStatsReload();
@@ -82,6 +91,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
   }
 
   function switchToMasters() {
+    setPlayerDropdownOpen(false);
     if (!isMasters) {
       setFilters({ currentDatabase: 'masters', eloPanelOpen: false });
       scheduleStatsReload();
@@ -90,6 +100,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
 
   function toggleEloPanel(e: React.MouseEvent) {
     e.stopPropagation();
+    setPlayerDropdownOpen(false);
     if (!isLichess) {
       setFilters({ currentDatabase: 'lichess', eloPanelOpen: true });
       scheduleStatsReload();
@@ -115,19 +126,10 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
     // (les données sont déjà en mémoire, on les re-trie dans CandidatesSection)
   }
 
-  // Tooltip joueur (affiché via CSS :hover sur le sub-label)
-  const playerTooltipLines: string[] = [];
-  if (isPlayer && filters.playerUsername) {
-    playerTooltipLines.push(`@${filters.playerUsername}`);
-    playerTooltipLines.push(`Couleur : ${filters.playerColor === 'black' ? 'Noirs' : 'Blancs'}`);
-    const tcMap: Record<string, string> = { all: 'Toutes', bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapide', daily: 'Corresp.' };
-    playerTooltipLines.push(`Cadence : ${tcMap[filters.playerTimeClass] ?? 'Toutes'}`);
-    if (filters.playerDateFrom || filters.playerDateTo) {
-      playerTooltipLines.push(`Période : ${filters.playerDateFrom || '…'} → ${filters.playerDateTo || '…'}`);
-    }
-    if (filters.playerEloMin > 0 || filters.playerEloMax < 3000) {
-      playerTooltipLines.push(`Elo adv : ${filters.playerEloMin} – ${filters.playerEloMax}`);
-    }
+  function switchToSavedPlayer() {
+    if (!savedPlayerStats) return;
+    setFilters({ currentDatabase: 'player', ...savedPlayerStats.filters });
+    scheduleStatsReload();
   }
 
   return (
@@ -146,7 +148,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
           >
             <span className="stats-filter-btn-label">Lichess</span>
             <span
-              className="stats-filter-btn-mini"
+              style={{ fontSize: '1rem', opacity: 0.9, cursor: 'pointer' }}
               title="Filtrer par Elo"
               onClick={toggleEloPanel}
             >
@@ -171,24 +173,73 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
         </button>
 
         {/* JOUEUR */}
-        <div className="stats-filter-btn-wrap">
-          <button
-            type="button"
-            id="stats-filter-player-btn"
-            className={`stats-filter-btn${isPlayer ? ' active' : ''}`}
-            onClick={() => openModal({ type: 'player-stats' })}
-            title="Analyser les parties d'un joueur Chess.com"
-          >
-            Joueur
-          </button>
-          {isPlayer && filters.playerUsername && (
+        <div className="stats-filter-btn-wrap" style={{ position: 'relative' }}>
+          {!isAuthenticated ? (
+            // Non connecté → redirige vers la modale de connexion
+            <button
+              type="button"
+              className="stats-filter-btn"
+              onClick={() => openModal({ type: 'auth' })}
+              title="Connectez-vous pour utiliser les stats joueur"
+            >
+              Joueur
+            </button>
+          ) : !savedPlayerStats ? (
+            // Connecté mais pas de stats sauvegardées → ouvre la modale
+            <button
+              type="button"
+              id="stats-filter-player-btn"
+              className={`stats-filter-btn${isPlayer ? ' active' : ''}`}
+              onClick={() => openModal({ type: 'player-stats' })}
+              title="Analyser les parties d'un joueur Chess.com"
+            >
+              Joueur
+            </button>
+          ) : (
+            // Connecté + stats sauvegardées → split button
+            <button
+              type="button"
+              id="stats-filter-player-btn"
+              className={`stats-filter-btn stats-filter-btn--split${isPlayer ? ' active' : ''}`}
+              onClick={switchToSavedPlayer}
+              title={`Stats de @${savedPlayerStats.filters.playerUsername}`}
+            >
+              <span className="stats-filter-btn-label">Joueur</span>
+              <span
+                style={{ fontSize: '1rem', opacity: 0.9, cursor: 'pointer' }}
+                title="Options"
+                onClick={(e) => { e.stopPropagation(); setPlayerDropdownOpen((v) => !v); }}
+              >
+                ▾
+              </span>
+            </button>
+          )}
+          {/* Dropdown (seulement si split button actif) */}
+          {isAuthenticated && savedPlayerStats && (
+            <div
+              className="stats-sort-menu"
+              hidden={!playerDropdownOpen}
+              style={{ minWidth: 160 }}
+            >
+              <button
+                type="button"
+                className={`stats-sort-menu-item${isPlayer ? ' active' : ''}`}
+                onClick={() => { switchToSavedPlayer(); setPlayerDropdownOpen(false); }}
+              >
+                @{savedPlayerStats.filters.playerUsername}
+              </button>
+              <button
+                type="button"
+                className="stats-sort-menu-item"
+                onClick={() => { setPlayerDropdownOpen(false); openModal({ type: 'player-stats' }); }}
+              >
+                Recharger / Autre compte
+              </button>
+            </div>
+          )}
+          {isPlayer && savedPlayerStats && (
             <span className="stats-filter-sub-label">
-              @{filters.playerUsername}
-              {playerTooltipLines.length > 0 && (
-                <span className="stats-player-tooltip">
-                  {playerTooltipLines.join('\n')}
-                </span>
-              )}
+              @{savedPlayerStats.filters.playerUsername}
             </span>
           )}
         </div>
@@ -205,7 +256,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
             <span style={{ flex: 1, textAlign: 'center', fontSize: '0.7rem' }}>
               Affichage
             </span>
-            <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>▾</span>
+            <span style={{ fontSize: '1rem', opacity: 0.9 }}>▾</span>
           </button>
           <div id="stats-sort-menu" className="stats-sort-menu" hidden={!sortMenuOpen}>
             {(Object.keys(SORT_LABELS) as StatsSortBy[]).map((s) => (

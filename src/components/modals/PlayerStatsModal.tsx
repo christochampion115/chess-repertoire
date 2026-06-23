@@ -1,13 +1,18 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useStatsStore } from '@/stores/statsStore';
-import { useChessStore } from '@/stores/chessStore';
+import { useAuthStore } from '@/stores/authStore';
+
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { ModalBox } from './ModalBox';
-import { fetchPlayerStats, fetchPlayerStatsBatch } from '@/services/stats';
-import { resetFreePlay } from '@/services/repertoire';
-import type { LichessStats } from '@/types/stats';
-import type { Color } from '@/types/chess';
+import { fetchPlayerStatsLoad, scheduleStatsReload } from '@/services/stats';
+
+const LOADING_MESSAGES = [
+  'Premier scan en cours',
+  'Récupération des parties',
+  'Répartitions des statistiques',
+  'On y est presque..',
+];
 
 const TIME_CLASS_OPTIONS = [
   { value: 'all',    label: 'Toutes' },
@@ -18,7 +23,8 @@ const TIME_CLASS_OPTIONS = [
 ];
 
 export function PlayerStatsModal() {
-  const closeModal = useUiStore((s) => s.closeModal);
+  const closeModal  = useUiStore((s) => s.closeModal);
+  const openModal   = useUiStore((s) => s.openModal);
 
   const [username, setUsername]         = useState('');
   const [color, setColor]               = useState<'white' | 'black'>('white');
@@ -31,16 +37,34 @@ export function PlayerStatsModal() {
   const [eloMin, setEloMin]             = useState('');
   const [eloMax, setEloMax]             = useState('');
 
-  const [loading, setLoading]     = useState(false);
-  const [progress, setProgress]   = useState(0);
-  const [loadingPhase, setLoadingPhase] = useState<'idle' | 'conn' | 'load' | 'blunders' | 'done'>('idle');
+  const [loading, setLoading]           = useState(false);
+  const [progress, setProgress]         = useState(0);
+  const [loadingPhase, setLoadingPhase] = useState<'idle' | 'conn' | 'archive' | 'positions' | 'done'>('idle');
   const [gamesTarget, setGamesTarget]   = useState(0);
-  const [error, setError]         = useState('');
+  const [positionsCurrent, setPositionsCurrent] = useState(0);
+  const [positionsTotal, setPositionsTotal]     = useState(0);
+  const [error, setError]               = useState('');
   const animatedGames = useAnimatedCounter(gamesTarget);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const [statusMsgIdx, setStatusMsgIdx] = useState(0);
+  const statusIntervalRef = useRef<ReturnType<typeof setInterval>>();
+  const abortRef          = useRef<AbortController | null>(null);
   const archiveStartedRef = useRef(false);
-  const rafRef = useRef(0);
+  const rafRef            = useRef(0);
+
+  useEffect(() => {
+    if (loadingPhase === 'archive' && gamesTarget === 0) {
+      statusIntervalRef.current = setInterval(() => {
+        setStatusMsgIdx((prev) => Math.min(prev + 1, 3));
+      }, 5000);
+    } else {
+      clearInterval(statusIntervalRef.current);
+      setStatusMsgIdx(0);
+    }
+    return () => clearInterval(statusIntervalRef.current);
+  }, [loadingPhase, gamesTarget]);
+
+  const token = useAuthStore.getState().token;
 
   async function handleSubmit() {
     const trimmedUser = username.trim();
@@ -51,6 +75,8 @@ export function PlayerStatsModal() {
     setProgress(0);
     setLoadingPhase('conn');
     setGamesTarget(0);
+    setPositionsCurrent(0);
+    setPositionsTotal(0);
     archiveStartedRef.current = false;
 
     const abortCtrl = new AbortController();
@@ -62,7 +88,7 @@ export function PlayerStatsModal() {
     const connLoop = (now: number) => {
       if (archiveStartedRef.current) { cancelAnimationFrame(rafRef.current); return; }
       const elapsed = now - animStart;
-      setProgress(Math.min((elapsed / CONN_DURATION) * 20, 20));
+      setProgress(Math.min(Math.round((elapsed / CONN_DURATION) * 10), 10));
       if (elapsed < CONN_DURATION) rafRef.current = requestAnimationFrame(connLoop);
     };
     rafRef.current = requestAnimationFrame(connLoop);
@@ -84,82 +110,36 @@ export function PlayerStatsModal() {
       playerEloMax,
     };
 
-    const onProgress = (p: { current: number; total: number; gamesInArchive: number }) => {
+    const onArchive = (data: { current: number; total: number; gamesInArchive: number }) => {
       if (!archiveStartedRef.current) {
         archiveStartedRef.current = true;
         cancelAnimationFrame(rafRef.current);
-        setLoadingPhase('load');
+        setLoadingPhase('archive');
       }
-      setProgress(20 + Math.round((p.current / p.total) * 65));
-      setGamesTarget((prev) => prev + p.gamesInArchive);
+      setProgress(10 + Math.round((data.current / data.total) * 65));
+      setGamesTarget((prev) => prev + data.gamesInArchive);
+    };
+
+    const onPositions = (data: { current: number; total: number }) => {
+      setLoadingPhase('positions');
+      setProgress(75 + Math.round((data.current / data.total) * 20));
+      setPositionsCurrent(data.current);
+      setPositionsTotal(data.total);
     };
 
     try {
-      // Reposition board to start
-      const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-      resetFreePlay(START_FEN, color as Color);
-      const store = useStatsStore.getState();
-      store.setLastStatsRequestKey('');
-
-      const fen = START_FEN;
-      const normFen = fen.split(' ').slice(0, 3).join(' ');
-      const cacheKey = `${normFen}|player|${trimmedUser}|${color}|${timeClass}|${dateFrom}-${dateTo}|${playerEloMin}-${playerEloMax}`;
-
-      // Check front-end cache first
-      if (store.statsCache[cacheKey] !== undefined) {
-        cancelAnimationFrame(rafRef.current);
-        store.setFilters({ currentDatabase: 'player', ...newFilters, eloPanelOpen: false });
-        store.setLichessStats(store.statsCache[cacheKey]);
-        store.setLastStatsRequestKey(cacheKey);
-        store.setSelectedUci('');
-        store.setData(store.statsCache[cacheKey] as LichessStats | null);
-        store.setLoading(false);
-        closeModal();
-        return;
-      }
-
-      const stats = await fetchPlayerStats(fen, newFilters, abortCtrl.signal, onProgress);
+      const result = await fetchPlayerStatsLoad(newFilters, abortCtrl.signal, onArchive, onPositions);
 
       cancelAnimationFrame(rafRef.current);
-      setProgress(85);
-      setLoadingPhase('blunders');
-
-      // Pre-cache other positions for instant navigation after modal close
-      const allFens = new Set<string>();
-      const chess = useChessStore.getState().chess;
-      const legalMoves = chess.moves({ verbose: true }) as Array<{ san: string }>;
-      for (const m of legalMoves) {
-        chess.move(m.san);
-        allFens.add(chess.fen());
-        chess.undo();
-      }
-      allFens.delete(fen);
-      if (allFens.size > 0) {
-        const s = useStatsStore.getState();
-        await Promise.race([
-          fetchPlayerStatsBatch([...allFens], newFilters).then((result: Record<string, unknown>) => {
-            for (const [f, st] of Object.entries(result)) {
-              const nf = f.split(' ').slice(0, 3).join(' ');
-              const bKey = `${nf}|player|${trimmedUser}|${color}|${timeClass}|${dateFrom}-${dateTo}|${playerEloMin}-${playerEloMax}`;
-              if (s.statsCache[bKey] === undefined) s.statsCache[bKey] = st;
-            }
-          }).catch(() => {}),
-          new Promise((r) => setTimeout(r, 30000)),
-        ]);
-      }
-
       setProgress(100);
       setLoadingPhase('done');
+
       await new Promise((r) => setTimeout(r, 400));
 
-      const store2 = useStatsStore.getState();
-      store2.setFilters({ currentDatabase: 'player', ...newFilters, eloPanelOpen: false });
-      store2.setLichessStats(stats);
-      store2.setLastStatsRequestKey(cacheKey);
-      store2.setSelectedUci('');
-      store2.setStatsCacheEntry(cacheKey, stats);
-      store2.setData(stats as LichessStats | null);
-      store2.setLoading(false);
+      const store = useStatsStore.getState();
+      store.setSavedPlayerStats({ cacheKey: result.cacheKey, filters: newFilters, createdAt: new Date().toISOString() });
+      store.setFilters({ currentDatabase: 'player', ...newFilters, eloPanelOpen: false });
+      scheduleStatsReload(); // force=true, bypass stale statsCache
 
       closeModal();
     } catch (err: unknown) {
@@ -180,8 +160,31 @@ export function PlayerStatsModal() {
     setLoadingPhase('idle');
   }
 
+  function handleClose() {
+    if (!loading) closeModal();
+  }
+
+  if (!token) {
+    return (
+      <ModalBox title="Statistiques joueur (Chess.com)" onClose={closeModal}>
+        <div className="ps-form">
+          <p className="ps-form__hint">Connexion requise pour charger les statistiques joueur.</p>
+          <div className="modal-actions">
+            <button className="ctrl-btn" onClick={closeModal}>Fermer</button>
+            <button
+              className="ctrl-btn ctrl-btn--primary"
+              onClick={() => { openModal({ type: 'auth' }); closeModal(); }}
+            >
+              Se connecter
+            </button>
+          </div>
+        </div>
+      </ModalBox>
+    );
+  }
+
   return (
-    <ModalBox title="Statistiques joueur (Chess.com)">
+    <ModalBox title="Statistiques joueur (Chess.com)" onClose={handleClose}>
       {loading ? (
         <div className="ps-progress">
           <p className="ps-progress__title">Chargement des parties de @{username}…</p>
@@ -192,10 +195,11 @@ export function PlayerStatsModal() {
             />
           </div>
           <p className="ps-progress__step">
-            {loadingPhase === 'conn' && 'Connexion au serveur…'}
-            {loadingPhase === 'load' && `${animatedGames} partie${animatedGames > 1 ? 's' : ''} chargée${animatedGames > 1 ? 's' : ''}`}
-            {loadingPhase === 'blunders' && 'Calcul des blunders…'}
-            {loadingPhase === 'done' && 'Terminé ✓'}
+            {loadingPhase === 'conn'      && 'Connexion au serveur…'}
+            {loadingPhase === 'archive' && gamesTarget === 0 && LOADING_MESSAGES[Math.min(statusMsgIdx, 3)]}
+            {loadingPhase === 'archive' && gamesTarget > 0 && `${Math.floor(animatedGames)} partie(s) chargée(s)`}
+            {loadingPhase === 'positions' && `Précalcul des positions… (${positionsCurrent} / ${positionsTotal})`}
+            {loadingPhase === 'done'      && 'Terminé ✓'}
           </p>
           <div className="modal-actions">
             <button className="ctrl-btn ctrl-btn--danger" onClick={handleAbort}>

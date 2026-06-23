@@ -8,6 +8,49 @@ export interface PatchNoteEntry {
 
 export const PATCH_NOTES: PatchNoteEntry[] = [
   {
+    id: 'v2.1.0',
+    date: '23/06/2026',
+    title: 'Stats joueur persistantes & correctifs',
+    excerpt: 'Refonte complète du système de stats joueur Chess.com avec stockage en base de données, précalcul intégral des positions, navigation instantanée entre les vues, et une série de correctifs d\'interface.',
+    content: `Cette mise à jour apporte une refonte majeure des statistiques joueur ainsi que de nombreuses corrections.
+
+**Stats joueur — refonte complète**
+• Les statistiques chargées sont désormais stockées en base de données et persistent entre les sessions.
+• Précalcul intégral de toutes les positions au chargement : navigation instantanée (< 1s) sur l'ensemble des coups.
+• Nouveau menu sur le bouton « Joueur » : basculez directement vers les stats déjà chargées ou ouvrez la modale pour un autre compte.
+• Bascule fluide entre les vues Lichess et Joueur sans rechargement.
+• Messages de progression améliorés avec phrases défilantes (« Premier scan en cours… », « Récupération des parties… ») comme pour le rapport.
+• Authentification requise pour les stats joueur, avec redirection vers la modale de connexion.
+
+**Moniteur & Panneau latéral**
+• Le bouton « Jeu libre » est maintenant fixe en haut à droite et ne bouge plus.
+• La police des noms de variantes dans le moniteur a été réduite pour un affichage plus lisible.
+• Le panneau d'analyse conserve une hauteur minimale fixe pour éviter les sauts visuels indésirables.
+
+**Coups candidats**
+• Correction d'un bug où les vignettes de stats se figeaient avec des cercles de chargement gris.
+• Les annotations par coup ne se déclenchent plus sur des données obsolètes.
+
+**Stats Lichess**
+• Correction de la position de l'interrupteur de filtre Elo, désormais aligné sur le bouton « Tri ».
+• Les boutons de filtres Elo et Tri ont leurs flèches agrandies pour une meilleure lisibilité.
+
+**Modales**
+• La fermeture de la modale de statistiques est bloquée pendant un chargement en cours.
+• La modale de paramètres d'analyse se ferme en cliquant à l'extérieur.
+• Les clics hors modale ne la ferment plus intempestivement.
+
+**Entraînement**
+• Depuis l'écran d'accueil, lancer un entraînement sur une variante précise ne lance plus l'intégralité du répertoire.
+• La modale de sélection d'entraînement ne disparaît plus avant le démarrage effectif.
+• La barre d'évaluation est masquée pendant l'entraînement.
+
+**Divers**
+• Correction du surlignage doré des mini-boards (coup correct mis en valeur).
+• Les flèches dynamiques et l'analyse n'affichent plus les coups des deux couleurs simultanément.
+• Correction de la qualité d'analyse (évaluations cohérentes avec la position réelle).`,
+  },
+  {
     id: 'v2.0.0',
     date: '21/06/2026',
     title: 'Migration TypeScript & correction de bugs',

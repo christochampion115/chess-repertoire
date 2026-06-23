@@ -88,7 +88,9 @@ export class StockfishWorker {
         resolvers.forEach((r) => r());
         return;
       }
-      this.onReadyCb?.();
+      const cb = this.onReadyCb;
+      this.onReadyCb = null;
+      cb?.();
       return;
     }
 

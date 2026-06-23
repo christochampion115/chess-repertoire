@@ -62,6 +62,16 @@ const PG_DDLS = [
     settings TEXT NOT NULL DEFAULT '{}',
     "updatedAt" TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS player_stats_cache (
+    id SERIAL PRIMARY KEY,
+    "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    "cacheKey" TEXT NOT NULL,
+    "fen" TEXT NOT NULL,
+    "data" TEXT NOT NULL,
+    "createdAt" TIMESTAMP DEFAULT NOW(),
+    UNIQUE("userId", "cacheKey", "fen")
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_player_stats_cache ON player_stats_cache("userId", "cacheKey", "fen")`,
 ];
 
 function convertPlaceholders(sql) {
@@ -128,6 +138,16 @@ const SQLITE_DDLS = [
     settings TEXT NOT NULL DEFAULT '{}',
     "updatedAt" TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS player_stats_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    "cacheKey" TEXT NOT NULL,
+    "fen" TEXT NOT NULL,
+    "data" TEXT NOT NULL,
+    "createdAt" TEXT DEFAULT (datetime('now')),
+    UNIQUE("userId", "cacheKey", "fen")
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_player_stats_cache ON player_stats_cache("userId", "cacheKey", "fen")`,
 ];
 
 function sqliteRun(sql, params = []) {
@@ -249,6 +269,50 @@ async function withTransaction(fn) {
   return sqliteTransaction(fn);
 }
 
+// ─── Player stats cache helpers ─────────────────────────────────────────────
+
+async function getPlayerStatFromCache(userId, cacheKey, fen) {
+  return get(null, `SELECT "data" FROM player_stats_cache WHERE "userId" = ? AND "cacheKey" = ? AND "fen" = ?`, [userId, cacheKey, fen]);
+}
+
+async function deletePlayerStatsForUser(userId) {
+  await run(null, `DELETE FROM player_stats_cache WHERE "userId" = ?`, [userId]);
+}
+
+async function bulkInsertPlayerStats(userId, cacheKey, rows) {
+  if (!rows || rows.length === 0) return;
+  await withTransaction(async (client) => {
+    if (USE_PG) {
+      // unnest : une seule requête réseau pour toutes les lignes
+      // évite N aller-retours réseau × latence (~50 ms/req sur DB distante)
+      await client.query(
+        `INSERT INTO player_stats_cache ("userId", "cacheKey", "fen", "data")
+         SELECT $1, $2, unnest($3::text[]), unnest($4::text[])
+         ON CONFLICT ("userId", "cacheKey", "fen")
+         DO UPDATE SET "data" = EXCLUDED."data", "createdAt" = NOW()`,
+        [userId, cacheKey, rows.map(r => r.fen), rows.map(r => r.data)]
+      );
+    } else {
+      // SQLite : multi-row INSERT, 200 lignes/statement (800 params < limite 999)
+      // réduit les round-trips node→SQLite de N_rows à ceil(N_rows/200)
+      const ROWS_PER_STMT = 200;
+      for (let i = 0; i < rows.length; i += ROWS_PER_STMT) {
+        const chunk = rows.slice(i, i + ROWS_PER_STMT);
+        const placeholders = chunk.map(() => '(?, ?, ?, ?)').join(', ');
+        const params = chunk.flatMap(({ fen, data }) => [userId, cacheKey, fen, data]);
+        await sqliteRun(
+          `INSERT OR REPLACE INTO player_stats_cache ("userId", "cacheKey", "fen", "data") VALUES ${placeholders}`,
+          params
+        );
+      }
+    }
+  });
+}
+
+async function getSavedPlayerStatsMeta(userId) {
+  return get(null, `SELECT "cacheKey", "createdAt" FROM player_stats_cache WHERE "userId" = ? ORDER BY "createdAt" DESC LIMIT 1`, [userId]);
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -256,4 +320,8 @@ module.exports = {
   get,
   all,
   withTransaction,
+  getPlayerStatFromCache,
+  deletePlayerStatsForUser,
+  bulkInsertPlayerStats,
+  getSavedPlayerStatsMeta,
 };

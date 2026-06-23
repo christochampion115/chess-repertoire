@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { Monitor } from '@/components/monitor/Monitor';
 import { AnalysisPanel } from '@/components/analysis/AnalysisPanel';
@@ -53,6 +53,20 @@ export const RightPanel = React.memo(function RightPanel() {
   const setFilter      = useStatsStore((s) => s.setFilter);
   const fen            = chess.fen();
   const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  const closeSettings = useCallback(() => setShowSettings(false), []);
+
+  useEffect(() => {
+    if (!showSettings) return;
+    const handler = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        closeSettings();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSettings, closeSettings]);
   const trainingPhase  = useTrainingStore((s) => s.phase);
   const trainingMode   = useTrainingStore((s) => s.mode);
   const trainingRoot   = useTrainingStore((s) => s.root);
@@ -90,12 +104,12 @@ export const RightPanel = React.memo(function RightPanel() {
               )}
             </div>
           </div>
-          {!isTraining && (activeRepIndex >= 0 ? (
-            <button className="btn-switch-freeplay" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>Passer en jeu libre</button>
-          ) : (
-            <button className="btn-open-new-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
-          ))}
         </div>
+        {!isTraining && (activeRepIndex >= 0 ? (
+          <button className="btn-switch-freeplay" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>Jeu libre</button>
+        ) : (
+          <button className="btn-open-new-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
+        ))}
 
         {/* ── PGN + commentaire (Monitor) ────────────────────── */}
         <Monitor />
@@ -108,7 +122,7 @@ export const RightPanel = React.memo(function RightPanel() {
 
         {/* ── Section Analyse (masquée pendant l'entraînement) ─── */}
         {!isTraining && (
-        <div className="monitor-analysis-section" id="monitor-analysis-section">
+        <div className={`monitor-analysis-section${isEnabled ? ' is-active' : ''}`} id="monitor-analysis-section">
           <div className="monitor-analysis-header">
 
             {/* Titre + toggle switch */}
@@ -125,25 +139,27 @@ export const RightPanel = React.memo(function RightPanel() {
               </label>
             </div>
 
-            {/* Bouton rouage paramètres (id analysis-depth-inline pour compat vanilla) */}
-            {isEnabled && (
-              <button
-                className="analysis-settings-btn"
-                id="analysis-settings-btn"
-                aria-expanded={showSettings}
-                onClick={() => setShowSettings((v) => !v)}
-              >
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="8" cy="8" r="2.5" />
-                  <path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.5 2.5l1.5 1.5M12 12l1.5 1.5M2.5 13.5l1.5-1.5M12 4l1.5-1.5" />
-                </svg>
-              </button>
-            )}
+            <div ref={settingsRef} style={{ display: 'contents' }}>
+              {/* Bouton rouage paramètres (id analysis-depth-inline pour compat vanilla) */}
+              {isEnabled && (
+                <button
+                  className="analysis-settings-btn"
+                  id="analysis-settings-btn"
+                  aria-expanded={showSettings}
+                  onClick={() => setShowSettings((v) => !v)}
+                >
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="8" r="2.5" />
+                    <path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.5 2.5l1.5 1.5M12 12l1.5 1.5M2.5 13.5l1.5-1.5M12 4l1.5-1.5" />
+                  </svg>
+                </button>
+              )}
 
-            {/* Panneau déroulant paramètres — enfant du header pour position fixe */}
-            {isEnabled && showSettings && (
-              <AnalysisPanel />
-            )}
+              {/* Panneau déroulant paramètres — enfant du header pour position fixe */}
+              {isEnabled && showSettings && (
+                <AnalysisPanel />
+              )}
+            </div>
           </div>
 
           {/* Lignes de résultats */}

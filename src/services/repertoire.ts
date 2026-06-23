@@ -228,6 +228,9 @@ export function initializeService(): void {
   initNodeMap();
   sanitizeAllRepertoires();
 
+  const { phase } = useTrainingStore.getState();
+  if (phase !== 'idle') return;
+
   const repStore = useRepertoireStore.getState();
   const { freePlayRoot, currentNodeId, repertoires, activeRepIndex } = repStore;
 
