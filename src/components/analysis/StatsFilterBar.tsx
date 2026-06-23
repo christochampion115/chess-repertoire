@@ -146,7 +146,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
           >
             <span className="stats-filter-btn-label">Lichess</span>
             <span
-              className="stats-filter-btn-mini"
+              style={{ fontSize: '0.6rem', opacity: 0.7, cursor: 'pointer' }}
               title="Filtrer par Elo"
               onClick={toggleEloPanel}
             >

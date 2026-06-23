@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useStatsStore } from '@/stores/statsStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
@@ -51,6 +51,7 @@ export const CandidatesSection = React.memo(function CandidatesSection() {
   const annotationsLoading  = useAnalysisStore((s) => s.annotationsLoading);
   const annotations         = useAnalysisStore((s) => s.annotations);
   const annotationsDepth    = useAnalysisStore((s) => s.annotationsDepth);
+  const annotationsKey      = useAnalysisStore((s) => s.annotationsKey);
   const runChildAnnotations = useAnalysisStore((s) => s.runChildAnnotations);
   const { showTooltip, hideTooltip } = useTooltipContext();
 
@@ -58,18 +59,23 @@ export const CandidatesSection = React.memo(function CandidatesSection() {
   const sideToMoveIsWhite = chess.turn() === 'w';
   const fen = chess.fen();
 
-  const prevFenRef = useRef(fen);
+  const lastStatsRequestKey = useStatsStore((s) => s.lastStatsRequestKey);
 
   // Déclencher les annotations par-coup quand la position change
   useEffect(() => {
     if (!isAnalysisEnabled || loading || !data?.moves?.length) return;
-    if (fen === prevFenRef.current && Object.keys(annotations).length > 0) return;
-    prevFenRef.current = fen;
+
+    // Stale data guard : les stats doivent correspondre à la position
+    const normFen = fen.split(' ').slice(0, 3).join(' ');
+    if (!lastStatsRequestKey.startsWith(normFen)) return;
+
+    // Annotations déjà calculées pour cette position
+    if (annotationsKey === fen && Object.keys(annotations).length > 0) return;
 
     const ucis = data.moves.map((m) => m.uci).filter(Boolean) as string[];
     const depth = annotationsDepth || 10;
     runChildAnnotations(fen, ucis, depth);
-  }, [fen, isAnalysisEnabled, loading, data, annotationsDepth, annotations, runChildAnnotations]);
+  }, [fen, isAnalysisEnabled, loading, data, annotationsDepth, annotationsKey, lastStatsRequestKey]);
 
   const allMoves   = data?.moves ?? [];
   const sorted     = sortMoves(allMoves, sortBy, sideToMoveIsWhite, fen, annotations);

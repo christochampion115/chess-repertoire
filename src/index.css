@@ -406,6 +406,11 @@ body {
   display: none;
 }
 
+.monitor-analysis-section.is-active #analysis-panel {
+  min-height: 150px;
+  overflow-y: auto;
+}
+
 .monitor-analysis-header {
   display: flex;
   align-items: center;
@@ -2839,9 +2844,7 @@ body {
 }
 
 .stats-filter-btn--split {
-  justify-content: space-between;
-  gap: 5px;
-  padding-right: 4px;
+  gap: 4px;
 }
 
 .stats-filter-btn-label {
@@ -2850,27 +2853,6 @@ body {
   gap: 5px;
   flex: 1;
   justify-content: center;
-}
-
-.stats-filter-btn-mini {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  border-radius: 5px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(148, 163, 184, 0.08);
-  color: #dbeafe;
-  font-size: 0.66rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.stats-filter-btn-mini:hover {
-  background: rgba(122, 174, 203, 0.2);
-  border-color: rgba(122, 174, 203, 0.68);
 }
 
 .stats-filter-btn:hover:not(:disabled) {

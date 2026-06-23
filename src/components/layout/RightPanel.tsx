@@ -122,7 +122,7 @@ export const RightPanel = React.memo(function RightPanel() {
 
         {/* ── Section Analyse (masquée pendant l'entraînement) ─── */}
         {!isTraining && (
-        <div className="monitor-analysis-section" id="monitor-analysis-section">
+        <div className={`monitor-analysis-section${isEnabled ? ' is-active' : ''}`} id="monitor-analysis-section">
           <div className="monitor-analysis-header">
 
             {/* Titre + toggle switch */}

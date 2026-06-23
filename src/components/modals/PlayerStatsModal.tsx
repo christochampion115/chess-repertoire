@@ -180,8 +180,12 @@ export function PlayerStatsModal() {
     setLoadingPhase('idle');
   }
 
+  function handleClose() {
+    if (!loading) closeModal();
+  }
+
   return (
-    <ModalBox title="Statistiques joueur (Chess.com)">
+    <ModalBox title="Statistiques joueur (Chess.com)" onClose={handleClose}>
       {loading ? (
         <div className="ps-progress">
           <p className="ps-progress__title">Chargement des parties de @{username}…</p>
