@@ -5,7 +5,7 @@ import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
-import { nodeMap, expandPathToCurrentNode } from './repertoire';
+import { nodeMap, expandPathToCurrentNode, initNodeMap } from './repertoire';
 import { apiRequest } from '@/services/api';
 import type { RepertoireNode } from '@/types/repertoire';
 import type { Color, Square } from '@/types/chess';
@@ -395,6 +395,7 @@ function buildTrainingLabel(node: RepertoireNode, repColor: Color): string {
 }
 
 export function confirmTrainingStart(): void {
+  initNodeMap();
   console.log('[TRAINING] confirmTrainingStart called', { pendingTrainingMode, pendingTrainingColor: pendingTrainingColor, hasNode: !!pendingTrainingNode });
   const node = pendingTrainingNode;
   if (!node) return;

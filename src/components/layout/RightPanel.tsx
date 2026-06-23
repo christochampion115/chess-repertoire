@@ -104,12 +104,12 @@ export const RightPanel = React.memo(function RightPanel() {
               )}
             </div>
           </div>
-          {!isTraining && (activeRepIndex >= 0 ? (
-            <button className="btn-switch-freeplay" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>Passer en jeu libre</button>
-          ) : (
-            <button className="btn-open-new-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
-          ))}
         </div>
+        {!isTraining && (activeRepIndex >= 0 ? (
+          <button className="btn-switch-freeplay" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>Jeu libre</button>
+        ) : (
+          <button className="btn-open-new-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
+        ))}
 
         {/* ── PGN + commentaire (Monitor) ────────────────────── */}
         <Monitor />

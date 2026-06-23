@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import { EvalBar } from './EvalBar';
 
 /**
@@ -9,11 +10,12 @@ import { EvalBar } from './EvalBar';
  * and boardFlipped from chessStore.
  */
 export const EvalBarConnected = React.memo(function EvalBarConnected() {
-  const isEnabled   = useAnalysisStore((s) => s.isEnabled);
-  const results     = useAnalysisStore((s) => s.results);
-  const boardFlipped = useChessStore((s) => s.boardFlipped);
+  const isEnabled     = useAnalysisStore((s) => s.isEnabled);
+  const results       = useAnalysisStore((s) => s.results);
+  const boardFlipped  = useChessStore((s) => s.boardFlipped);
+  const trainingPhase = useTrainingStore((s) => s.phase);
 
-  if (!isEnabled || results.length === 0) return null;
+  if (!isEnabled || results.length === 0 || trainingPhase !== 'idle') return null;
 
   const first = results[0];
   if (!first) return null;

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
@@ -16,15 +16,13 @@ const TRAINING_MODES: Record<TrainingMode, { label: string; description: string 
   randomizer: { label: 'Randomizer', description: 'Affiche des positions de test totalement au hasard dans l\'arbre, sans reroll.' },
 };
 
-function pruneTree(node: RepertoireNode, keepIds: Set<string>): RepertoireNode | null {
-  if (keepIds.has(node.id)) return node;
-  const keptChildren: RepertoireNode[] = [];
+function findNodeById(node: RepertoireNode, id: string): RepertoireNode | null {
+  if (node.id === id) return node;
   for (const child of node.children) {
-    const pruned = pruneTree(child, keepIds);
-    if (pruned) keptChildren.push(pruned);
+    const found = findNodeById(child, id);
+    if (found) return found;
   }
-  if (keptChildren.length === 0) return null;
-  return { ...node, children: keptChildren };
+  return null;
 }
 
 interface VariantEntry {
@@ -48,7 +46,6 @@ export function HomeTrainingModal() {
   const closeModal = useUiStore((s) => s.closeModal);
   const openModal = useUiStore((s) => s.openModal);
   const navigate = useNavigate();
-  const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const repertoires = useRepertoireStore((s) => s.repertoires);
   const activeRepIndex = useRepertoireStore((s) => s.activeRepIndex);
@@ -65,13 +62,6 @@ export function HomeTrainingModal() {
   });
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<TrainingMode>('vertical');
-  const [pendingNavigation, setPendingNavigation] = useState(false);
-
-  useEffect(() => {
-    if (pendingNavigation && location.pathname === '/app') {
-      closeModal();
-    }
-  }, [location.pathname, pendingNavigation]);
 
   const handleStart = () => {
     if (selectedIdx === null || !repertoires[selectedIdx] || !selectedId) return;
@@ -81,15 +71,15 @@ export function HomeTrainingModal() {
     if (selectedId === rep.id) {
       prepareTraining(rep, repColor);
     } else {
-      const pruned = pruneTree(rep, new Set([selectedId]));
-      if (!pruned) return;
-      prepareTraining(pruned, repColor);
+      const targetNode = findNodeById(rep, selectedId);
+      if (!targetNode) return;
+      prepareTraining(targetNode, repColor);
     }
 
     setPendingTrainingMode(mode);
-    setPendingNavigation(true);
     navigate('/app');
     confirmTrainingStart();
+    closeModal();
   };
 
   const handleSelectRep = (idx: number) => {

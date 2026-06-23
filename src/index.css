@@ -275,8 +275,6 @@ body {
 .monitor-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   width: 100%;
 }
 .monitor-header > div:first-child {
@@ -285,6 +283,10 @@ body {
 }
 
 .btn-switch-freeplay {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
   background: var(--surface-soft);
   color: var(--text-main);
   border: 1px solid var(--soft-border);
@@ -293,11 +295,9 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 8px 18px rgba(0,0,0,0.16);
   transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-  flex-shrink: 0;
-  min-width: 100px;
-  text-align: center;
 }
 .btn-switch-freeplay:hover {
   background: rgba(122, 174, 203, 0.12);
@@ -305,6 +305,10 @@ body {
   transform: translateY(-1px);
 }
 .btn-open-new-rep {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
   background: var(--surface-soft);
   color: var(--text-main);
   border: 1px solid var(--soft-border);
@@ -313,11 +317,9 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 8px 18px rgba(0,0,0,0.16);
   transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-  flex-shrink: 0;
-  min-width: 100px;
-  text-align: center;
 }
 .btn-open-new-rep:hover {
   background: rgba(122, 174, 203, 0.12);
@@ -331,6 +333,10 @@ body {
   letter-spacing: -0.02em;
   line-height: 1.2;
   min-height: 1.4em;
+  padding-right: 125px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .monitor-title-name {
   font-weight: 800;
@@ -338,6 +344,7 @@ body {
 .monitor-title-vars {
   font-weight: 400;
   margin-top: 2px;
+  font-size: 0.85rem;
 }
 
 .monitor-pgn {
