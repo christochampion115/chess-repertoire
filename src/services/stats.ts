@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useStatsStore } from '@/stores/statsStore';
 import { useChessStore } from '@/stores/chessStore';
+import { useAuthStore } from '@/stores/authStore';
 import type { LichessStats } from '@/types/stats';
 
 function getStatsRequestKey(fen: string): string {
@@ -208,11 +209,13 @@ export async function fetchPlayerStats(fen: string, playerFilters: any = {}, sig
 
   if (onProgress) {
     const sseCandidates = buildProxyCandidates('/api/chesscom/stats/stream');
+    const token = useAuthStore.getState().token;
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     for (const endpoint of sseCandidates) {
       if (signal?.aborted) throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
       const url = `${endpoint}?${params.toString()}`;
       try {
-        const response = await fetch(url, { headers: { Accept: 'text/event-stream' }, signal, mode: 'cors' });
+        const response = await fetch(url, { headers: { Accept: 'text/event-stream', ...authHeaders }, signal, mode: 'cors' });
         if (!response.ok) continue;
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
@@ -242,13 +245,15 @@ export async function fetchPlayerStats(fen: string, playerFilters: any = {}, sig
 
   const proxyCandidates = buildProxyCandidates('/api/chesscom/stats');
   const networkErrors: string[] = [];
+  const token = useAuthStore.getState().token;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   for (const endpoint of proxyCandidates) {
     if (signal?.aborted) throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
     const url = `${endpoint}?${params.toString()}`;
     const t0 = performance.now();
     try {
-      const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' }, signal }, 90000);
+      const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json', ...authHeaders }, signal }, 90000);
       const t1 = performance.now();
       console.log(`[stats] GET ${endpoint} → ${response.status} (${Math.round(t1 - t0)}ms)`);
       if (!response.ok) {
@@ -298,4 +303,74 @@ export async function fetchPlayerStatsBatch(fens: string[], playerFilters: any =
     } catch { /* essaie le candidat suivant */ }
   }
   return {};
+}
+
+// ─── SSE : précalcul intégral Chess.com (nécessite un compte) ─────────────────
+// Retourne les métadonnées du set stocké en DB : { cacheKey, totalPositions, totalGames }.
+export async function fetchPlayerStatsLoad(
+  playerFilters: any = {},
+  signal: AbortSignal | null = null,
+  onArchive: ((d: any) => void) | null = null,
+  onPositions: ((d: any) => void) | null = null,
+): Promise<{ cacheKey: string; totalPositions: number; totalGames: number }> {
+  const {
+    playerUsername = '',
+    playerColor = 'white',
+    playerTimeClass = 'all',
+    playerDateFrom = '',
+    playerDateTo = '',
+    playerEloMin = 0,
+    playerEloMax = 3000,
+  } = playerFilters;
+
+  const params = new URLSearchParams({ username: playerUsername, color: playerColor });
+  if (playerTimeClass && playerTimeClass !== 'all') params.set('timeClass', playerTimeClass);
+  if (playerDateFrom) params.set('dateFrom', playerDateFrom);
+  if (playerDateTo) params.set('dateTo', playerDateTo);
+  if (playerEloMin > 0) params.set('eloMin', String(playerEloMin));
+  if (playerEloMax < 3000) params.set('eloMax', String(playerEloMax));
+
+  const token = useAuthStore.getState().token;
+  if (!token) throw new Error('Connexion requise pour charger les stats joueur');
+
+  const sseCandidates = buildProxyCandidates('/api/chesscom/stats/load/stream');
+
+  for (const endpoint of sseCandidates) {
+    if (signal?.aborted) throw new DOMException('Annulé par l\'utilisateur', 'AbortError');
+    const url = `${endpoint}?${params.toString()}`;
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: 'text/event-stream', Authorization: `Bearer ${token}` },
+        signal,
+        mode: 'cors',
+      });
+      if (!response.ok) {
+        if (response.status === 401) throw new Error('Session expirée, veuillez vous reconnecter');
+        continue;
+      }
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'archive')   { onArchive?.(data); }
+          else if (data.type === 'positions') { onPositions?.(data); }
+          else if (data.type === 'complete')  { return data; }
+          else if (data.type === 'error')     { throw new Error(data.error); }
+        }
+      }
+    } catch (error: any) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
+      if (error?.message?.includes('Session expirée')) throw error;
+      // essaie le candidat suivant
+    }
+  }
+  throw new Error('Impossible de joindre le backend pour le chargement des stats joueur');
 }

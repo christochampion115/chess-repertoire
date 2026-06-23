@@ -10,11 +10,13 @@ import { loadStatsIfNeeded } from '@/services/stats';
 export function useStatsAutoLoad(): void {
   const fen = useChessStore((s) => s.chess.fen());
   const database = useStatsStore((s) => s.filters.currentDatabase);
-  const lastFen = useRef('');
+  const lastKey = useRef('');
 
   useEffect(() => {
-    if (!fen || fen === lastFen.current) return;
-    lastFen.current = fen;
+    if (!fen) return;
+    const key = `${database}|${fen}`;
+    if (key === lastKey.current) return;
+    lastKey.current = key;
     loadStatsIfNeeded(fen);
   }, [fen, database]);
 }

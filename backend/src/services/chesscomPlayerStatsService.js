@@ -642,4 +642,58 @@ async function getChesscomReport(filters, { minFreq = 3 } = {}, onProgress = nul
   };
 }
 
-module.exports = { getChesscomPlayerStats, getChesscomPlayerStatsBatch, getChesscomReport };
+// ── Précalcul intégral + stockage DB ─────────────────────────────────────────
+// Charge toutes les parties, construit la map globale fenNorm → stats,
+// supprime l'ancien set de l'utilisateur, et insère tout en DB par chunks.
+async function computeAndStoreAllPositions(filters, userId, onPositionProgress, db) {
+  // Extract the archive progress callback injected by the route (not a real filter field)
+  const { _onArchiveProgress, ...cleanFilters } = filters;
+
+  const { totalGames, truncated, parsedGames } = await ensureGamesLoaded(cleanFilters, _onArchiveProgress || null);
+  const message = truncated
+    ? `Analyse limitée à ${GAME_LIMIT} parties. Affinez la période ou la cadence pour plus de précision.`
+    : '';
+
+  // Construire positionMap : fenNorm → matches[]
+  const positionMap = new Map();
+  for (const pg of parsedGames) {
+    for (const pos of pg.positions) {
+      let matches = positionMap.get(pos.fenNorm);
+      if (!matches) { matches = []; positionMap.set(pos.fenNorm, matches); }
+      matches.push({ san: pos.san, uci: pos.uci, result: pg.result, oppRating: pg.opponentElo });
+    }
+  }
+
+  const cacheKey    = makeGamesCacheKey(cleanFilters);
+  const uniqueFens  = [...positionMap.keys()];
+  const total       = uniqueFens.length;
+
+  // Supprimer l'ancien set de l'utilisateur
+  await db.deletePlayerStatsForUser(userId);
+
+  // Construire tous les rows puis insérer en une seule transaction
+  // (1 requête réseau pour PG, ~ceil(N/200) db.run() pour SQLite)
+  if (onPositionProgress) onPositionProgress({ current: 0, total });
+  const allRows = uniqueFens.map(fen => ({
+    fen,
+    data: JSON.stringify({
+      moves: aggregateMoves(positionMap.get(fen)),
+      totalGames,
+      truncated: truncated || false,
+      message,
+    }),
+  }));
+  await db.bulkInsertPlayerStats(userId, cacheKey, allRows);
+  if (onPositionProgress) onPositionProgress({ current: total, total });
+
+  return { cacheKey, totalPositions: total, totalGames, truncated: truncated || false };
+}
+
+module.exports = {
+  getChesscomPlayerStats,
+  getChesscomPlayerStatsBatch,
+  getChesscomReport,
+  computeAndStoreAllPositions,
+  makeGamesCacheKey,
+  normalizeFen,
+};

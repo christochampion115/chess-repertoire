@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LichessStats, StatsFilters } from '@/types/stats';
+import type { LichessStats, StatsFilters, SavedPlayerStats } from '@/types/stats';
 
 interface StatsState {
   data: LichessStats | null;
@@ -15,6 +15,7 @@ interface StatsState {
   statsCache: Record<string, unknown>;
   lastStatsRequestKey: string;
   lichessStats: unknown;
+  savedPlayerStats: SavedPlayerStats | null;
 }
 
 interface StatsActions {
@@ -30,6 +31,7 @@ interface StatsActions {
   setStatsCacheEntry: (key: string, value: unknown) => void;
   setLastStatsRequestKey: (key: string) => void;
   setLichessStats: (stats: unknown) => void;
+  setSavedPlayerStats: (s: SavedPlayerStats | null) => void;
   reset: () => void;
 }
 
@@ -65,6 +67,7 @@ export const useStatsStore = create<StatsState & StatsActions>()(
   statsCache: {},
   lastStatsRequestKey: '',
   lichessStats: null,
+  savedPlayerStats: null,
 
   setData: (data) => set({ data }),
   setLoading: (loading) => set({ loading }),
@@ -82,11 +85,12 @@ export const useStatsStore = create<StatsState & StatsActions>()(
     set((s) => ({ statsCache: { ...s.statsCache, [key]: value } })),
   setLastStatsRequestKey: (key) => set({ lastStatsRequestKey: key }),
   setLichessStats: (stats) => set({ lichessStats: stats }),
+  setSavedPlayerStats: (s) => set({ savedPlayerStats: s }),
   reset: () => set({ data: null, loading: false, error: null, selectedUci: '' }),
     }),
     {
       name: 'alphaChess.statsFilters',     // même clé que l'app vanilla
-      partialize: (s) => ({ filters: s.filters }),
+      partialize: (s) => ({ filters: s.filters, savedPlayerStats: s.savedPlayerStats }),
     },
   ),
 );

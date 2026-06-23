@@ -41,3 +41,17 @@ export interface LichessStats {
   openingName?: string;
   eco?: string;
 }
+
+export interface SavedPlayerStats {
+  cacheKey: string;
+  filters: Pick<StatsFilters,
+    | 'playerUsername'
+    | 'playerColor'
+    | 'playerTimeClass'
+    | 'playerDateFrom'
+    | 'playerDateTo'
+    | 'playerEloMin'
+    | 'playerEloMax'
+  >;
+  createdAt: string; // ISO date
+}
