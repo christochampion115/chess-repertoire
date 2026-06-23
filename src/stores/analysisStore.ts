@@ -22,6 +22,18 @@ let _annotationRunToken = 0;
 /** Dernier FEN évalué — évite de relancer si la position n'a pas changé. */
 let _lastEvalFen = '';
 
+// ── Throttle flèches (anti-scintillement UX) ────────────────────────────────
+/** Intervalle minimum entre deux mises à jour des flèches (ms). */
+const THROTTLE_ARROWS_MS = 500;
+/** Timestamp du dernier flush vers Zustand. */
+let _throttleLastFlush = 0;
+/** Timer du flush trailing (garantit que le dernier résultat est toujours affiché). */
+let _throttleTimer: ReturnType<typeof setTimeout> | null = null;
+/** Buffer du dernier résultat calculé, en attente de flush. */
+let _throttlePendingResults: AnalysisLine[] = [];
+let _throttlePendingFen = '';
+let _throttlePendingToken = 0;
+
 interface AnalysisState {
   isEnabled: boolean;
   depth: number;
@@ -104,6 +116,8 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
         if (s.isEnabled) {
           _sfWorker?.stop();
           _lastEvalFen = '';
+          if (_throttleTimer !== null) { clearTimeout(_throttleTimer); _throttleTimer = null; }
+          _throttlePendingResults = [];
           set({ isEnabled: false, results: [], error: null });
           return;
         }
@@ -117,6 +131,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
       setDepth: (d) => {
         const clamped = Math.min(20, Math.max(5, d));
         const { isEnabled } = get();
+        get().cache.clear();
         if (isEnabled && _sfWorker) {
           _lastEvalToken++;
           _lastEvalFen = '';
@@ -130,7 +145,12 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
 
       updateResults: (fen, results) => {
         set({ results, error: null });
-        if (fen) get().cacheResults(fen, results);
+        // Ne cacher que les résultats complets (depth atteint) pour éviter
+        // la pollution du cache par des résultats intermédiaires interrompus.
+        const targetDepth = get().depth;
+        if (fen && results.length > 0 && (results[0]?.depth ?? 0) >= targetDepth) {
+          get().cacheResults(fen, results);
+        }
       },
 
       setError: (error) => set({ error }),
@@ -145,6 +165,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
         if (multiPVChanged && _sfWorker) {
           // Arrêter la recherche en cours, changer l'option, puis attendre
           // le readyok avant de relancer — évite l'état incohérent WASM.
+          get().cache.clear();
           _sfWorker.stop();
           _sfWorker.setOption('MultiPV', next.multiPV);
           set({ settings: next, results: [] });
@@ -225,14 +246,31 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
             mpvIndex: msg.mpvIndex,
           };
 
-          // Remplacer la ligne existante avec le même uci, puis trier par mpvIndex
-          const { results: prevResults } = get();
-          const filtered = prevResults.filter((l) => l.uci !== uci);
+          // Mettre à jour le buffer en mémoire (sans déclencher de set() Zustand)
+          const filtered = _throttlePendingResults.filter((l) => l.mpvIndex !== msg.mpvIndex);
           filtered.push(line);
           filtered.sort((a, b) => a.mpvIndex - b.mpvIndex);
+          _throttlePendingResults = filtered.slice(0, settings.multiPV);
+          _throttlePendingFen = _lastEvalFen;
+          _throttlePendingToken = _lastEvalToken;
 
-          const newResults = filtered.slice(0, settings.multiPV);
-          get().updateResults(_lastEvalFen, newResults);
+          // Throttle-leading + debounce-trailing :
+          // – Leading  : flush immédiat si le dernier flush est vieux (≥ THROTTLE_ARROWS_MS)
+          // – Trailing : timer garantissant que le DERNIER résultat est toujours affiché
+          const now = Date.now();
+          if (now - _throttleLastFlush >= THROTTLE_ARROWS_MS) {
+            _throttleLastFlush = now;
+            if (_throttleTimer !== null) { clearTimeout(_throttleTimer); _throttleTimer = null; }
+            get().updateResults(_throttlePendingFen, _throttlePendingResults);
+          } else {
+            if (_throttleTimer !== null) clearTimeout(_throttleTimer);
+            _throttleTimer = setTimeout(() => {
+              _throttleTimer = null;
+              if (_throttlePendingToken !== _lastEvalToken) return;
+              _throttleLastFlush = Date.now();
+              get().updateResults(_throttlePendingFen, _throttlePendingResults);
+            }, THROTTLE_ARROWS_MS);
+          }
         });
 
         _sfWorker.onError((message) => {
@@ -259,6 +297,8 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
       },
 
       disposeWorker: () => {
+        if (_throttleTimer !== null) { clearTimeout(_throttleTimer); _throttleTimer = null; }
+        _throttlePendingResults = [];
         _sfWorker?.terminate();
         _sfWorker = null;
       },
@@ -266,17 +306,32 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
       evaluateFen: (fen) => {
         const { isEnabled, depth } = get();
         if (!isEnabled || !_sfWorker) return;
-        if (fen === _lastEvalFen && get().results.length > 0) return;
+        // Guard : ne pas relancer si les résultats sont déjà complets (depth atteint).
+        // On utilise la profondeur et non results.length pour ne pas bloquer
+        // sur des résultats partiels issus d'une évaluation interrompue.
+        const currentResults = get().results;
+        if (
+          fen === _lastEvalFen &&
+          currentResults.length > 0 &&
+          (currentResults[0]?.depth ?? 0) >= depth
+        ) return;
         // Vérifier le cache LRU avant d'envoyer au worker
         const cached = get().getCached(fen);
         if (cached !== undefined) {
           _lastEvalFen = fen;
           _lastEvalToken++;
-          set({ results: cached, error: null });
+          if (_throttleTimer !== null) { clearTimeout(_throttleTimer); _throttleTimer = null; }
+          _throttlePendingResults = [];
+          set({ results: cached.slice(0, get().settings.multiPV), error: null });
           return;
         }
         _lastEvalFen = fen;
         _lastEvalToken++;
+        // Réinitialiser le throttle : le premier résultat de cette position
+        // doit être affiché immédiatement (leading edge).
+        if (_throttleTimer !== null) { clearTimeout(_throttleTimer); _throttleTimer = null; }
+        _throttleLastFlush = 0;
+        _throttlePendingResults = [];
         set({ results: [] });
         _sfWorker.evaluate(fen, [], depth, _lastEvalToken);
       },
@@ -327,6 +382,12 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>()(
         } finally {
           if (token === _annotationRunToken) {
             set({ annotationsLoading: false });
+          }
+          // Les annotations ont peut-être interrompu l'évaluation principale.
+          // Forcer une ré-évaluation propre si l'analyse est toujours active.
+          if (get().isEnabled && _sfWorker) {
+            _lastEvalFen = '';
+            get().evaluateFen(useChessStore.getState().chess.fen());
           }
         }
       },
