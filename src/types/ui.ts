@@ -8,7 +8,7 @@ export type ActiveModal =
   | { type: 'new-repertoire' }
   | { type: 'rename'; itemId: string }
   | { type: 'training-confirm'; rootId: string; mode: TrainingMode }
-  | { type: 'training-interrupt'; title: string; message: string; onConfirm: () => void }
+  | { type: 'training-interrupt'; title: string; message: string; confirmLabel?: string; cancelLabel?: string; onConfirm: () => void; onCancel?: () => void }
   | { type: 'training-stop' }
   | { type: 'training-done' }
   | { type: 'training-victory'; report: SurvivalReport }

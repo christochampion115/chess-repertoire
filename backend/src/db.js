@@ -72,6 +72,14 @@ const PG_DDLS = [
     UNIQUE("userId", "cacheKey", "fen")
   )`,
   `CREATE INDEX IF NOT EXISTS idx_player_stats_cache ON player_stats_cache("userId", "cacheKey", "fen")`,
+  `CREATE TABLE IF NOT EXISTS saved_reports (
+    id SERIAL PRIMARY KEY,
+    "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    params TEXT NOT NULL,
+    data TEXT NOT NULL,
+    "createdAt" TIMESTAMP DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_saved_reports_userId ON saved_reports("userId")`,
 ];
 
 function convertPlaceholders(sql) {
@@ -148,6 +156,14 @@ const SQLITE_DDLS = [
     UNIQUE("userId", "cacheKey", "fen")
   )`,
   `CREATE INDEX IF NOT EXISTS idx_player_stats_cache ON player_stats_cache("userId", "cacheKey", "fen")`,
+  `CREATE TABLE IF NOT EXISTS saved_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    params TEXT NOT NULL,
+    data TEXT NOT NULL,
+    "createdAt" TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_saved_reports_userId ON saved_reports("userId")`,
 ];
 
 function sqliteRun(sql, params = []) {
@@ -313,6 +329,45 @@ async function getSavedPlayerStatsMeta(userId) {
   return get(null, `SELECT "cacheKey", "createdAt" FROM player_stats_cache WHERE "userId" = ? ORDER BY "createdAt" DESC LIMIT 1`, [userId]);
 }
 
+// ─── Saved reports helpers ──────────────────────────────────────────────────
+
+async function saveReport(userId, params, data, maxReports = 3) {
+  const res = await run(null,
+    `INSERT INTO saved_reports ("userId", params, data) VALUES (?, ?, ?) RETURNING id, "createdAt"`,
+    [userId, params, data]
+  );
+  await run(null,
+    `DELETE FROM saved_reports WHERE "userId" = ? AND id NOT IN (
+      SELECT id FROM saved_reports WHERE "userId" = ? ORDER BY "createdAt" DESC LIMIT ?
+    )`,
+    [userId, userId, maxReports]
+  );
+  return res.lastID
+    ? get(null, `SELECT id, "createdAt" FROM saved_reports WHERE id = ?`, [res.lastID])
+    : { id: res.id, createdAt: res.createdAt };
+}
+
+async function getSavedReportsList(userId) {
+  return all(null,
+    `SELECT id, params, data, "createdAt" FROM saved_reports WHERE "userId" = ? ORDER BY "createdAt" DESC`,
+    [userId]
+  );
+}
+
+async function getSavedReportById(userId, id) {
+  return get(null,
+    `SELECT * FROM saved_reports WHERE "userId" = ? AND id = ?`,
+    [userId, id]
+  );
+}
+
+async function deleteSavedReport(userId, id) {
+  await run(null,
+    `DELETE FROM saved_reports WHERE "userId" = ? AND id = ?`,
+    [userId, id]
+  );
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -324,4 +379,8 @@ module.exports = {
   deletePlayerStatsForUser,
   bulkInsertPlayerStats,
   getSavedPlayerStatsMeta,
+  saveReport,
+  getSavedReportsList,
+  getSavedReportById,
+  deleteSavedReport,
 };

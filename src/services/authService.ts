@@ -180,6 +180,7 @@ async function finalizeAuthenticatedSession(response: any): Promise<void> {
   auth.setToken(token);
   auth.setUser(user);
   auth.setStatus('logged');
+  auth.setGuestMode(false);
 
   try {
     const repResponse = await apiRequest('/repertoires', { token });

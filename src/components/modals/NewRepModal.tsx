@@ -58,7 +58,7 @@ export function NewRepModal() {
   // Reset form when modal opens
   useEffect(() => {
     if (modal?.type === 'new-repertoire') {
-      setMode('start');
+      setMode(modal.initialMode ?? 'start');
       setName('');
       setSelectedColor('w');
       setFolderValue('');

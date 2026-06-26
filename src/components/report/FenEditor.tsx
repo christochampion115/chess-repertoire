@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Chess, type Square } from 'chess.js';
 import { START_FEN } from '@/services/openings';
-import { loadItem, STORAGE_KEYS } from '@/services/storage';
+import { useChessStore } from '@/stores/chessStore';
 
 const WIKI_PIECES: Record<string, string> = {
   wp: '4/45/Chess_plt45.svg',
@@ -27,9 +27,10 @@ function squareName(index: number): string {
 interface FenEditorProps {
   color: 'white' | 'black';
   onFenChange: (fen: string, path: string) => void;
+  active?: boolean;
 }
 
-export const FenEditor = React.memo(function FenEditor({ color, onFenChange }: FenEditorProps) {
+export const FenEditor = React.memo(function FenEditor({ color, onFenChange, active }: FenEditorProps) {
   const chessRef = useRef(new Chess());
   const [selectedSq, setSelectedSq] = useState<string | null>(null);
   const [legalTargets, setLegalTargets] = useState<Set<string>>(new Set());
@@ -40,9 +41,9 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange }: F
   const [fenInput, setFenInput] = useState('');
   const [fenError, setFenError] = useState<string | null>(null);
 
-  const savedTheme = useMemo(() => loadItem<{ light: string; dark: string }>(STORAGE_KEYS.BOARD_THEME), []);
-  const lightBg = savedTheme?.light || '#ebecd0';
-  const darkBg = savedTheme?.dark || '#779556';
+  const boardTheme = useChessStore((s) => s.boardTheme);
+  const lightBg = boardTheme.light || '#ebecd0';
+  const darkBg = boardTheme.dark || '#779556';
 
   const board = chessRef.current.board();
 
@@ -51,8 +52,8 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange }: F
     const f = chess.fen();
     setFenInput(f);
     setFenError(null);
-    onFenChange(f, chess.history().join(' '));
-  }, [onFenChange]);
+    if (active) onFenChange(f, chess.history().join(' '));
+  }, [active, onFenChange]);
 
   const rerender = useCallback(() => {
     forceUpdate((n) => n + 1);
@@ -139,6 +140,10 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange }: F
     reset();
   }, [color, reset]);
 
+  useEffect(() => {
+    if (active) syncFen();
+  }, [active, syncFen]);
+
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
       <div
@@ -167,9 +172,8 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange }: F
           const isLast = lastMove && (lastMove.from === sq || lastMove.to === sq);
           const icon = piece ? WIKI_PIECES[piece.color + piece.type] : null;
 
-          let bg = isLight ? lightBg : darkBg;
-          if (isSelected) bg = 'rgba(122,174,203,0.45)';
-          else if (isLast) bg = isLight ? 'rgba(245,158,11,0.38)' : 'rgba(245,158,11,0.50)';
+          const bg = isLight ? lightBg : darkBg;
+          const isHighlighted = isSelected || isLast;
 
           return (
             <div
@@ -192,6 +196,17 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange }: F
                   src={`https://upload.wikimedia.org/wikipedia/commons/${icon}`}
                   alt=""
                   style={{ width: '88%', height: '88%', userSelect: 'none', pointerEvents: 'none' }}
+                />
+              )}
+              {isHighlighted && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(122,174,203,0.16)',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
                 />
               )}
               {isLegal && (
