@@ -14,6 +14,16 @@ function buildApiBase(): string {
   return 'http://localhost:4000/api';
 }
 
+// Vérification : le canonical (true si VITE_API_URL fourni au build)
+let apiBase;
+function getApiBase(): string {
+  if (apiBase === undefined) {
+    apiBase = buildApiBase();
+    console.log('[REPORT] API_BASE =', apiBase, '| VITE_API_URL =', import.meta.env.VITE_API_URL);
+  }
+  return apiBase;
+}
+
 export function estimateDuration(dateFrom?: string, dateTo?: string): number {
   let months = 12;
   if (dateFrom && dateTo) {
@@ -31,8 +41,7 @@ export function estimateDuration(dateFrom?: string, dateTo?: string): number {
 }
 
 export function buildReportUrl(params: ReportParams): string {
-  const apiBase = buildApiBase();
-  const url = new URL(`${apiBase}/chesscom/report/stream`);
+  const url = new URL(`${getApiBase()}/chesscom/report/stream`);
   url.searchParams.set('username', params.username);
   url.searchParams.set('color', params.color);
   url.searchParams.set('timeClass', params.timeClass);
@@ -52,6 +61,8 @@ export async function fetchChesscomReport(
 ): Promise<ReportData> {
   const url = buildReportUrl(params);
 
+  console.log('[REPORT FETCH] URL:', url);
+
   const res = await fetch(url, {
     method: 'GET',
     headers: { Accept: 'text/event-stream' },
@@ -59,8 +70,9 @@ export async function fetchChesscomReport(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `Erreur ${res.status}` }));
-    throw new Error(err.error || `Erreur serveur ${res.status}`);
+    const text = await res.text().catch(() => '');
+    console.log('[REPORT FETCH] HTTP error', res.status, 'body:', text.slice(0, 500));
+    throw new Error(`Erreur serveur ${res.status}`);
   }
 
   const reader = res.body!.getReader();
@@ -76,7 +88,13 @@ export async function fetchChesscomReport(
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const raw = line.slice(6);
-        const data = JSON.parse(raw);
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          console.error('[SSE PARSE ERROR] raw data:', raw.slice(0, 1000));
+          throw new Error('Réponse SSE invalide du serveur');
+        }
         if (data.type === 'archive' || data.type === 'phase') {
           onProgress?.(data);
         } else if (data.type === 'complete') {
@@ -92,8 +110,7 @@ export async function fetchChesscomReport(
 }
 
 export async function fetchChesscomReportJSON(params: ReportParams): Promise<ReportData> {
-  const apiBase = buildApiBase();
-  const url = new URL(`${apiBase}/chesscom/report`);
+  const url = new URL(`${getApiBase()}/chesscom/report`);
   url.searchParams.set('username', params.username);
   url.searchParams.set('color', params.color);
   url.searchParams.set('timeClass', params.timeClass);
@@ -115,42 +132,78 @@ export async function fetchChesscomReportJSON(params: ReportParams): Promise<Rep
   return res.json();
 }
 
-const API_BASE = buildApiBase();
-
 export async function saveReportToServer(params: ReportParams, data: ReportData) {
+  const base = getApiBase();
   const token = useAuthStore.getState().token;
   if (!token) return null;
-  const res = await fetch(`${API_BASE}/chesscom/report/save`, {
+  const url = `${base}/chesscom/report/save`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ params, data }),
   });
-  if (!res.ok) throw new Error('Erreur lors de la sauvegarde du rapport');
-  return res.json();
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.error('[SAVE ERROR]', url, res.status, text.slice(0, 500));
+    throw new Error('Erreur lors de la sauvegarde du rapport');
+  }
+  const text = await res.text();
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    console.error('[SAVE] réponse non-JSON, body:', text.slice(0, 500));
+    throw new Error('Réponse invalide du serveur (sauvegarde)');
+  }
+  return JSON.parse(text);
 }
 
 export async function fetchSavedReports(): Promise<SavedReportMeta[]> {
+  const base = getApiBase();
   const token = useAuthStore.getState().token;
   if (!token) return [];
-  const res = await fetch(`${API_BASE}/chesscom/report/saved`, {
+  const url = `${base}/chesscom/report/saved`;
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Erreur lors du chargement des rapports');
-  return res.json();
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.error('[FETCH SAVED ERROR]', url, res.status, text.slice(0, 500));
+    throw new Error('Erreur lors du chargement des rapports');
+  }
+  const text = await res.text();
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    console.error('[FETCH SAVED] réponse non-JSON, body:', text.slice(0, 500));
+    return [];
+  }
+  return JSON.parse(text);
 }
 
 export async function fetchSavedReportById(id: number) {
+  const base = getApiBase();
   const token = useAuthStore.getState().token;
-  const res = await fetch(`${API_BASE}/chesscom/report/saved/${id}`, {
+  const url = `${base}/chesscom/report/saved/${id}`;
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Erreur lors du chargement du rapport');
-  return res.json();
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.error('[FETCH SAVED BY ID ERROR]', url, res.status, text.slice(0, 500));
+    throw new Error('Erreur lors du chargement du rapport');
+  }
+  const text = await res.text();
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    console.error('[FETCH SAVED BY ID] réponse non-JSON, body:', text.slice(0, 500));
+    throw new Error('Réponse invalide du serveur (chargement)');
+  }
+  return JSON.parse(text);
 }
 
 export async function deleteSavedReportOnServer(id: number) {
+  const base = getApiBase();
   const token = useAuthStore.getState().token;
-  const res = await fetch(`${API_BASE}/chesscom/report/saved/${id}`, {
+  const url = `${base}/chesscom/report/saved/${id}`;
+  const res = await fetch(url, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
