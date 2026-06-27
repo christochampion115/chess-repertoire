@@ -4,7 +4,7 @@ const { Chess } = require('chess.js');
 
 const CHESS_COM_API = 'https://api.chess.com/pub';
 const GAME_LIMIT             = 10000; // max parties filtrées (garde-fou)
-const ARCHIVE_FETCH_DELAY_MS = 80;    // délai inter-archive pour éviter les 429
+const ARCHIVE_FETCH_DELAY_MS = 600;   // délai inter-archive pour éviter les 429 / Cloudflare
 const CACHE_TTL_MS  = 20 * 60 * 1000; // 20 min
 const GAMES_CACHE_MAX  = 5;   // entrées max dans gamesCache (LRU simple)
 const RESULT_CACHE_MAX = 500; // entrées max dans resultCache
@@ -53,10 +53,18 @@ async function fetchChesscomJson(url) {
   }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    const err = new Error(`Chess.com API erreur ${response.status}${text ? `: ${text}` : ''}`);
+    const err = new Error(`Chess.com API erreur ${response.status}${text ? `: ${text.slice(0, 100)}` : ''}`);
     err.status = response.status;
     throw err;
   }
+
+  const ct = response.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    const err = new Error('Chess.com a retourné une réponse non-JSON (rate limit probable). Réessaie dans quelques minutes.');
+    err.status = 429;
+    throw err;
+  }
+
   return response.json();
 }
 
