@@ -4,7 +4,7 @@ const { Chess } = require('chess.js');
 
 const CHESS_COM_API = 'https://api.chess.com/pub';
 const GAME_LIMIT             = 10000; // max parties filtrées (garde-fou)
-const ARCHIVE_FETCH_DELAY_MS = 600;   // délai inter-archive pour éviter les 429 / Cloudflare
+const ARCHIVE_FETCH_DELAY_MS = 80;    // délai inter-archive pour éviter les 429
 const CACHE_TTL_MS  = 20 * 60 * 1000; // 20 min
 const GAMES_CACHE_MAX  = 5;   // entrées max dans gamesCache (LRU simple)
 const RESULT_CACHE_MAX = 500; // entrées max dans resultCache

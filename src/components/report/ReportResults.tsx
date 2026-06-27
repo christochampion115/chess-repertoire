@@ -13,16 +13,6 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
   const [activeTab, setActiveTab] = useState<'priorities' | 'strengths'>('priorities');
 
   const { totalGames, parsedGames, baselineScore, items, truncated, rootFen, positionFiltered, groups, honorables: rawHonorables } = data;
-  console.log('REPORT_DEBUG:', {
-    totalGames, parsedGames, baselineScore,
-    itemsLen: items?.length,
-    impactEloFirst: items[0]?.impactElo,
-    groupsLen: groups?.length,
-    hasGroups: !!groups,
-    firstGroup: groups?.[0] ? { impactElo: groups[0].impactElo } : null,
-    honorablesLen: rawHonorables?.length,
-    keys: Object.keys(data).join(', ')
-  });
   const analyzed = parsedGames !== undefined ? parsedGames : totalGames;
   const worstItems = items.filter((i) => i.gap > 0.01);
   const bestItems = items.filter((i) => i.gap < -0.01);

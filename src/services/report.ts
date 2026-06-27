@@ -14,13 +14,9 @@ function buildApiBase(): string {
   return 'http://localhost:4000/api';
 }
 
-// Vérification : le canonical (true si VITE_API_URL fourni au build)
-let apiBase;
+let apiBase: string | undefined;
 function getApiBase(): string {
-  if (apiBase === undefined) {
-    apiBase = buildApiBase();
-    console.log('[REPORT] API_BASE =', apiBase, '| VITE_API_URL =', import.meta.env.VITE_API_URL);
-  }
+  if (apiBase === undefined) apiBase = buildApiBase();
   return apiBase;
 }
 
@@ -61,8 +57,6 @@ export async function fetchChesscomReport(
 ): Promise<ReportData> {
   const url = buildReportUrl(params);
 
-  console.log('[REPORT FETCH] URL:', url);
-
   const res = await fetch(url, {
     method: 'GET',
     headers: { Accept: 'text/event-stream' },
@@ -70,8 +64,6 @@ export async function fetchChesscomReport(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.log('[REPORT FETCH] HTTP error', res.status, 'body:', text.slice(0, 500));
     throw new Error(`Erreur serveur ${res.status}`);
   }
 
@@ -92,13 +84,11 @@ export async function fetchChesscomReport(
         try {
           data = JSON.parse(raw);
         } catch {
-          console.error('[SSE PARSE ERROR] raw data:', raw.slice(0, 1000));
           throw new Error('Réponse SSE invalide du serveur');
         }
         if (data.type === 'archive' || data.type === 'phase') {
           onProgress?.(data);
         } else if (data.type === 'complete') {
-          console.log('SSE_RAW:', JSON.stringify(data.data).slice(0, 2000));
           return data.data;
         } else if (data.type === 'error') {
           throw new Error(data.error);
@@ -142,15 +132,9 @@ export async function saveReportToServer(params: ReportParams, data: ReportData)
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ params, data }),
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.error('[SAVE ERROR]', url, res.status, text.slice(0, 500));
-    throw new Error('Erreur lors de la sauvegarde du rapport');
-  }
+  if (!res.ok) throw new Error('Erreur lors de la sauvegarde du rapport');
   const text = await res.text();
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    console.error('[SAVE] réponse non-JSON, body:', text.slice(0, 500));
+  if (!(res.headers.get('content-type') || '').includes('application/json')) {
     throw new Error('Réponse invalide du serveur (sauvegarde)');
   }
   return JSON.parse(text);
@@ -164,15 +148,9 @@ export async function fetchSavedReports(): Promise<SavedReportMeta[]> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.error('[FETCH SAVED ERROR]', url, res.status, text.slice(0, 500));
-    throw new Error('Erreur lors du chargement des rapports');
-  }
+  if (!res.ok) throw new Error('Erreur lors du chargement des rapports');
   const text = await res.text();
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    console.error('[FETCH SAVED] réponse non-JSON, body:', text.slice(0, 500));
+  if (!(res.headers.get('content-type') || '').includes('application/json')) {
     return [];
   }
   return JSON.parse(text);
@@ -185,15 +163,9 @@ export async function fetchSavedReportById(id: number) {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.error('[FETCH SAVED BY ID ERROR]', url, res.status, text.slice(0, 500));
-    throw new Error('Erreur lors du chargement du rapport');
-  }
+  if (!res.ok) throw new Error('Erreur lors du chargement du rapport');
   const text = await res.text();
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    console.error('[FETCH SAVED BY ID] réponse non-JSON, body:', text.slice(0, 500));
+  if (!(res.headers.get('content-type') || '').includes('application/json')) {
     throw new Error('Réponse invalide du serveur (chargement)');
   }
   return JSON.parse(text);

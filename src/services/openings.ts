@@ -15,7 +15,7 @@ let OPENINGS: OpeningEntry[] | null = null;
 
 export async function ensureOpeningsLoaded(): Promise<void> {
   if (OPENINGS) return;
-  const res = await fetch('data/openings.json');
+  const res = await fetch('/data/openings.json');
   if (!res.ok) throw new Error(`Impossible de charger les ouvertures (${res.status})`);
   const data: OpeningsData = await res.json();
   OPENINGS = data.openings;
