@@ -543,16 +543,16 @@ async function getChesscomReport(filters, { minFreq = 3 } = {}, onProgress = nul
 
   // ── Phase 3 : Groupement (free mode) ou plat (position mode) ────────────
   if (!playerStartFen) {
-    // Grouper par depth du 3e coup joueur
-    const targetLength = playerColor === 'white' ? 4 : 5;
-    const groupsByFen = new Map(); // fenBefore → aggregate
+    // Grouper par depth du 4e coup joueur
+    const targetLength = playerColor === 'white' ? 6 : 7;
+    const groupsByFen = new Map(); // fen → aggregate
 
     for (const item of reportItems) {
       if (item.contextPath.length !== targetLength) continue;
       const fen = item.fenBefore || item.fenAfter;
       if (!groupsByFen.has(fen)) {
         groupsByFen.set(fen, {
-          key: [...item.contextPath, item.playerMove].join(' '),
+          key: item.contextPath.join(' '),
           total: 0, wins: 0, draws: 0, losses: 0,
           contextPath: item.contextPath,
           playerMove: item.playerMove,
@@ -597,7 +597,7 @@ async function getChesscomReport(filters, { minFreq = 3 } = {}, onProgress = nul
     for (const group of selected) {
       const children = reportItems.filter(item => {
         const itemKey = [...item.contextPath, item.playerMove].join(' ');
-        return itemKey.startsWith(group.key + ' ') && itemKey !== group.key;
+        return itemKey.startsWith(group.key + ' ') && item.contextPath.length > targetLength;
       });
       group.children = children;
       group.problematicLines = children
@@ -618,7 +618,11 @@ async function getChesscomReport(filters, { minFreq = 3 } = {}, onProgress = nul
     const honorables = reportItems
       .filter(item => {
         const itemKey = [...item.contextPath, item.playerMove].join(' ');
-        return !coveredKeys.has(itemKey) && item.contextPath.length !== targetLength;
+        if (coveredKeys.has(itemKey)) return false;
+        for (const ck of coveredKeys) {
+          if (ck.startsWith(itemKey + ' ')) return false;
+        }
+        return item.contextPath.length > targetLength;
       })
       .sort((a, b) => a.impactElo - b.impactElo)
       .slice(0, 5);

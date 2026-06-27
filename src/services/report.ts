@@ -56,6 +56,7 @@ export async function fetchChesscomReport(
   signal?: AbortSignal
 ): Promise<ReportData> {
   const url = buildReportUrl(params);
+  console.log('[DEBUG fetchChesscomReport] URL:', url, '| startFen:', params.startFen);
 
   const res = await fetch(url, {
     method: 'GET',

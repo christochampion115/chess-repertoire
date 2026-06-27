@@ -77,8 +77,9 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
   const curMonth = String(now.getMonth() + 1).padStart(2, '0');
 
   const handleFenChange = useCallback((fen: string, path: string) => {
+    if (!posFilterActive) return;
     onParamsChange({ startFen: fen, startPath: path });
-  }, [onParamsChange]);
+  }, [posFilterActive, onParamsChange]);
 
   const togglePosFilter = useCallback(() => {
     const next = !posFilterActive;
