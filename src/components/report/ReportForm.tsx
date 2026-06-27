@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { ReportParams, PlayerTimeClass } from '@/types/report';
 import { FenEditor } from './FenEditor';
-import { estimateDuration } from '@/services/report';
 
 interface ReportFormProps {
   params: ReportParams;
@@ -60,135 +59,154 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 6,
 };
 
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: '0.7rem',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '.1em',
+  color: '#94a3b8',
+  marginBottom: 10,
+};
+
 export const ReportForm = React.memo(function ReportForm({ params, onParamsChange, onSubmit, error }: ReportFormProps) {
-  const [advOpen, setAdvOpen] = useState(false);
-  const [posEnabled, setPosEnabled] = useState(false);
+  const [posFilterActive, setPosFilterActive] = useState(false);
   const years = useMemo(() => initYearOptions(), []);
 
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = String(now.getMonth() + 1).padStart(2, '0');
 
-  const dateFrom = params.dateFrom;
-  const dateTo = params.dateTo;
-  const durEstimate = estimateDuration(
-    dateFrom ? `${dateFrom.replace('/', '-')}` : undefined,
-    dateTo ? `${dateTo.replace('/', '-')}` : undefined
-  );
-
   const handleFenChange = useCallback((fen: string, path: string) => {
     onParamsChange({ startFen: fen, startPath: path });
   }, [onParamsChange]);
 
+  const togglePosFilter = useCallback(() => {
+    const next = !posFilterActive;
+    setPosFilterActive(next);
+    if (!next) onParamsChange({ startFen: '', startPath: '' });
+  }, [posFilterActive, onParamsChange]);
+
   return (
-    <div
-      style={{
-        background: 'rgba(17,24,39,0.96)',
-        border: '1px solid rgba(148,163,184,0.18)',
-        borderRadius: 10,
-        padding: '28px 32px',
-      }}
-    >
-      <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: '#94a3b8', marginBottom: 14 }}>
-        Compte Chess.com
-      </div>
+    <div>
+      {/* ── outer flex: left column (grid + période) + right position card ── */}
+      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', marginBottom: 20 }}>
 
-      <div style={{ marginBottom: 18 }}>
-        <label style={labelStyle} htmlFor="rapport-username">Pseudo Chess.com</label>
-        <input
-          id="rapport-username"
-          type="text"
-          value={params.username}
-          onChange={(e) => onParamsChange({ username: e.target.value })}
-          placeholder="ex: Magnus"
-          style={inputStyle}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </div>
+        {/* ── LEFT COLUMN ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-      <div style={{ marginBottom: 18 }}>
-        <label style={labelStyle}>Couleur analysée</label>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {(['white', 'black'] as const).map((c) => (
-            <label
-              key={c}
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: 10,
-                background: 'rgba(15,23,42,0.96)',
-                border: `2px solid ${params.color === c ? 'rgba(122,174,203,0.5)' : 'rgba(148,163,184,0.18)'}`,
-                borderRadius: 8,
-                cursor: 'pointer',
-                color: params.color === c ? '#7aaecb' : '#94a3b8',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-              }}
-            >
+          {/* 2-col grid — rows 1-4 total ~280 px (= board height)
+              Row 3 paddingTop: 113 creates the inter-group gap:
+              24 + 82 + (113+24) + 37 = 280 px */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              columnGap: 32,
+              alignItems: 'start',
+            }}
+          >
+            {/* Row 1 : section titles */}
+            <div style={{ ...sectionTitleStyle }}>Compte Chess.com</div>
+            <div style={{ ...sectionTitleStyle }}>Couleur</div>
+
+            {/* Row 2 : username  |  couleur buttons */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle} htmlFor="rapport-username">Pseudo Chess.com</label>
               <input
-                type="radio"
-                name="rapport-color"
-                value={c}
-                checked={params.color === c}
-                onChange={() => onParamsChange({ color: c })}
-                style={{ display: 'none' }}
+                id="rapport-username"
+                type="text"
+                value={params.username}
+                onChange={(e) => onParamsChange({ username: e.target.value })}
+                placeholder="ex: Magnus"
+                style={inputStyle}
+                autoComplete="off"
+                spellCheck={false}
               />
-              {c === 'white' ? '♙ Blancs' : '♟ Noirs'}
-            </label>
-          ))}
-        </div>
-      </div>
+            </div>
+            {/* paddingTop: 22 skips label height → buttons align with the input field */}
+            <div style={{ marginBottom: 20, paddingTop: 22 }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {(['white', 'black'] as const).map((c) => (
+                  <label
+                    key={c}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: 10,
+                      background: 'rgba(15,23,42,0.96)',
+                      border: `2px solid ${params.color === c ? 'rgba(122,174,203,0.5)' : 'rgba(148,163,184,0.18)'}`,
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      color: params.color === c ? '#7aaecb' : '#94a3b8',
+                      fontSize: '0.88rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="rapport-color"
+                      value={c}
+                      checked={params.color === c}
+                      onChange={() => onParamsChange({ color: c })}
+                      style={{ display: 'none' }}
+                    />
+                    {c === 'white' ? '♙ Blancs' : '♟ Noirs'}
+                  </label>
+                ))}
+              </div>
+            </div>
 
-      <button
-        type="button"
-        onClick={() => setAdvOpen(!advOpen)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'none',
-          border: 'none',
-          color: '#94a3b8',
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          padding: '6px 0',
-        }}
-      >
-        <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: advOpen ? 'rotate(90deg)' : undefined }}>
-          ›
-        </span>
-        Filtres avancés
-      </button>
+            {/* Row 3 : section titles — paddingTop: 45 = inter-group spacer */}
+            <div style={{ ...sectionTitleStyle, paddingTop: 45 }}>Filtres de parties</div>
+            <div style={{ ...sectionTitleStyle, paddingTop: 45 }}>ELO adversaire</div>
 
-      {advOpen && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: '#94a3b8', marginBottom: 14, marginTop: 22 }}>
-            Filtres de parties
+            {/* Row 4 : cadence  |  ELO inputs */}
+            <div>
+              <select
+                id="rapport-timeclass"
+                value={params.timeClass}
+                onChange={(e) => onParamsChange({ timeClass: e.target.value as PlayerTimeClass })}
+                style={{ ...selectStyle, width: '100%' }}
+              >
+                <option value="all">Toutes</option>
+                <option value="bullet">Bullet</option>
+                <option value="blitz">Blitz</option>
+                <option value="rapid">Rapide</option>
+                <option value="classical">Classique</option>
+                <option value="daily">Correspondance</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="number"
+                  placeholder="Min"
+                  min={0}
+                  max={3000}
+                  value={params.eloMin || ''}
+                  onChange={(e) => onParamsChange({ eloMin: parseInt(e.target.value) || 0 })}
+                  style={{ ...inputStyle, width: 100 }}
+                />
+                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
+                <input
+                  type="number"
+                  placeholder="Max"
+                  min={0}
+                  max={3000}
+                  value={params.eloMax === 3000 ? '' : params.eloMax}
+                  onChange={(e) => onParamsChange({ eloMax: parseInt(e.target.value) || 3000 })}
+                  style={{ ...inputStyle, width: 100 }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle} htmlFor="rapport-timeclass">Cadence</label>
-            <select
-              id="rapport-timeclass"
-              value={params.timeClass}
-              onChange={(e) => onParamsChange({ timeClass: e.target.value as PlayerTimeClass })}
-              style={selectStyle}
-            >
-              <option value="all">Toutes</option>
-              <option value="bullet">Bullet</option>
-              <option value="blitz">Blitz</option>
-              <option value="rapid">Rapide</option>
-              <option value="classical">Classique</option>
-              <option value="daily">Correspondance</option>
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Période (de — à)</label>
+          {/* ── PÉRIODE ── */}
+          <div style={{ paddingTop: 52, marginBottom: 20 }}>
+            <div style={sectionTitleStyle}>Période (de — à)</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.82rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>De</span>
               <select
@@ -235,121 +253,100 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
             </div>
           </div>
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>ELO adversaire</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input
-                type="number"
-                placeholder="Min"
-                min={0}
-                max={3000}
-                value={params.eloMin || ''}
-                onChange={(e) => onParamsChange({ eloMin: parseInt(e.target.value) || 0 })}
-                style={{ ...inputStyle, width: 100 }}
-              />
-              <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
-              <input
-                type="number"
-                placeholder="Max"
-                min={0}
-                max={3000}
-                value={params.eloMax === 3000 ? '' : params.eloMax}
-                onChange={(e) => onParamsChange({ eloMax: parseInt(e.target.value) || 3000 })}
-                style={{ ...inputStyle, width: 100 }}
-              />
+          {/* ── LANCER ── */}
+          <button
+            type="button"
+            onClick={onSubmit}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              marginTop: 16,
+              padding: '13px 32px',
+              background: 'rgba(122,174,203,0.85)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <span>🔍</span>
+            Lancer l'analyse
+          </button>
+
+          {error && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: '10px 14px',
+                background: 'rgba(239,68,68,.12)',
+                border: '1px solid rgba(239,68,68,.3)',
+                borderRadius: 8,
+                fontSize: '0.85rem',
+                color: '#fca5a5',
+              }}
+            >
+              {error}
             </div>
-          </div>
+          )}
 
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: '#94a3b8', marginBottom: 14, marginTop: 22 }}>
-            Paramètres d'analyse
-          </div>
+        </div>{/* end left column */}
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', color: '#e2e8f0', cursor: 'pointer', marginBottom: 10 }}>
-              <input
-                type="checkbox"
-                checked={posEnabled}
-                onChange={(e) => setPosEnabled(e.target.checked)}
-                style={{ accentColor: '#7aaecb' }}
-              />
-              Activer un filtre de position précis
-            </label>
-            {posEnabled && (
-              <div
-                style={{
-                  padding: 14,
-                  border: '1px solid rgba(148,163,184,0.18)',
-                  borderRadius: 10,
-                  background: 'rgba(13,27,42,0.55)',
-                }}
-              >
-                <FenEditor color={params.color} onFenChange={handleFenChange} />
-                <p style={{ marginTop: 8, fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.45 }}>
-                  Jouez les coups sur ce mini-échiquier. Le rapport ne gardera que les parties qui atteignent exactement cette position.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div
-        style={{
-          marginTop: 20,
-          padding: '10px 16px',
-          background: 'rgba(122,174,203,0.07)',
-          border: '1px solid rgba(122,174,203,0.15)',
-          borderRadius: 8,
-          fontSize: '0.82rem',
-          color: '#94a3b8',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        <span>⏱</span>
-        <span>~{durEstimate}s estimés</span>
-      </div>
-
-      {error && (
+        {/* ── POSITION CARD ── */}
         <div
           style={{
-            marginTop: 12,
-            padding: '10px 14px',
-            background: 'rgba(239,68,68,.12)',
-            border: '1px solid rgba(239,68,68,.3)',
-            borderRadius: 8,
-            fontSize: '0.85rem',
-            color: '#fca5a5',
+            width: 320,
+            flexShrink: 0,
+            background: 'rgba(15,23,42,0.92)',
+            border: `1px solid ${posFilterActive ? 'rgba(122,174,203,0.35)' : 'rgba(148,163,184,0.15)'}`,
+            borderRadius: 10,
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            opacity: posFilterActive ? 1 : 0.55,
+            transition: 'opacity 0.2s, border-color 0.2s',
           }}
         >
-          {error}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ ...sectionTitleStyle, marginBottom: 0, color: posFilterActive ? '#7aaecb' : '#94a3b8' }}>
+              Filtre de position
+            </div>
+            <button
+              type="button"
+              onClick={togglePosFilter}
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                padding: '5px 12px',
+                borderRadius: 6,
+                background: posFilterActive ? 'rgba(122,174,203,0.2)' : 'rgba(148,163,184,0.08)',
+                border: `1px solid ${posFilterActive ? 'rgba(122,174,203,0.4)' : 'rgba(148,163,184,0.2)'}`,
+                color: posFilterActive ? '#7aaecb' : '#94a3b8',
+                transition: 'background 0.2s, border-color 0.2s, color 0.2s',
+              }}
+            >
+              {posFilterActive ? '✓ Actif' : 'Activer'}
+            </button>
+          </div>
+          <div style={{ pointerEvents: posFilterActive ? 'auto' : 'none' }}>
+            <FenEditor color={params.color} onFenChange={handleFenChange} active={posFilterActive} />
+          </div>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: 1.4 }}>
+            {posFilterActive
+              ? "Jouez les coups sur l'échiquier. Le rapport ne gardera que les parties qui atteignent cette position."
+              : "Activez le filtre pour restreindre l'analyse à une position précise."}
+          </p>
         </div>
-      )}
 
-      <button
-        type="button"
-        onClick={onSubmit}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          width: '100%',
-          padding: 13,
-          marginTop: 22,
-          background: 'rgba(122,174,203,0.85)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          fontSize: '0.95rem',
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
-      >
-        <span>🔍</span>
-        Lancer l'analyse
-      </button>
+      </div>{/* end outer flex */}
+
+
     </div>
   );
 });

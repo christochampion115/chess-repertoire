@@ -3,7 +3,7 @@ import type { ReportGroup, PriorityBadge } from '@/types/report';
 import { getOpeningNameByPath, pathToPgn, getMoveNumberFromFen } from '@/services/openings';
 import { ReportMiniBoard } from './ReportMiniBoard';
 import { ReportWdlBar } from './ReportWdlBar';
-import { ReportConfidence } from './ReportConfidence';
+
 import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { ReportChildCard } from './ReportChildCard';
 import { useRepertoireStore } from '@/stores/repertoireStore';
@@ -22,7 +22,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   rootFen,
   variant = 'weakness',
 }: ReportGroupCardProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const startMove = getMoveNumberFromFen(rootFen);
   const repertoires = useRepertoireStore((s) => s.repertoires);
   const reportColor = useReportStore((s) => s.params.color);
@@ -182,10 +182,6 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
             <div style={{ fontSize: '0.78rem', color: '#94a3b8', padding: '6px 0', lineHeight: 1.45 }}>
               {explanation}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ReportConfidence total={group.total} />
-            </div>
           </div>
 
           {group.fen && (
@@ -233,15 +229,30 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
             }}
           >
             <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{expanded ? '▼' : '▶'}</span>
-            <span>{allChildren.length} ligne{allChildren.length > 1 ? 's' : ''}</span>
+            <span style={{ fontWeight: 600 }}>{allChildren.length} ligne{allChildren.length > 1 ? `s ${variant === 'weakness' ? 'problématiques' : 'surperformantes'}` : ` ${variant === 'weakness' ? 'problématique' : 'surperformante'}`}</span>
+            {!expanded && (
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.04em',
+                  padding: '2px 8px',
+                  borderRadius: 100,
+                  background: 'rgba(251,113,133,0.15)',
+                  color: '#fca5a5',
+                  border: '1px solid rgba(251,113,133,0.25)',
+                }}
+              >
+                {allChildren.length} ligne{allChildren.length > 1 ? 's' : ''}
+              </span>
+            )}
           </button>
           {expanded && (
             <div style={{ background: 'rgba(15,23,42,0.5)' }}>
               {group.problematicLines.length > 0 && variant === 'weakness' && (
                 <>
-                  <div style={{ padding: '10px 16px 4px 28px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8', opacity: 0.7 }}>
-                    Lignes problématiques
-                  </div>
                   {group.problematicLines.map((child, i) => (
                     <ReportChildCard key={i} item={child} rootFen={rootFen} variant="weakness" />
                   ))}

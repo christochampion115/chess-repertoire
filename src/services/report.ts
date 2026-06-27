@@ -1,4 +1,5 @@
-import type { ReportParams, ReportData, ReportProgress } from '@/types/report';
+import type { ReportParams, ReportData, ReportProgress, SavedReportMeta } from '@/types/report';
+import { useAuthStore } from '@/stores/authStore';
 
 function normalizeBaseUrl(url: string): string {
   return String(url || '').trim().replace(/\/+$/, '');
@@ -112,4 +113,46 @@ export async function fetchChesscomReportJSON(params: ReportParams): Promise<Rep
   }
 
   return res.json();
+}
+
+const API_BASE = buildApiBase();
+
+export async function saveReportToServer(params: ReportParams, data: ReportData) {
+  const token = useAuthStore.getState().token;
+  if (!token) return null;
+  const res = await fetch(`${API_BASE}/chesscom/report/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ params, data }),
+  });
+  if (!res.ok) throw new Error('Erreur lors de la sauvegarde du rapport');
+  return res.json();
+}
+
+export async function fetchSavedReports(): Promise<SavedReportMeta[]> {
+  const token = useAuthStore.getState().token;
+  if (!token) return [];
+  const res = await fetch(`${API_BASE}/chesscom/report/saved`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Erreur lors du chargement des rapports');
+  return res.json();
+}
+
+export async function fetchSavedReportById(id: number) {
+  const token = useAuthStore.getState().token;
+  const res = await fetch(`${API_BASE}/chesscom/report/saved/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Erreur lors du chargement du rapport');
+  return res.json();
+}
+
+export async function deleteSavedReportOnServer(id: number) {
+  const token = useAuthStore.getState().token;
+  const res = await fetch(`${API_BASE}/chesscom/report/saved/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Erreur lors de la suppression du rapport');
 }

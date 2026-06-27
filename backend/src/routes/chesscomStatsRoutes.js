@@ -198,7 +198,63 @@ router.post('/batchstats', async (req, res) => {
   }
 });
 
-module.exports = router;
+// ── POST /report/save — Sauvegarde un rapport en base ─────────────────────────
+router.post('/report/save', authMiddleware, async (req, res) => {
+  const { params, data } = req.body;
+  if (!params || !data) return res.status(400).json({ error: 'params and data required' });
+  try {
+    const saved = await db.saveReport(req.user.id, JSON.stringify(params), JSON.stringify(data));
+    res.json({ success: true, ...saved });
+  } catch (error) {
+    console.error('[chesscom report save] error', error);
+    res.status(500).json({ error: error.message || 'Erreur sauvegarde rapport' });
+  }
+});
+
+// ── GET /report/saved — Liste des rapports sauvegardés ────────────────────────
+router.get('/report/saved', authMiddleware, async (req, res) => {
+  try {
+    const list = await db.getSavedReportsList(req.user.id);
+    const enriched = list.map((r) => {
+      const p = JSON.parse(r.params);
+      const d = JSON.parse(r.data);
+      return {
+        id: r.id,
+        params: p,
+        totalGames: d.totalGames ?? d.parsedGames ?? 0,
+        baselineScore: d.baselineScore ?? 0,
+        createdAt: r.createdAt,
+      };
+    });
+    res.json(enriched);
+  } catch (error) {
+    console.error('[chesscom report saved list] error', error);
+    res.status(500).json({ error: error.message || 'Erreur liste rapports' });
+  }
+});
+
+// ── GET /report/saved/:id — Charge un rapport sauvegardé ──────────────────────
+router.get('/report/saved/:id', authMiddleware, async (req, res) => {
+  try {
+    const report = await db.getSavedReportById(req.user.id, req.params.id);
+    if (!report) return res.status(404).json({ error: 'Rapport introuvable' });
+    res.json({ params: JSON.parse(report.params), data: JSON.parse(report.data), createdAt: report.createdAt });
+  } catch (error) {
+    console.error('[chesscom report saved get] error', error);
+    res.status(500).json({ error: error.message || 'Erreur chargement rapport' });
+  }
+});
+
+// ── DELETE /report/saved/:id — Supprime un rapport sauvegardé ─────────────────
+router.delete('/report/saved/:id', authMiddleware, async (req, res) => {
+  try {
+    await db.deleteSavedReport(req.user.id, req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[chesscom report saved delete] error', error);
+    res.status(500).json({ error: error.message || 'Erreur suppression rapport' });
+  }
+});
 
 // ── GET /report — Rapport de priorités d'entraînement ────────────────────────
 router.get('/report', async (req, res) => {

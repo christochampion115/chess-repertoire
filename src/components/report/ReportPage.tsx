@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { useReportStore } from '@/stores/reportStore';
-import { fetchChesscomReport } from '@/services/report';
+import { fetchChesscomReport, saveReportToServer, fetchSavedReportById } from '@/services/report';
 import { ensureOpeningsLoaded } from '@/services/openings';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { useUiStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
+import { SplashScreen } from '@/components/layout/SplashScreen';
 import { ReportForm } from './ReportForm';
 import { ReportResults } from './ReportResults';
+import { ReportSavedList } from './ReportSavedList';
 
 const LOADING_MESSAGES = [
   'Premier scan en cours',
@@ -17,6 +20,9 @@ const LOADING_MESSAGES = [
 
 export const ReportPage = React.memo(function ReportPage() {
   const { view, params, data, error, setView, setParams, setData, setError, reset } = useReportStore();
+  const user = useAuthStore((s) => s.user);
+  const isGuestMode = useAuthStore((s) => s.isGuestMode);
+  const token = useAuthStore((s) => s.token);
   const [loadingPct, setLoadingPct] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState<'idle' | 'conn' | 'load' | 'blunders' | 'done'>('idle');
   const [gamesTarget, setGamesTarget] = useState(0);
@@ -147,6 +153,9 @@ export const ReportPage = React.memo(function ReportPage() {
       await new Promise((r) => setTimeout(r, 400));
       setData(result);
       setView('results');
+      saveReportToServer(params, result).catch((err) =>
+        console.warn('[auto-save] Échec sauvegarde rapport:', err)
+      );
     } catch (err: unknown) {
       cancelAnimationFrame(rafRef.current);
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -161,6 +170,38 @@ export const ReportPage = React.memo(function ReportPage() {
       setView('form');
     }
   }, [params, setView, setData, setError]);
+
+  useEffect(() => {
+    if (view !== 'results' || !isGuestMode) return;
+    window.history.pushState(null, '', window.location.href);
+    const onPopState = () => {
+      openModal({
+        type: 'training-interrupt' as const,
+        title: 'Sauvegarder ce rapport ?',
+        message: 'Vous êtes en mode invité. Connectez-vous pour sauvegarder ce rapport et le retrouver plus tard.',
+        confirmLabel: 'Se connecter',
+        cancelLabel: 'Quitter sans sauvegarder',
+        onConfirm: () => {
+          window.history.back();
+          openModal({ type: 'auth' });
+        },
+        onCancel: () => {
+          window.history.back();
+        },
+      });
+      window.history.pushState(null, '', window.location.href);
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [view, isGuestMode, openModal]);
 
   const handleCancel = useCallback(() => {
     openModal({
@@ -177,13 +218,48 @@ export const ReportPage = React.memo(function ReportPage() {
   }, [openModal, reset]);
 
   const handleNewAnalysis = useCallback(() => {
-    reset();
-  }, [reset]);
+    if (view === 'results' && isGuestMode) {
+      openModal({
+        type: 'training-interrupt' as const,
+        title: 'Sauvegarder ce rapport ?',
+        message: 'Vous êtes en mode invité. Connectez-vous pour sauvegarder ce rapport et le retrouver plus tard.',
+        confirmLabel: 'Se connecter',
+        cancelLabel: 'Quitter sans sauvegarder',
+        onConfirm: () => {
+          openModal({ type: 'auth' });
+        },
+        onCancel: () => {
+          reset();
+        },
+      });
+    } else {
+      reset();
+    }
+  }, [view, isGuestMode, openModal, reset]);
+
+  const handleLoadSaved = useCallback(async (id: number) => {
+    try {
+      const saved = await fetchSavedReportById(id);
+      setParams(saved.params);
+      setData(saved.data);
+      setView('results');
+    } catch {
+      setError('Impossible de charger le rapport.');
+    }
+  }, [setParams, setData, setView, setError]);
+
+  if (!user && !isGuestMode) {
+    return (
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px 80px' }}>
+        <SplashScreen />
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
-        maxWidth: 1100,
+        maxWidth: 1200,
         margin: '0 auto',
         padding: '32px 24px 80px',
       }}
@@ -222,12 +298,15 @@ export const ReportPage = React.memo(function ReportPage() {
       </div>
 
       {view === 'form' && (
-        <ReportForm
-          params={params}
-          onParamsChange={setParams}
-          onSubmit={handleSubmit}
-          error={error}
-        />
+        <>
+          <ReportForm
+            params={params}
+            onParamsChange={setParams}
+            onSubmit={handleSubmit}
+            error={error}
+          />
+          {token && <ReportSavedList onLoad={handleLoadSaved} />}
+        </>
       )}
 
       {view === 'loading' && (

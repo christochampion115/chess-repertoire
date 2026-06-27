@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { loadItem, STORAGE_KEYS } from '@/services/storage';
+import React from 'react';
+import { useChessStore } from '@/stores/chessStore';
 
 const WIKI_PIECES: Record<string, string> = {
   wp: '4/45/Chess_plt45.svg',
@@ -37,9 +37,9 @@ export const ReportMiniBoard = React.memo(function ReportMiniBoard({
   darkSquare = '#779556',
   size = 24,
 }: ReportMiniBoardProps) {
-  const savedTheme = useMemo(() => loadItem<{ light: string; dark: string }>(STORAGE_KEYS.BOARD_THEME), []);
-  const ls = lightSquare || savedTheme?.light || '#ebecd0';
-  const ds = darkSquare || savedTheme?.dark || '#779556';
+  const boardTheme = useChessStore((s) => s.boardTheme);
+  const ls = lightSquare || boardTheme.light || '#ebecd0';
+  const ds = darkSquare || boardTheme.dark || '#779556';
 
   const fenPart = (fen || '').split(' ')[0] || '';
   const rows = fenPart.split('/');
@@ -97,18 +97,28 @@ export const ReportMiniBoard = React.memo(function ReportMiniBoard({
               background: bg,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: hl ? 'inset 0 0 0 2px #ffd700' : undefined,
-            }}
-          >
-            {icon && (
-              <img
-                src={`https://upload.wikimedia.org/wikipedia/commons/${icon}`}
-                alt=""
-                style={{ width: size - 2, height: size - 2 }}
-              />
-            )}
-          </div>
+                justifyContent: 'center',
+                position: 'relative',
+              }}
+            >
+              {icon && (
+                <img
+                  src={`https://upload.wikimedia.org/wikipedia/commons/${icon}`}
+                  alt=""
+                  style={{ width: size - 2, height: size - 2 }}
+                />
+              )}
+              {hl && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(122,174,203,0.16)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+            </div>
         );
       })}
     </div>

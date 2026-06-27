@@ -3,7 +3,7 @@ import type { ReportItem } from '@/types/report';
 import { pathToPgn, getMoveNumberFromFen } from '@/services/openings';
 import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { getPriorityBadge } from './reportUtils';
-import { ReportConfidence } from './ReportConfidence';
+
 
 interface ReportChildCardProps {
   item: ReportItem;
@@ -69,7 +69,6 @@ export const ReportChildCard = React.memo(function ReportChildCard({
         </span>
         <span style={{ color: '#7aaecb' }}>{pts} pts</span>
         <span style={{ color: '#94a3b8' }}>{item.total} parties</span>
-        <ReportConfidence total={item.total} />
       </div>
     </div>
   );

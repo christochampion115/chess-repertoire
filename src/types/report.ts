@@ -84,6 +84,14 @@ export interface ReportSSEError {
 
 export type ReportSSEEvent = ReportProgress | ReportSSEComplete | ReportSSEError;
 
+export interface SavedReportMeta {
+  id: number;
+  params: ReportParams;
+  totalGames: number;
+  baselineScore: number;
+  createdAt: string;
+}
+
 export interface PriorityBadge {
   badgeClass: 'badge-critical' | 'badge-important' | 'badge-minor';
   itemClass: 'report-item--critical' | 'report-item--important' | 'report-item--minor';
