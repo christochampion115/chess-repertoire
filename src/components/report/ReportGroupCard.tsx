@@ -34,9 +34,10 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
     try {
       sessionStorage.setItem('alphaChess.openAtFen', encodeURIComponent(group.fen));
       sessionStorage.setItem('alphaChess.openFreePlay', '1');
-      window.location.href = 'index.html';
+      sessionStorage.setItem('alphaChess.openAtColor', reportColor === 'black' ? 'b' : 'w');
+      window.location.href = '/app';
     } catch { /* localStorage might be full */ }
-  }, [group.fen]);
+  }, [group.fen, reportColor]);
 
   const hPct = (group.groupScore * 100).toFixed(0);
   const basePct = (baselineScore * 100).toFixed(0);

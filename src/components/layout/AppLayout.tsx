@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useTrainingStore } from '@/stores/trainingStore';
+import { useUiStore } from '@/stores/uiStore';
 import * as repertoireService from '@/services/repertoire';
 import { bootstrapSession } from '@/services/authService';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -42,6 +43,33 @@ export function AppLayout() {
     bootstrapSession();
     return () => { disposeWorker(); };
   }, [initWorker, disposeWorker]);
+
+  /* ── Ouverture depuis un rapport (bouton "Ouvrir →") ────── */
+  const openModal = useUiStore((s) => s.openModal);
+
+  useEffect(() => {
+    const rawFen = sessionStorage.getItem('alphaChess.openAtFen');
+    if (!rawFen) return;
+
+    const fen = decodeURIComponent(rawFen);
+    const color = (sessionStorage.getItem('alphaChess.openAtColor') || 'w') as 'w' | 'b';
+
+    sessionStorage.removeItem('alphaChess.openAtFen');
+    sessionStorage.removeItem('alphaChess.openFreePlay');
+    sessionStorage.removeItem('alphaChess.openAtColor');
+
+    const matches = repertoireService.findRepsByFen(fen, color);
+
+    if (matches.length === 0) {
+      useChessStore.setState({ boardFlipped: color === 'b' });
+      repertoireService.resetFreePlay(fen, color);
+      openModal({ type: 'new-repertoire', initialMode: 'current', initialColor: color });
+    } else if (matches.length === 1) {
+      repertoireService.navigateToNode(matches[0].nodeId);
+    } else {
+      openModal({ type: 'select-repertoire', repChoices: matches });
+    }
+  }, [openModal]);
 
   /* ── Analyse (désactivée pendant l'entraînement) ────────── */
   const chess         = useChessStore((s) => s.chess);

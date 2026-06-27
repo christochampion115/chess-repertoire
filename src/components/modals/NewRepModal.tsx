@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
+import { useChessStore } from '@/stores/chessStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { ModalBox } from './ModalBox';
 import * as repertoireService from '@/services/repertoire';
@@ -60,7 +61,7 @@ export function NewRepModal() {
     if (modal?.type === 'new-repertoire') {
       setMode(modal.initialMode ?? 'start');
       setName('');
-      setSelectedColor('w');
+      setSelectedColor(modal.initialColor ?? 'w');
       setFolderValue('');
       setNewFolderName('');
       setPgnText('');
@@ -120,7 +121,12 @@ export function NewRepModal() {
         const cid = useRepertoireStore.getState().currentNodeId;
         if (!cid) { setError('Aucune position actuelle (ouvrez un répertoire d\'abord).'); return; }
         const sans = pgnService.getCurrentLineMoves(cid);
-        pgnService.buildRepertoireFromMoves(sans, trimmed, selectedColor, resolvedFolderId);
+        if (sans.length > 0) {
+          pgnService.buildRepertoireFromMoves(sans, trimmed, selectedColor, resolvedFolderId);
+        } else {
+          const currentFen = useChessStore.getState().chess.fen();
+          repertoireService.createNewRepertoire(trimmed, selectedColor, resolvedFolderId, false, currentFen);
+        }
         closeModal();
 
       } else if (mode === 'pgn-text') {
