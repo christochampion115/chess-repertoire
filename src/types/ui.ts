@@ -5,7 +5,7 @@ import type { TrainingMode, SurvivalReport } from './training';
  * null = aucune modale ouverte.
  */
 export type ActiveModal =
-  | { type: 'new-repertoire' }
+  | { type: 'new-repertoire'; initialMode?: 'start' | 'current' | 'pgn-file' | 'pgn-text'; initialColor?: 'w' | 'b' }
   | { type: 'rename'; itemId: string }
   | { type: 'training-confirm'; rootId: string; mode: TrainingMode }
   | { type: 'training-interrupt'; title: string; message: string; confirmLabel?: string; cancelLabel?: string; onConfirm: () => void; onCancel?: () => void }
@@ -26,6 +26,7 @@ export type ActiveModal =
   | { type: 'folder-group' }
   | { type: 'annotation' }
   | { type: 'patch-notes' }
+  | { type: 'select-repertoire'; repChoices: { repIndex: number; nodeId: string; repName: string }[] }
   | null;
 
 export interface OpenPanels {

@@ -44,7 +44,10 @@ export const useReportStore = create<ReportState & ReportActions>()((set, get) =
   abortController: null,
 
   setView: (view) => set({ view }),
-  setParams: (patch) => set((s) => ({ params: { ...s.params, ...patch } })),
+  setParams: (patch) => {
+    if ('startFen' in patch) console.log('[DEBUG setParams] startFen →', patch.startFen, '| stack:', new Error().stack?.split('\n').slice(2, 6).join(' | '));
+    set((s) => ({ params: { ...s.params, ...patch } }));
+  },
   setProgress: (progress) => set((s) => ({ progress: { ...s.progress, ...progress } })),
   setData: (data) => set({ data }),
   setError: (error) => set({ error }),

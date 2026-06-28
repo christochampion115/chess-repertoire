@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import type { Square } from '@/types/chess';
+import type { Color, Square } from '@/types/chess';
 import type { RepertoireNode } from '@/types/repertoire';
 import { useChessStore } from '@/stores/chessStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
@@ -331,9 +331,10 @@ export function createNewRepertoire(
   color: 'w' | 'b',
   folderId?: string | null,
   isExample = false,
+  fen?: string,
 ): RepertoireNode {
   const id = 'rep_' + Math.random().toString(36).substr(2, 9);
-  const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const startingFen = fen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
   const store = useRepertoireStore.getState();
   let resolvedFolderId: string | undefined = folderId ?? undefined;
@@ -378,7 +379,7 @@ export function createNewRepertoire(
     name,
     color,
     san: 'Initial',
-    fen,
+    fen: startingFen,
     parentId: null,
     children: [],
     moveNum: 0,
@@ -400,7 +401,7 @@ export function createNewRepertoire(
   store.setActiveRepIndex(newReps.length - 1);
   useRepertoireStore.setState({ currentNodeId: id, redoStack: [] });
   useChessStore.setState({ boardFlipped: color === 'b' });
-  _updateChessPosition(fen);
+  _updateChessPosition(startingFen);
   _incrementVersion();
 
   registerCreatedRepertoire(newNode);
@@ -1030,6 +1031,38 @@ export function findNodeWithVarName(
   return null;
 }
 
+export function findRepsByFen(
+  fen: string,
+  color: 'w' | 'b',
+): { repIndex: number; nodeId: string; repName: string }[] {
+  const nf = normalizeFen(fen);
+  const state = useRepertoireStore.getState();
+  const results: { repIndex: number; nodeId: string; repName: string }[] = [];
+
+  for (let i = 0; i < state.repertoires.length; i++) {
+    const root = state.repertoires[i];
+    if (root.color !== color) continue;
+
+    let foundId: string | null = null;
+    const walk = (node: RepertoireNode) => {
+      if (foundId) return;
+      if (normalizeFen(node.fen) === nf) {
+        foundId = node.id;
+      }
+      for (const child of node.children) {
+        if (!foundId) walk(child);
+      }
+    };
+    walk(root);
+
+    if (foundId) {
+      results.push({ repIndex: i, nodeId: foundId, repName: root.name || `Répertoire ${i + 1}` });
+    }
+  }
+
+  return results;
+}
+
 export function nameVariantNode(nodeId: string, name: string): boolean {
   const node = nodeMap.get(nodeId);
   if (!node) return false;
@@ -1134,17 +1167,22 @@ export function switchToFreePlay(): void {
 
   // Clone the path into a detached free-play tree
   const rootId = 'fp_' + Math.random().toString(36).substr(2, 9);
+  const rootFen = path[0]?.fen ?? fen;
+  const rootFParts = rootFen.split(' ');
+  const rootFmove = parseInt(rootFParts[rootFParts.length - 1], 10) || 0;
+  const rootFTurn: Color = rootFParts[1] === 'b' ? 'w' : 'b';
+
   const rootClone: RepertoireNode = {
     ...(path[0] ?? {}),
     id: rootId,
     name: 'Jeu Libre',
     color: 'w',
     san: 'Initial',
-    fen: path[0]?.fen ?? fen,
+    fen: rootFen,
     parentId: null,
     children: [],
-    moveNum: 0,
-    turn: 'b',
+    moveNum: rootFmove,
+    turn: rootFTurn,
     createdAt: Date.now(),
     comment: '',
     varName: '',
@@ -1177,8 +1215,83 @@ export function switchToFreePlay(): void {
   _updateChessPosition(fen);
 }
 
-export function resetFreePlay(fen: string, flippedColor: Color = 'w'): string {
+export function resetFreePlay(
+  fen: string,
+  flippedColor: Color = 'w',
+  path?: string[],
+  rootFen?: string,
+): string {
+  const fenParts = fen.split(' ');
+  const fullmoveNum = parseInt(fenParts[fenParts.length - 1], 10) || 0;
+  const fenTurn = fenParts[1] as 'w' | 'b' | undefined;
+  const turn: Color = fenTurn === 'b' ? 'w' : 'b';
+
   const rootId = 'fp_' + Math.random().toString(36).substr(2, 9);
+
+  if (path && path.length > 0) {
+    const baseFen = rootFen ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    const startChess = new Chess(baseFen);
+
+    const rootNode: RepertoireNode = {
+      id: rootId,
+      name: 'Jeu Libre',
+      color: flippedColor,
+      san: 'Initial',
+      fen: baseFen,
+      parentId: null,
+      children: [],
+      moveNum: 0,
+      turn: 'b',
+      createdAt: Date.now(),
+      comment: '',
+      varName: '',
+      varAnnotation: '',
+    };
+    nodeMap.set(rootId, rootNode);
+
+    let parentNode = rootNode;
+    let parentId = rootId;
+
+    for (const san of path) {
+      const childId = 'fp_' + Math.random().toString(36).substr(2, 9);
+      startChess.move(san);
+      const childFen = startChess.fen();
+      const childParts = childFen.split(' ');
+      const childMove = parseInt(childParts[childParts.length - 1], 10) || 0;
+      const childTurn: Color = childParts[1] === 'b' ? 'w' : 'b';
+
+      const childNode: RepertoireNode = {
+        id: childId,
+        san,
+        fen: childFen,
+        parentId,
+        children: [],
+        moveNum: childMove,
+        turn: childTurn,
+        createdAt: Date.now(),
+        comment: '',
+        varName: '',
+        varAnnotation: '',
+      };
+
+      nodeMap.set(childId, childNode);
+      parentNode.children.push(childNode);
+      parentNode = childNode;
+      parentId = childId;
+    }
+
+    _invalidateFenIndex();
+    useRepertoireStore.setState({
+      activeRepIndex: -1,
+      freePlayRoot: rootNode,
+      currentNodeId: parentId,
+      redoStack: [],
+    });
+    useChessStore.setState({ boardFlipped: flippedColor === 'b' });
+    _updateChessPosition(fen);
+    return parentId;
+  }
+
   const rootNode: RepertoireNode = {
     id: rootId,
     name: 'Jeu Libre',
@@ -1187,8 +1300,8 @@ export function resetFreePlay(fen: string, flippedColor: Color = 'w'): string {
     fen,
     parentId: null,
     children: [],
-    moveNum: 0,
-    turn: 'b',
+    moveNum: fullmoveNum,
+    turn,
     createdAt: Date.now(),
     comment: '',
     varName: '',
@@ -1202,7 +1315,7 @@ export function resetFreePlay(fen: string, flippedColor: Color = 'w'): string {
     currentNodeId: rootId,
     redoStack: [],
   });
-  useChessStore.setState({ boardFlipped: flippedColor === 'black' });
+  useChessStore.setState({ boardFlipped: flippedColor === 'b' });
   _updateChessPosition(fen);
   return rootId;
 }
