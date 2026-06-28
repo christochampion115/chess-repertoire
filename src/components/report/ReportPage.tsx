@@ -242,6 +242,7 @@ export const ReportPage = React.memo(function ReportPage() {
       const saved = await fetchSavedReportById(id);
       setParams(saved.params);
       setData(saved.data);
+      await ensureOpeningsLoaded();
       setView('results');
     } catch {
       setError('Impossible de charger le rapport.');
