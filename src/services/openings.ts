@@ -34,6 +34,15 @@ export function lookupEco(path: string[]): string | null {
   return null;
 }
 
+export function lookupEcoEntry(path: string[]): { name: string; eco: string } | null {
+  if (!OPENINGS) return null;
+  const str = pathToString(path);
+  for (const entry of OPENINGS) {
+    if (str.startsWith(entry.s) || str === entry.s) return { name: entry.n, eco: entry.e };
+  }
+  return null;
+}
+
 export function getMoveNumberFromFen(fen?: string): number {
   if (!fen) return 1;
   const parts = fen.split(' ');

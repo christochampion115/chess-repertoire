@@ -53,16 +53,22 @@ export function AppLayout() {
 
     const fen = decodeURIComponent(rawFen);
     const color = (sessionStorage.getItem('alphaChess.openAtColor') || 'w') as 'w' | 'b';
+    const rawPath = sessionStorage.getItem('alphaChess.openAtPath');
+    const path = rawPath ? rawPath.split(' ').filter(Boolean) : undefined;
+    const rawRootFen = sessionStorage.getItem('alphaChess.openAtRootFen');
+    const rootFen = rawRootFen ? decodeURIComponent(rawRootFen) : undefined;
 
     sessionStorage.removeItem('alphaChess.openAtFen');
     sessionStorage.removeItem('alphaChess.openFreePlay');
     sessionStorage.removeItem('alphaChess.openAtColor');
+    sessionStorage.removeItem('alphaChess.openAtPath');
+    sessionStorage.removeItem('alphaChess.openAtRootFen');
 
     const matches = repertoireService.findRepsByFen(fen, color);
 
     if (matches.length === 0) {
       useChessStore.setState({ boardFlipped: color === 'b' });
-      repertoireService.resetFreePlay(fen, color);
+      repertoireService.resetFreePlay(fen, color, path, rootFen);
       openModal({ type: 'new-repertoire', initialMode: 'current', initialColor: color });
     } else if (matches.length === 1) {
       repertoireService.navigateToNode(matches[0].nodeId);

@@ -114,8 +114,7 @@ export const RightPanel = React.memo(function RightPanel() {
         {/* ── PGN + commentaire (Monitor) ────────────────────── */}
         <Monitor />
 
-        {/* ── Ouverture (Phase 5) ────────────────────────────── */}
-        <div id="opening-info" />
+        {/* ── Ouverture (intégrée dans le Monitor) ───────────── */}
 
         {/* ── Moniteur Survie (remplace l'analyse en training survie) ── */}
         {isSurvival && <SurvivalMonitor />}

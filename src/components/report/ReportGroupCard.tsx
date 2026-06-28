@@ -33,11 +33,13 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
     if (!group.fen) return;
     try {
       sessionStorage.setItem('alphaChess.openAtFen', encodeURIComponent(group.fen));
+      sessionStorage.setItem('alphaChess.openAtPath', group.key || '');
+      sessionStorage.setItem('alphaChess.openAtRootFen', rootFen ? encodeURIComponent(rootFen) : '');
       sessionStorage.setItem('alphaChess.openFreePlay', '1');
       sessionStorage.setItem('alphaChess.openAtColor', reportColor === 'black' ? 'b' : 'w');
       window.location.href = '/app';
     } catch { /* localStorage might be full */ }
-  }, [group.fen, reportColor]);
+  }, [group.fen, group.key, rootFen, reportColor]);
 
   const hPct = (group.groupScore * 100).toFixed(0);
   const basePct = (baselineScore * 100).toFixed(0);
