@@ -2,6 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '@/stores/uiStore';
 
+const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
+  id: i,
+  x: +((i * 73.7117 + 5) % 100).toFixed(2),
+  y: +((i * 38.197 + 7) % 85).toFixed(2),
+  size: +(0.8 + (i % 3) * 0.6).toFixed(2),
+  dur: +(2.5 + (i % 6) * 0.5).toFixed(2),
+  delay: +((i * 0.37) % 5).toFixed(2),
+}));
+
 export const ViewHome = React.memo(function ViewHome() {
   const navigate = useNavigate();
   const openModal = useUiStore((s) => s.openModal);
@@ -9,14 +18,34 @@ export const ViewHome = React.memo(function ViewHome() {
   return (
     <div id="view-home">
       <section className="home-hero">
+        <div className="home-hero-bg" aria-hidden="true" />
+        <div className="hero-particles" aria-hidden="true">
+          {PARTICLES.map(p => (
+            <span
+              key={p.id}
+              className="hero-particle"
+              style={{
+                left: `${p.x}%`,
+                top: `${p.y}%`,
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                animationDuration: `${p.dur}s`,
+                animationDelay: `${p.delay}s`,
+              }}
+            />
+          ))}
+        </div>
         <div className="home-hero-inner">
-          <h1 className="home-hero-title">Maîtrisez vos ouvertures</h1>
+          <h1 className="home-hero-title">
+            Maîtrisez vos ouvertures
+          </h1>
           <p className="home-hero-subtitle">
             Construisez votre répertoire coup par coup, entraînez-vous avec des systèmes
-            de drill, et progressez avec des données réelles à votre niveau Elo.
+            de drill, et progressez avec des données réelles.
           </p>
           <div className="home-hero-cta">
             <button className="home-cta-btn home-cta-btn--primary" disabled>
+              <span aria-hidden="true">🎓</span>
               Tutoriel — bientôt disponible
             </button>
           </div>
@@ -56,13 +85,14 @@ export const ViewHome = React.memo(function ViewHome() {
             </p>
           </div>
 
-          <div className="feature-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/rapport')}>
+          <div className="feature-card feature-card--active" role="button" tabIndex={0} onClick={() => navigate('/rapport')}>
             <div className="feature-card-icon">📊</div>
             <h3 className="feature-card-title">Analyse des performances</h3>
             <p className="feature-card-desc">
               Identifiez vos points faibles en ouverture depuis votre compte
               Chess.com et obtenez un rapport personnalisé de priorités d'entraînement.
             </p>
+            <span className="feature-card-link">Analyser →</span>
           </div>
         </div>
       </section>
