@@ -22,12 +22,15 @@ export const ViewHome = React.memo(function ViewHome() {
     if (!el) return;
 
     let rafId = 0;
+    const PARALLAX_SPEED = 0.03;
     const onScroll = () => {
       if (rafId) return;
       rafId = requestAnimationFrame(() => {
         rafId = 0;
         const y = window.scrollY;
-        el.style.transform = `translateY(${(y * 0.03).toFixed(1)}px)`;
+        // Pour que les particules (position:absolute) se déplacent COMME les particules fixed du body,
+        // on doit compenser le scroll naturel du hero: translateY(y * (PARALLAX_SPEED - 1))
+        el.style.transform = `translateY(${(y * (PARALLAX_SPEED - 1)).toFixed(1)}px)`;
       });
     };
 
@@ -116,6 +119,16 @@ export const ViewHome = React.memo(function ViewHome() {
               Chess.com et obtenez un rapport personnalisé de priorités d'entraînement.
             </p>
             <span className="feature-card-link">Analyser →</span>
+          </div>
+
+          <div className="feature-card feature-card--soon">
+            <div className="feature-card-badge">Bientôt</div>
+            <h3 className="feature-card-title">À venir</h3>
+          </div>
+
+          <div className="feature-card feature-card--soon">
+            <div className="feature-card-badge">Bientôt</div>
+            <h3 className="feature-card-title">À venir</h3>
           </div>
         </div>
       </section>

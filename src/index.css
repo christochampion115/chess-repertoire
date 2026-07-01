@@ -4277,7 +4277,7 @@ body::after {
 
 .home-features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 24px;
 }
 
@@ -4844,4 +4844,142 @@ body::after {
   text-align: center;
   padding: 16px 0;
   font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DESKTOP RESPONSIVENESS — Breakpoints PC uniquement (min-width)
+   Adapte l'espace horizontal de façon progressive.
+   Ne modifie pas le design, les couleurs ni la structure.
+   Ne touche pas au comportement ≤ 1023px.
+════════════════════════════════════════════════════════════════ */
+
+/* ── 1200px : 4 cartes par ligne garanties ───────────────────── */
+@media (min-width: 1200px) {
+  .home-features-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ── 1440px : expansion légère ───────────────────────────────── */
+@media (min-width: 1440px) {
+  .top-bar,
+  .main-layout,
+  #view-home {
+    width: min(100%, 1420px);
+  }
+
+  .main-layout {
+    grid-template-columns:
+      minmax(270px, 340px)
+      minmax(480px, 800px)
+      minmax(310px, 450px);
+    gap: 30px;
+  }
+
+  .hero-particles {
+    left: calc(50% - 680px);
+    right: calc(50% - 680px);
+  }
+}
+
+/* ── 1920px : Full HD large ──────────────────────────────────── */
+@media (min-width: 1920px) {
+  .top-bar,
+  .main-layout,
+  #view-home {
+    width: min(100%, 1700px);
+  }
+
+  .main-layout {
+    grid-template-columns:
+      minmax(280px, 370px)
+      minmax(480px, 860px)
+      minmax(320px, 490px);
+    gap: 34px;
+  }
+
+  .board-shell,
+  #training-banner {
+    width: min(100%, 860px);
+  }
+
+  .board-controls {
+    width: min(100%, 860px);
+  }
+
+  .home-features {
+    padding: 0 40px;
+  }
+
+  .home-features-grid {
+    gap: 30px;
+  }
+}
+
+/* ── 2560px : QHD ────────────────────────────────────────────── */
+@media (min-width: 2560px) {
+  .top-bar,
+  .main-layout,
+  #view-home {
+    width: min(100%, 2100px);
+  }
+
+  .main-layout {
+    grid-template-columns:
+      minmax(300px, 430px)
+      minmax(480px, 960px)
+      minmax(340px, 570px);
+    gap: 42px;
+  }
+
+  .board-shell,
+  #training-banner {
+    width: min(100%, 960px);
+  }
+
+  .board-controls {
+    width: min(100%, 960px);
+  }
+
+  .home-features {
+    padding: 0 60px;
+  }
+
+  .home-features-grid {
+    gap: 36px;
+  }
+}
+
+/* ── 3840px : 4K ─────────────────────────────────────────────── */
+@media (min-width: 3840px) {
+  .top-bar,
+  .main-layout,
+  #view-home {
+    width: min(100%, 2600px);
+  }
+
+  .main-layout {
+    grid-template-columns:
+      minmax(340px, 520px)
+      minmax(480px, 1120px)
+      minmax(380px, 680px);
+    gap: 52px;
+  }
+
+  .board-shell,
+  #training-banner {
+    width: min(100%, 1120px);
+  }
+
+  .board-controls {
+    width: min(100%, 1120px);
+  }
+
+  .home-features {
+    padding: 0 80px;
+  }
+
+  .home-features-grid {
+    gap: 44px;
+  }
 }
