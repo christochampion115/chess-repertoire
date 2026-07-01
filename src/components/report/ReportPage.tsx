@@ -10,6 +10,8 @@ import { SplashScreen } from '@/components/layout/SplashScreen';
 import { ReportForm } from './ReportForm';
 import { ReportResults } from './ReportResults';
 import { ReportSavedList } from './ReportSavedList';
+import { btnSecondary } from './reportStyles';
+import './report.css';
 
 const LOADING_MESSAGES = [
   'Premier scan en cours',
@@ -25,6 +27,7 @@ export const ReportPage = React.memo(function ReportPage() {
   const token = useAuthStore((s) => s.token);
   const [loadingPct, setLoadingPct] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState<'idle' | 'conn' | 'load' | 'blunders' | 'done'>('idle');
+  const [formTab, setFormTab] = useState<'analyze' | 'saved'>('analyze');
   const [gamesTarget, setGamesTarget] = useState(0);
   const animatedGames = useAnimatedCounter(gamesTarget);
   const [statusMsgIdx, setStatusMsgIdx] = useState(0);
@@ -262,123 +265,108 @@ export const ReportPage = React.memo(function ReportPage() {
       style={{
         maxWidth: 1200,
         margin: '0 auto',
-        padding: '32px 24px 80px',
+        padding: '24px 24px 40px',
       }}
     >
-      <div
-        style={{
-          background: 'rgba(15,23,42,0.96)',
-          borderBottom: '1px solid rgba(148,163,184,0.18)',
-          padding: '0 24px',
-          height: 56,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          margin: '-32px -24px 24px',
-        }}
-      >
-        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-          📊 Analyse des performances
-        </span>
-        <div style={{ flex: 1 }} />
-        <span
-          style={{
-            fontSize: '0.72rem',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '.05em',
-            padding: '2px 8px',
-            borderRadius: 100,
-            background: 'rgba(122,174,203,0.18)',
-            color: '#7aaecb',
-            border: '1px solid rgba(122,174,203,0.28)',
-          }}
-        >
-          BÊTA
-        </span>
+      <div className="report-page-header">
+        <span className="report-page-header-label">Rapport</span>
       </div>
 
       {view === 'form' && (
         <>
-          <ReportForm
-            params={params}
-            onParamsChange={setParams}
-            onSubmit={handleSubmit}
-            error={error}
-          />
-          {token && <ReportSavedList onLoad={handleLoadSaved} />}
+          <div className="report-tabs">
+            <button
+              type="button"
+              className={`report-tab${formTab === 'analyze' ? ' active' : ''}`}
+              onClick={() => setFormTab('analyze')}
+            >
+              Analyser
+            </button>
+            {token && (
+              <button
+                type="button"
+                className={`report-tab${formTab === 'saved' ? ' active' : ''}`}
+                onClick={() => setFormTab('saved')}
+              >
+                Mes rapports
+              </button>
+            )}
+          </div>
+          {(formTab === 'analyze' || !token) && (
+            <ReportForm
+              params={params}
+              onParamsChange={setParams}
+              onSubmit={handleSubmit}
+              error={error}
+            />
+          )}
+          {formTab === 'saved' && token && (
+            <ReportSavedList onLoad={handleLoadSaved} />
+          )}
         </>
       )}
 
       {view === 'loading' && (
-        <div
-          style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
-            padding: '48px 32px',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: '3rem', marginBottom: 16 }}>⚙️</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
-            Analyse en cours…
-          </div>
-          <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: 32 }}>
-            {params.username} · {params.color === 'white' ? 'Blancs' : 'Noirs'}
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 56, padding: '140px 0' }}>
+          <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
+            <div className="report-loading-knight" style={{ fontSize: '4.5rem' }}>♞</div>
+            <div className="report-loading-knight" style={{ fontSize: '4.5rem', animationDelay: '0.15s' }}>♞</div>
+            <div className="report-loading-knight" style={{ fontSize: '4.5rem', animationDelay: '0.3s' }}>♞</div>
           </div>
 
-          <div
-            style={{
-              background: 'rgba(15,23,42,0.96)',
-              border: '1px solid rgba(148,163,184,0.15)',
-              borderRadius: 100,
-              height: 10,
-              overflow: 'hidden',
-              marginBottom: 12,
-            }}
-          >
+          <div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f8fafc' }}>
+              Analyse en cours…
+            </div>
+            <div style={{ fontSize: '1rem', color: '#94a3b8', marginTop: 6 }}>
+              {params.username} · {params.color === 'white' ? 'Blancs' : 'Noirs'}
+            </div>
+          </div>
+
+          <div style={{ width: '100%' }}>
             <div
               style={{
-                height: '100%',
-                width: `${loadingPct}%`,
+                background: 'linear-gradient(160deg, rgba(15,25,50,0.6), rgba(8,16,29,0.7))',
+                boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2)',
                 borderRadius: 100,
-                background: loadingPct >= 100
-                  ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-                  : 'linear-gradient(90deg, #7aaecb, #818cf8)',
-                transition: 'width 0.3s ease',
+                height: 16,
+                overflow: 'hidden',
               }}
-            />
-          </div>
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${loadingPct}%`,
+                  borderRadius: 100,
+                  background: loadingPct >= 100
+                    ? 'linear-gradient(90deg, #22c55e, #4ade80)'
+                    : 'linear-gradient(90deg, #22D3EE, #6366F1)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
 
-          <div
-            style={{
-              fontSize: '0.8rem',
-              color: '#94a3b8',
-              minHeight: 20,
-              marginBottom: 6,
-            }}
-          >
-            {loadingPhase === 'conn' && 'Connexion au serveur…'}
-            {loadingPhase === 'load' && gamesTarget === 0 && LOADING_MESSAGES[Math.min(statusMsgIdx, 3)]}
-            {loadingPhase === 'load' && gamesTarget > 0 && `${Math.floor(animatedGames)} partie${Math.floor(animatedGames) > 1 ? 's' : ''} chargée${Math.floor(animatedGames) > 1 ? 's' : ''}`}
-            {loadingPhase === 'blunders' && 'Calcul des blunders…'}
-            {loadingPhase === 'done' && 'Terminé ✓'}
+            <div
+              style={{
+                fontSize: '0.9rem',
+                color: '#94a3b8',
+                minHeight: 22,
+                marginTop: 14,
+              }}
+            >
+              {loadingPhase === 'conn' && 'Connexion au serveur…'}
+              {loadingPhase === 'load' && gamesTarget === 0 && LOADING_MESSAGES[Math.min(statusMsgIdx, 3)]}
+              {loadingPhase === 'load' && gamesTarget > 0 && `${Math.floor(animatedGames)} partie${Math.floor(animatedGames) > 1 ? 's' : ''} chargée${Math.floor(animatedGames) > 1 ? 's' : ''}`}
+              {loadingPhase === 'blunders' && 'Calcul des blunders…'}
+              {loadingPhase === 'done' && 'Terminé ✓'}
+            </div>
           </div>
 
           <button
             type="button"
             onClick={handleCancel}
-            style={{
-              background: 'none',
-              border: '1px solid rgba(148,163,184,0.18)',
-              color: '#94a3b8',
-              padding: '7px 18px',
-              borderRadius: 7,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              marginTop: 16,
-            }}
+            className="rbtn-secondary"
+            style={btnSecondary}
           >
             Annuler
           </button>

@@ -18,7 +18,7 @@ const WIKI_PIECES: Record<string, string> = {
   bk: 'f/f0/Chess_kdt45.svg',
 };
 
-const SQUARE_SIZE = 35;
+const SQUARE_SIZE = 30;
 
 function squareName(index: number): string {
   return String.fromCharCode(97 + (index % 8)) + String(8 - Math.floor(index / 8));
@@ -38,9 +38,6 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange, act
   const [, forceUpdate] = useState(0);
   const flipped = color === 'black';
 
-  const [fenInput, setFenInput] = useState('');
-  const [fenError, setFenError] = useState<string | null>(null);
-
   const boardTheme = useChessStore((s) => s.boardTheme);
   const lightBg = boardTheme.light || '#ebecd0';
   const darkBg = boardTheme.dark || '#779556';
@@ -49,10 +46,7 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange, act
 
   const syncFen = useCallback(() => {
     const chess = chessRef.current;
-    const f = chess.fen();
-    setFenInput(f);
-    setFenError(null);
-    if (active) onFenChange(f, chess.history().join(' '));
+    if (active) onFenChange(chess.fen(), chess.history().join(' '));
   }, [active, onFenChange]);
 
   const rerender = useCallback(() => {
@@ -119,23 +113,6 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange, act
     reset();
   }, [reset]);
 
-  const handleFenInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setFenInput(val);
-    try {
-      const chess = new Chess(val);
-      chessRef.current = chess;
-      setSelectedSq(null);
-      setLegalTargets(new Set());
-      setLastMove(null);
-      setFenError(null);
-      forceUpdate((n) => n + 1);
-      syncFen();
-    } catch {
-      setFenError('FEN invalide');
-    }
-  }, [syncFen]);
-
   useEffect(() => {
     reset();
   }, [color, reset]);
@@ -145,7 +122,7 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange, act
   }, [active, syncFen]);
 
   return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
       <div
         style={{
           display: 'grid',
@@ -229,47 +206,8 @@ export const FenEditor = React.memo(function FenEditor({ color, onFenChange, act
           );
         })}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 200 }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button type="button" onClick={reset} style={btnStyle}>Initiale</button>
-          <button type="button" onClick={undo} style={btnStyle}>Annuler</button>
-          <button type="button" onClick={clear} style={btnStyle}>Vider</button>
-        </div>
-        <label style={{ fontSize: '0.78rem', color: '#94a3b8' }}>FEN</label>
-        <input
-          type="text"
-          value={fenInput}
-          onChange={handleFenInputChange}
-          placeholder="Saisissez une FEN…"
-          style={{
-            fontFamily: 'monospace',
-            fontSize: '0.78rem',
-            background: 'rgba(15,23,42,0.96)',
-            border: `1px solid ${fenError ? 'rgba(239,68,68,.5)' : 'rgba(148,163,184,0.18)'}`,
-            borderRadius: 6,
-            color: fenError ? '#fca5a5' : '#e2e8f0',
-            padding: '8px 10px',
-            outline: 'none',
-          }}
-        />
-        {fenError && (
-          <div style={{ fontSize: '0.72rem', color: '#fca5a5', marginTop: 4 }}>
-            {fenError}
-          </div>
-        )}
-      </div>
     </div>
   );
 });
 
-const btnStyle: React.CSSProperties = {
-  flex: 1,
-  background: 'rgba(15,23,42,0.96)',
-  border: '1px solid rgba(148,163,184,0.18)',
-  color: '#e2e8f0',
-  borderRadius: 6,
-  padding: '8px 10px',
-  cursor: 'pointer',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-};
+

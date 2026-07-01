@@ -113,7 +113,7 @@ export const ViewHome = React.memo(function ViewHome() {
 
           <div className="feature-card feature-card--active" role="button" tabIndex={0} onClick={() => navigate('/rapport')}>
             <div className="feature-card-icon">📊</div>
-            <h3 className="feature-card-title">Analyse des performances</h3>
+            <h3 className="feature-card-title">Rapport</h3>
             <p className="feature-card-desc">
               Identifiez vos points faibles en ouverture depuis votre compte
               Chess.com et obtenez un rapport personnalisé de priorités d'entraînement.

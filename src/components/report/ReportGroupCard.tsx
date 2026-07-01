@@ -8,6 +8,8 @@ import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { ReportChildCard } from './ReportChildCard';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useReportStore } from '@/stores/reportStore';
+import { cardLg, btnSecondary } from './reportStyles';
+import './report.css';
 
 interface ReportGroupCardProps {
   group: ReportGroup;
@@ -98,11 +100,11 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
 
   return (
     <div
+      className="rcard"
       style={{
-        background: 'rgba(17,24,39,0.96)',
-        border: `1px solid rgba(148,163,184,0.18)`,
+        ...cardLg,
         borderLeft: `4px solid ${borderColor}`,
-        borderRadius: 10,
+        border: 'none',
         marginBottom: 10,
         overflow: 'hidden',
       }}
@@ -143,8 +145,8 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                   fontFamily: "'Courier New',monospace",
                   fontSize: '0.82rem',
                   color: '#94a3b8',
-                  background: 'rgba(15,23,42,0.96)',
-                  borderRadius: 6,
+                  background: 'rgba(8,16,29,0.7)',
+                  borderRadius: 8,
                   padding: '6px 10px',
                   marginBottom: 14,
                   lineHeight: 1.6,
@@ -194,15 +196,12 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                 type="button"
                 onClick={openInApp}
                 title="Ouvrir cette position dans l'application"
+                className="rbtn-ghost"
                 style={{
-                  background: 'none',
-                  border: '1px solid rgba(148,163,184,0.18)',
-                  color: '#94a3b8',
-                  borderRadius: 6,
+                  ...btnSecondary,
                   padding: '4px 10px',
                   fontSize: '0.68rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
+                  color: '#3B82F6',
                 }}
               >
                 Ouvrir →
@@ -216,15 +215,16 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
         <>
           <button
             onClick={() => setExpanded(!expanded)}
+            className="rtoggle"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               width: '100%',
               padding: '8px 16px',
-              background: 'rgba(15,23,42,0.5)',
+              background: 'rgba(8,16,29,0.6)',
               border: 'none',
-              borderTop: '1px solid rgba(148,163,184,0.18)',
+              borderTop: '1px solid rgba(148,163,184,0.08)',
               color: '#e2e8f0',
               fontSize: '0.80rem',
               cursor: 'pointer',
@@ -243,9 +243,9 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                   letterSpacing: '.04em',
                   padding: '2px 8px',
                   borderRadius: 100,
-                  background: 'rgba(251,113,133,0.15)',
-                  color: '#fca5a5',
-                  border: '1px solid rgba(251,113,133,0.25)',
+                  background: 'rgba(99,102,241,0.15)',
+                  color: '#a5b4fc',
+                  border: '1px solid rgba(99,102,241,0.25)',
                 }}
               >
                 {allChildren.length} ligne{allChildren.length > 1 ? 's' : ''}
@@ -253,7 +253,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
             )}
           </button>
           {expanded && (
-            <div style={{ background: 'rgba(15,23,42,0.5)' }}>
+            <div style={{ background: 'rgba(8,16,29,0.5)' }}>
               {group.problematicLines.length > 0 && variant === 'weakness' && (
                 <>
                   {group.problematicLines.map((child, i) => (
@@ -263,7 +263,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
               )}
               {group.compensatingLines.length > 0 && (
                 <>
-                  <div style={{ padding: '10px 16px 4px 28px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8', opacity: 0.7 }}>
+                  <div style={{ padding: '10px 16px 4px 28px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#64748b', opacity: 0.8 }}>
                     {variant === 'weakness' ? 'Lignes compensatrices' : 'Lignes surperformantes'}
                   </div>
                   {group.compensatingLines.map((child, i) => (

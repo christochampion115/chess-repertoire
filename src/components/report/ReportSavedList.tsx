@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { fetchSavedReports, deleteSavedReportOnServer } from '@/services/report';
 import type { SavedReportMeta } from '@/types/report';
+import { cardLg } from './reportStyles';
+import './report.css';
 
 interface ReportSavedListProps {
   onLoad: (id: number) => void;
@@ -39,21 +41,14 @@ export const ReportSavedList = React.memo(function ReportSavedList({ onLoad }: R
   };
 
   return (
-    <div style={{ marginTop: 32, borderTop: '2px dashed rgba(148,163,184,0.12)', paddingTop: 24 }}>
+    <div style={{ marginTop: 32, borderTop: '1px solid rgba(148,163,184,0.08)', paddingTop: 24 }}>
       <style>{`
-        .saved-report-card {
-          transition: background 0.2s, border-color 0.2s;
-        }
-        .saved-report-card:hover {
-          background: rgba(25,33,52,0.96) !important;
-          border-color: rgba(148,163,184,0.35) !important;
-        }
         .saved-report-card:hover .saved-report-del {
           opacity: 1 !important;
         }
         .saved-report-del { transition: opacity 0.2s; }
       `}</style>
-      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+      <div style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 16, color: '#e2e8f0' }}>
         Rapports sauvegardés
       </div>
 
@@ -75,9 +70,7 @@ export const ReportSavedList = React.memo(function ReportSavedList({ onLoad }: R
           onClick={() => onLoad(r.id)}
           className="saved-report-card"
           style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
+            ...cardLg,
             padding: '14px 18px',
             marginBottom: 10,
             display: 'flex',

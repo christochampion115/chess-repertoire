@@ -1,6 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import type { ReportParams, PlayerTimeClass } from '@/types/report';
 import { FenEditor } from './FenEditor';
+import { inputStyle, btnPrimary, cardLg } from './reportStyles';
+import './report.css';
 
 interface ReportFormProps {
   params: ReportParams;
@@ -28,28 +30,6 @@ const MONTHS = [
   { value: '09', label: 'Sep' }, { value: '10', label: 'Oct' },
   { value: '11', label: 'Nov' }, { value: '12', label: 'Déc' },
 ];
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'rgba(15,23,42,0.96)',
-  border: '1px solid rgba(148,163,184,0.18)',
-  borderRadius: 8,
-  color: '#e2e8f0',
-  padding: '10px 14px',
-  fontSize: '0.92rem',
-  outline: 'none',
-};
-
-const selectStyle: React.CSSProperties = {
-  background: 'rgba(17,24,39,0.7)',
-  border: '1px solid rgba(148,163,184,0.13)',
-  borderRadius: 6,
-  color: '#e2e8f0',
-  padding: '9px 12px',
-  fontSize: '0.88rem',
-  outline: 'none',
-  cursor: 'pointer',
-};
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
@@ -90,25 +70,15 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
   return (
     <div>
       {/* ── outer flex: left column (grid + période) + right position card ── */}
-      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', marginBottom: 20 }}>
+      <div className="report-form-outer">
 
         {/* ── LEFT COLUMN ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="report-form-fields">
 
-          {/* 2-col grid — rows 1-4 total ~280 px (= board height)
-              Row 3 paddingTop: 113 creates the inter-group gap:
-              24 + 82 + (113+24) + 37 = 280 px */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              columnGap: 32,
-              alignItems: 'start',
-            }}
-          >
+          <div className="report-2col-grid">
             {/* Row 1 : section titles */}
-            <div style={{ ...sectionTitleStyle }}>Compte Chess.com</div>
-            <div style={{ ...sectionTitleStyle }}>Couleur</div>
+            <div className="report-section-title">Compte Chess.com</div>
+            <div className="report-section-title">Couleur</div>
 
             {/* Row 2 : username  |  couleur buttons */}
             <div style={{ marginBottom: 20 }}>
@@ -124,12 +94,12 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
                 spellCheck={false}
               />
             </div>
-            {/* paddingTop: 22 skips label height → buttons align with the input field */}
-            <div style={{ marginBottom: 20, paddingTop: 22 }}>
+            <div style={{ marginBottom: 20 }} className="report-field-no-label">
               <div style={{ display: 'flex', gap: 10 }}>
                 {(['white', 'black'] as const).map((c) => (
                   <label
                     key={c}
+                    className="rcolor-radio"
                     style={{
                       flex: 1,
                       display: 'flex',
@@ -137,13 +107,17 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
                       justifyContent: 'center',
                       gap: 8,
                       padding: 10,
-                      background: 'rgba(15,23,42,0.96)',
-                      border: `2px solid ${params.color === c ? 'rgba(122,174,203,0.5)' : 'rgba(148,163,184,0.18)'}`,
+                      background: params.color === c
+                        ? 'linear-gradient(180deg, rgba(70,150,255,0.15), rgba(70,150,255,0.05))'
+                        : 'linear-gradient(180deg, rgba(70,150,255,0.04), rgba(70,150,255,0.01))',
+                      border: 'none',
+                      boxShadow: params.color === c ? 'inset 0 1px 2px rgba(70,150,255,0.2)' : 'inset 0 0 0 1px rgba(148,163,184,0.12)',
                       borderRadius: 8,
                       cursor: 'pointer',
-                      color: params.color === c ? '#7aaecb' : '#94a3b8',
+                      color: params.color === c ? '#ffffff' : '#94a3b8',
                       fontSize: '0.88rem',
                       fontWeight: 600,
+                      transition: 'background 0.2s ease, box-shadow 0.2s ease',
                     }}
                   >
                     <input
@@ -160,25 +134,27 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
               </div>
             </div>
 
-            {/* Row 3 : section titles — paddingTop: 45 = inter-group spacer */}
-            <div style={{ ...sectionTitleStyle, paddingTop: 45 }}>Filtres de parties</div>
-            <div style={{ ...sectionTitleStyle, paddingTop: 45 }}>ELO adversaire</div>
+            {/* inter-group spacer */}
+            <div style={{ gridColumn: '1 / -1', height: 14 }} />
+            {/* Row 3 : section titles */}
+            <div className="report-section-title">Filtres de parties</div>
+            <div className="report-section-title">ELO adversaire</div>
 
             {/* Row 4 : cadence  |  ELO inputs */}
             <div>
-              <select
-                id="rapport-timeclass"
+              <CustomSelect
                 value={params.timeClass}
-                onChange={(e) => onParamsChange({ timeClass: e.target.value as PlayerTimeClass })}
-                style={{ ...selectStyle, width: '100%' }}
-              >
-                <option value="all">Toutes</option>
-                <option value="bullet">Bullet</option>
-                <option value="blitz">Blitz</option>
-                <option value="rapid">Rapide</option>
-                <option value="classical">Classique</option>
-                <option value="daily">Correspondance</option>
-              </select>
+                options={[
+                  { value: 'all', label: 'Toutes' },
+                  { value: 'bullet', label: 'Bullet' },
+                  { value: 'blitz', label: 'Blitz' },
+                  { value: 'rapid', label: 'Rapide' },
+                  { value: 'classical', label: 'Classique' },
+                  { value: 'daily', label: 'Correspondance' },
+                ]}
+                onChange={(v) => onParamsChange({ timeClass: v as PlayerTimeClass })}
+                id="rapport-timeclass"
+              />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -187,8 +163,10 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
                   placeholder="Min"
                   min={0}
                   max={3000}
+                  step={50}
                   value={params.eloMin || ''}
                   onChange={(e) => onParamsChange({ eloMin: parseInt(e.target.value) || 0 })}
+                  className="rinput"
                   style={{ ...inputStyle, width: 100 }}
                 />
                 <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
@@ -197,8 +175,10 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
                   placeholder="Max"
                   min={0}
                   max={3000}
+                  step={50}
                   value={params.eloMax === 3000 ? '' : params.eloMax}
                   onChange={(e) => onParamsChange({ eloMax: parseInt(e.target.value) || 3000 })}
+                  className="rinput"
                   style={{ ...inputStyle, width: 100 }}
                 />
               </div>
@@ -206,51 +186,47 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
           </div>
 
           {/* ── PÉRIODE ── */}
-          <div style={{ paddingTop: 52, marginBottom: 20 }}>
+          <div style={{ marginBottom: 20 }} className="report-period-section">
             <div style={sectionTitleStyle}>Période (de — à)</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.82rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>De</span>
-              <select
+              <CustomSelect
                 value={params.dateFrom?.split('/')[0] || ''}
-                onChange={(e) => {
+                options={years}
+                onChange={(v) => {
                   const month = params.dateFrom?.split('/')[1] || '';
-                  onParamsChange({ dateFrom: e.target.value ? `${e.target.value}/${month}` : '' });
+                  onParamsChange({ dateFrom: v ? `${v}/${month}` : '' });
                 }}
-                style={selectStyle}
-              >
-                {years.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
-              </select>
-              <select
+                style={{ width: 100 }}
+              />
+              <CustomSelect
                 value={params.dateFrom?.split('/')[1] || ''}
-                onChange={(e) => {
+                options={MONTHS}
+                onChange={(v) => {
                   const year = params.dateFrom?.split('/')[0] || '';
-                  onParamsChange({ dateFrom: e.target.value ? `${year}/${e.target.value}` : '' });
+                  onParamsChange({ dateFrom: v ? `${year}/${v}` : '' });
                 }}
-                style={selectStyle}
-              >
-                {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
+                style={{ width: 80 }}
+              />
               <span style={{ fontSize: '0.82rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>à</span>
-              <select
-                value={params.dateTo?.split('/')[0] || curYear}
-                onChange={(e) => {
+              <CustomSelect
+                value={params.dateTo?.split('/')[0] || String(curYear)}
+                options={years}
+                onChange={(v) => {
                   const month = params.dateTo?.split('/')[1] || curMonth;
-                  onParamsChange({ dateTo: e.target.value ? `${e.target.value}/${month}` : '' });
+                  onParamsChange({ dateTo: v ? `${v}/${month}` : '' });
                 }}
-                style={selectStyle}
-              >
-                {years.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
-              </select>
-              <select
+                style={{ width: 100 }}
+              />
+              <CustomSelect
                 value={params.dateTo?.split('/')[1] || curMonth}
-                onChange={(e) => {
+                options={MONTHS}
+                onChange={(v) => {
                   const year = params.dateTo?.split('/')[0] || String(curYear);
-                  onParamsChange({ dateTo: `${year}/${e.target.value}` });
+                  onParamsChange({ dateTo: `${year}/${v}` });
                 }}
-                style={selectStyle}
-              >
-                {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
+                style={{ width: 80 }}
+              />
             </div>
           </div>
 
@@ -258,20 +234,11 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
           <button
             type="button"
             onClick={onSubmit}
+            className="rbtn-primary"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
+              ...btnPrimary,
               marginTop: 16,
-              padding: '13px 32px',
-              background: 'rgba(122,174,203,0.85)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
               fontSize: '0.95rem',
-              fontWeight: 700,
-              cursor: 'pointer',
             }}
           >
             <span>🔍</span>
@@ -298,42 +265,30 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
 
         {/* ── POSITION CARD ── */}
         <div
+          className="rcard"
           style={{
-            width: 320,
+            width: 300,
             flexShrink: 0,
-            background: 'rgba(15,23,42,0.92)',
-            border: `1px solid ${posFilterActive ? 'rgba(122,174,203,0.35)' : 'rgba(148,163,184,0.15)'}`,
-            borderRadius: 10,
+            ...cardLg,
             padding: 16,
             display: 'flex',
             flexDirection: 'column',
+            alignItems: 'center',
             gap: 12,
             opacity: posFilterActive ? 1 : 0.55,
-            transition: 'opacity 0.2s, border-color 0.2s',
+            border: 'none',
+            boxShadow: posFilterActive ? 'inset 0 1px 2px rgba(70,150,255,0.2)' : 'inset 0 0 0 1px rgba(148,163,184,0.12)',
+            transition: 'opacity 0.2s, box-shadow 0.2s',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ ...sectionTitleStyle, marginBottom: 0, color: posFilterActive ? '#7aaecb' : '#94a3b8' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <div className="report-section-title" style={{ marginBottom: 0, color: posFilterActive ? '#a5b4fc' : '#94a3b8' }}>
               Filtre de position
             </div>
-            <button
-              type="button"
-              onClick={togglePosFilter}
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                padding: '5px 12px',
-                borderRadius: 6,
-                background: posFilterActive ? 'rgba(122,174,203,0.2)' : 'rgba(148,163,184,0.08)',
-                border: `1px solid ${posFilterActive ? 'rgba(122,174,203,0.4)' : 'rgba(148,163,184,0.2)'}`,
-                color: posFilterActive ? '#7aaecb' : '#94a3b8',
-                transition: 'background 0.2s, border-color 0.2s, color 0.2s',
-              }}
-            >
-              {posFilterActive ? '✓ Actif' : 'Activer'}
-            </button>
+            <label className="analysis-switch" style={{ marginLeft: 12 }}>
+              <input type="checkbox" checked={posFilterActive} onChange={togglePosFilter} />
+              <span className="analysis-switch-track" />
+            </label>
           </div>
           <div style={{ pointerEvents: posFilterActive ? 'auto' : 'none' }}>
             <FenEditor color={params.color} onFenChange={handleFenChange} active={posFilterActive} />
@@ -348,6 +303,101 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
       </div>{/* end outer flex */}
 
 
+    </div>
+  );
+});
+
+/* ── Custom select (évite le flash blanc du <select> natif) ── */
+interface SelectOption { value: string; label: string; }
+const CustomSelect = React.memo(function CustomSelect({
+  value, options, onChange, style, ...rest
+}: {
+  value: string;
+  options: SelectOption[];
+  onChange: (v: string) => void;
+  style?: React.CSSProperties;
+  id?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  const selected = options.find(o => o.value === value);
+  return (
+    <div ref={ref} style={{ position: 'relative', ...style } as React.CSSProperties}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%',
+          background: 'rgba(15,23,42,0.92)',
+          border: 'none',
+          boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2)',
+          borderRadius: 6,
+          color: '#e2e8f0',
+          padding: '9px 12px',
+          fontSize: '0.88rem',
+          cursor: 'pointer',
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <span>{selected ? selected.label : ''}</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ flexShrink: 0 }}>
+          <path d="M1 1l4 4 4-4" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            marginTop: 2,
+            background: '#0f172a',
+            border: '1px solid rgba(148,163,184,0.18)',
+            borderRadius: 6,
+            boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+            overflow: 'hidden',
+          }}
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                background: opt.value === value ? 'rgba(99,102,241,0.15)' : 'transparent',
+                border: 'none',
+                color: '#e2e8f0',
+                padding: '8px 12px',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+              }}
+              onPointerEnter={(e) => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; }}
+              onPointerLeave={(e) => { e.currentTarget.style.background = opt.value === value ? 'rgba(99,102,241,0.15)' : 'transparent'; }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 });

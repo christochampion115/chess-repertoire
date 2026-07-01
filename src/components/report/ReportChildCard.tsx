@@ -3,6 +3,7 @@ import type { ReportItem } from '@/types/report';
 import { pathToPgn, getMoveNumberFromFen } from '@/services/openings';
 import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { getPriorityBadge } from './reportUtils';
+import { cardLg } from './reportStyles';
 
 
 interface ReportChildCardProps {
@@ -28,8 +29,8 @@ export const ReportChildCard = React.memo(function ReportChildCard({
     <div
       style={{
         padding: '10px 16px 10px 28px',
-        borderBottom: '1px solid rgba(148,163,184,0.18)',
-        background: 'rgba(17,24,39,0.96)',
+        borderBottom: '1px solid rgba(148,163,184,0.08)',
+        background: 'linear-gradient(160deg, rgba(15,25,50,0.6), rgba(8,16,29,0.7))',
       }}
     >
       <div
@@ -67,7 +68,7 @@ export const ReportChildCard = React.memo(function ReportChildCard({
         <span style={{ fontWeight: 600, minWidth: 30, color: variant === 'weakness' ? '#fca5a5' : '#86efac' }}>
           {item.gap >= 0 ? `−${gapPct}` : `+${Math.abs(item.gap * 100).toFixed(0)}`}%
         </span>
-        <span style={{ color: '#7aaecb' }}>{pts} pts</span>
+        <span style={{ color: '#3B82F6' }}>{pts} pts</span>
         <span style={{ color: '#94a3b8' }}>{item.total} parties</span>
       </div>
     </div>

@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import type { ReportData, ReportGroup, ReportParams } from '@/types/report';
 import { summarizeParams } from '@/services/openings';
 import { ReportGroupCard } from './ReportGroupCard';
+import { cardLg, titleGradient, btnSecondary } from './reportStyles';
+import './report.css';
 
 interface ReportResultsProps {
   data: ReportData;
@@ -48,7 +50,7 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
         <div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc' }}>
+          <div style={{ ...titleGradient, fontSize: '1.05rem', fontWeight: 900 }}>
             Rapport d'analyse
           </div>
           <div style={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.45 }}>
@@ -58,19 +60,8 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
         <button
           type="button"
           onClick={onNewAnalysis}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            background: 'none',
-            border: '1px solid rgba(148,163,184,0.18)',
-            color: '#94a3b8',
-            padding: '7px 14px',
-            borderRadius: 7,
-            fontSize: '0.82rem',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
+          className="rbtn-secondary"
+          style={btnSecondary}
         >
           ← Nouvelle analyse
         </button>
@@ -85,10 +76,9 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
         }}
       >
         <div
+          className="rcard"
           style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
+            ...cardLg,
             padding: 16,
             textAlign: 'center',
           }}
@@ -99,10 +89,9 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
           </div>
         </div>
         <div
+          className="rcard"
           style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
+            ...cardLg,
             padding: 16,
             textAlign: 'center',
           }}
@@ -115,10 +104,10 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
           </div>
         </div>
         <div
+          className="rcard"
           style={{
-            background: 'rgba(17,24,39,0.96)',
+            ...cardLg,
             border: '1px solid rgba(251,113,133,.22)',
-            borderRadius: 10,
             padding: 16,
             textAlign: 'center',
           }}
@@ -150,12 +139,11 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
 
       {!hasPriorities && !hasStrengths && (
         <div
+          className="rcard"
           style={{
+            ...cardLg,
             textAlign: 'center',
             padding: '48px 24px',
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
           }}
         >
           <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎉</div>
@@ -170,21 +158,22 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
 
       {hasPriorities && (
         <>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid rgba(148,163,184,0.18)' }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
             {(['priorities', 'strengths'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
+                className="rtab"
                 onClick={() => setActiveTab(tab)}
                 style={{
                   background: 'none',
                   border: 'none',
-                  borderBottom: `3px solid ${activeTab === tab ? '#7aaecb' : 'transparent'}`,
+                  borderBottom: `3px solid ${activeTab === tab ? '#6366F1' : 'transparent'}`,
                   marginBottom: -2,
                   padding: '8px 16px',
                   fontSize: '0.85rem',
                   fontWeight: 600,
-                  color: activeTab === tab ? '#7aaecb' : '#94a3b8',
+                  color: activeTab === tab ? '#6366F1' : '#94a3b8',
                   cursor: 'pointer',
                 }}
               >
@@ -261,12 +250,11 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
             <div>
               {!hasStrengths && (
                 <div
+                  className="rcard"
                   style={{
+                    ...cardLg,
                     textAlign: 'center',
                     padding: '48px 24px',
-                    background: 'rgba(17,24,39,0.96)',
-                    border: '1px solid rgba(148,163,184,0.18)',
-                    borderRadius: 10,
                   }}
                 >
                   <div style={{ fontSize: '2rem', marginBottom: 8 }}>🏆</div>
