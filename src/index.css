@@ -91,43 +91,45 @@ body::after {
   background: transparent;
 }
 
+/* ── Parallax particle layers ─────────────────────────────────
+   position: fixed → couvre tout l'écran (ignore le max-width)
+   will-change: transform → accélération GPU
+   translateY appliqué par JS au scroll (vitesses différentes)
+──────────────────────────────────────────────────────────────── */
 .particles-bg {
-  position: absolute;
+  position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 1440px;
-  height: 100%;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
+  will-change: transform;
 }
 
 .particles-fg {
-  position: absolute;
+  position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 1440px;
-  height: 100%;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
+  will-change: transform;
 }
 
 .particles-edge {
-  position: absolute;
+  position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 1440px;
-  height: 100%;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
+  will-change: transform;
 }
 
 .top-bar {
@@ -3979,13 +3981,14 @@ body::after {
   pointer-events: none;
   z-index: 1;
   overflow: hidden;
+  will-change: transform;
 }
 
 .hero-particle {
   position: absolute;
   border-radius: 50%;
-  background: rgba(147, 197, 253, 0.9);
-  box-shadow: 0 0 4px rgba(147, 197, 253, 0.4);
+  background: rgba(147, 197, 253, 1);
+  box-shadow: 0 0 6px rgba(147, 197, 253, 0.6), 0 0 12px rgba(70, 150, 255, 0.3);
   animation: heroTwinkle ease-in-out infinite;
 }
 

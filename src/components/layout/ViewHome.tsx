@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '@/stores/uiStore';
 
-const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
+const PARTICLES = Array.from({ length: 48 }, (_, i) => ({
   id: i,
   x: +((i * 73.7117 + 5) % 100).toFixed(2),
   y: +((i * 38.197 + 7) % 85).toFixed(2),
-  size: +(0.8 + (i % 3) * 0.6).toFixed(2),
+  size: +(1.5 + (i % 4) * 0.65).toFixed(2),
   dur: +(2.5 + (i % 6) * 0.5).toFixed(2),
   delay: +((i * 0.37) % 5).toFixed(2),
 }));
@@ -14,12 +14,35 @@ const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
 export const ViewHome = React.memo(function ViewHome() {
   const navigate = useNavigate();
   const openModal = useUiStore((s) => s.openModal);
+  const heroParticlesRef = useRef<HTMLDivElement>(null);
+
+  // ── Parallax pour les particules du hero
+  useEffect(() => {
+    const el = heroParticlesRef.current;
+    if (!el) return;
+
+    let rafId = 0;
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        const y = window.scrollY;
+        el.style.transform = `translateY(${(y * 0.03).toFixed(1)}px)`;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   return (
     <div id="view-home">
       <section className="home-hero">
         <div className="home-hero-bg" aria-hidden="true" />
-        <div className="hero-particles" aria-hidden="true">
+        <div ref={heroParticlesRef} className="hero-particles" aria-hidden="true">
           {PARTICLES.map(p => (
             <span
               key={p.id}

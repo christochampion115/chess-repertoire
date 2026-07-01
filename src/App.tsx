@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ViewHome } from '@/components/layout/ViewHome';
@@ -43,11 +44,45 @@ const EDGE_PARTICLES = Array.from({ length: 22 }, (_, i) => {
 });
 
 export function App() {
+  const bgRef   = useRef<HTMLDivElement>(null);
+  const fgRef   = useRef<HTMLDivElement>(null);
+  const edgeRef = useRef<HTMLDivElement>(null);
+
+  // ── Parallax au scroll : chaque calque se déplace à une vitesse différente
+  // Plus la vitesse est PETITE, plus lointain semble l'objet
+  // bg=0.03 (très lointain), edge=0.08 (intermédiaire), fg=0.15 (premier plan)
+  useEffect(() => {
+    const layers = [
+      { el: bgRef.current,   speed: 0.03 },
+      { el: edgeRef.current, speed: 0.08 },
+      { el: fgRef.current,   speed: 0.15 },
+    ] as const;
+
+    let rafId = 0;
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        const y = window.scrollY;
+        for (const { el, speed } of layers) {
+          if (el) el.style.transform = `translateY(${(y * speed).toFixed(1)}px)`;
+        }
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <TooltipProvider>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', position: 'relative' }}>
-          <div className="particles-bg" aria-hidden="true">
+          <div ref={bgRef} className="particles-bg" aria-hidden="true">
             {BG_PARTICLES.map(p => (
               <span
                 key={p.id}
@@ -63,7 +98,7 @@ export function App() {
               />
             ))}
           </div>
-          <div className="particles-fg" aria-hidden="true">
+          <div ref={fgRef} className="particles-fg" aria-hidden="true">
             {FG_PARTICLES.map(p => (
               <span
                 key={p.id}
@@ -79,7 +114,7 @@ export function App() {
               />
             ))}
           </div>
-          <div className="particles-edge" aria-hidden="true">
+          <div ref={edgeRef} className="particles-edge" aria-hidden="true">
             {EDGE_PARTICLES.map(p => (
               <span
                 key={p.id}
