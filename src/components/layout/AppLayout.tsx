@@ -5,7 +5,6 @@ import { useChessStore } from '@/stores/chessStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useUiStore } from '@/stores/uiStore';
 import * as repertoireService from '@/services/repertoire';
-import { bootstrapSession } from '@/services/authService';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { RightPanel } from '@/components/layout/RightPanel';
 import { SplashScreen } from '@/components/layout/SplashScreen';
@@ -40,7 +39,6 @@ export function AppLayout() {
   useEffect(() => {
     initWorker();
     repertoireService.initializeService();
-    bootstrapSession();
     return () => { disposeWorker(); };
   }, [initWorker, disposeWorker]);
 

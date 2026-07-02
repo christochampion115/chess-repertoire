@@ -54,9 +54,8 @@ export const ReportChildCard = React.memo(function ReportChildCard({
               letterSpacing: '.06em',
               padding: '1px 6px',
               borderRadius: 100,
-              background: 'rgba(74,222,128,.10)',
-              color: '#86efac',
-              border: '1px solid rgba(74,222,128,.22)',
+              background: 'rgba(34,211,238,.12)',
+              color: '#67e8f9',
             }}
           >
             FORT
@@ -65,10 +64,10 @@ export const ReportChildCard = React.memo(function ReportChildCard({
         <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 30, color: '#f8fafc' }}>
           {linePct}%
         </span>
-        <span style={{ fontWeight: 600, minWidth: 30, color: variant === 'weakness' ? '#fca5a5' : '#86efac' }}>
+        <span style={{ fontWeight: 600, minWidth: 30, color: variant === 'weakness' ? '#94a3b8' : '#67e8f9' }}>
           {item.gap >= 0 ? `−${gapPct}` : `+${Math.abs(item.gap * 100).toFixed(0)}`}%
         </span>
-        <span style={{ color: '#3B82F6' }}>{pts} pts</span>
+        <span style={{ color: '#cbd5e1' }}>{pts} pts</span>
         <span style={{ color: '#94a3b8' }}>{item.total} parties</span>
       </div>
     </div>

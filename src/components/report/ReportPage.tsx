@@ -35,6 +35,7 @@ export const ReportPage = React.memo(function ReportPage() {
   const abortRef = useRef<AbortController | null>(null);
   const rafRef = useRef(0);
   const archiveStartedRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   useEffect(() => {
     if (loadingPhase === 'load' && gamesTarget === 0) {
@@ -156,9 +157,17 @@ export const ReportPage = React.memo(function ReportPage() {
       await new Promise((r) => setTimeout(r, 400));
       setData(result);
       setView('results');
-      saveReportToServer(params, result).catch((err) =>
-        console.warn('[auto-save] Échec sauvegarde rapport:', err)
-      );
+      setSaveStatus('saving');
+      try {
+        const saveResult = await saveReportToServer(params, result);
+        if (saveResult?.missingAuth) {
+          setSaveStatus('idle');
+        } else {
+          setSaveStatus('saved');
+        }
+      } catch {
+        setSaveStatus('error');
+      }
     } catch (err: unknown) {
       cancelAnimationFrame(rafRef.current);
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -254,7 +263,7 @@ export const ReportPage = React.memo(function ReportPage() {
 
   if (!user && !isGuestMode) {
     return (
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px 80px' }}>
+      <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', padding: '32px 24px 80px' }}>
         <SplashScreen />
       </div>
     );
@@ -264,12 +273,15 @@ export const ReportPage = React.memo(function ReportPage() {
     <div
       style={{
         maxWidth: 1200,
+        width: '100%',
         margin: '0 auto',
         padding: '24px 24px 40px',
       }}
     >
       <div className="report-page-header">
-        <span className="report-page-header-label">Rapport</span>
+        <span className="report-page-header-label" style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>
+          {view === 'results' && params.username ? `Rapport : ${params.username}` : 'Rapport'}
+        </span>
       </div>
 
       {view === 'form' && (
@@ -307,14 +319,14 @@ export const ReportPage = React.memo(function ReportPage() {
       )}
 
       {view === 'loading' && (
-        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 56, padding: '140px 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 48, padding: '120px 0', width: '100%', alignItems: 'stretch' }}>
           <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
             <div className="report-loading-knight" style={{ fontSize: '4.5rem' }}>♞</div>
             <div className="report-loading-knight" style={{ fontSize: '4.5rem', animationDelay: '0.15s' }}>♞</div>
             <div className="report-loading-knight" style={{ fontSize: '4.5rem', animationDelay: '0.3s' }}>♞</div>
           </div>
 
-          <div>
+          <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f8fafc' }}>
               Analyse en cours…
             </div>
@@ -323,7 +335,7 @@ export const ReportPage = React.memo(function ReportPage() {
             </div>
           </div>
 
-          <div style={{ width: '100%' }}>
+          <div style={{ width: '100%', padding: '0 24px' }}>
             <div
               style={{
                 background: 'linear-gradient(160deg, rgba(15,25,50,0.6), rgba(8,16,29,0.7))',
@@ -331,6 +343,7 @@ export const ReportPage = React.memo(function ReportPage() {
                 borderRadius: 100,
                 height: 16,
                 overflow: 'hidden',
+                width: '100%',
               }}
             >
               <div
@@ -352,6 +365,7 @@ export const ReportPage = React.memo(function ReportPage() {
                 color: '#94a3b8',
                 minHeight: 22,
                 marginTop: 14,
+                textAlign: 'center',
               }}
             >
               {loadingPhase === 'conn' && 'Connexion au serveur…'}
@@ -362,19 +376,38 @@ export const ReportPage = React.memo(function ReportPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="rbtn-secondary"
-            style={btnSecondary}
-          >
-            Annuler
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="rbtn-secondary"
+              style={btnSecondary}
+            >
+              Annuler
+            </button>
+          </div>
         </div>
       )}
 
       {view === 'results' && data && (
-        <ReportResults data={data} params={params} onNewAnalysis={handleNewAnalysis} />
+        <>
+          {saveStatus === 'saving' && (
+            <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#94a3b8', padding: '4px 0' }}>
+              Sauvegarde automatique…
+            </div>
+          )}
+          {saveStatus === 'saved' && (
+            <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#22c55e', padding: '4px 0' }}>
+              Rapport sauvegardé ✓
+            </div>
+          )}
+          {saveStatus === 'error' && (
+            <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#fb7185', padding: '4px 0' }}>
+              Échec de la sauvegarde automatique
+            </div>
+          )}
+          <ReportResults data={data} params={params} onNewAnalysis={handleNewAnalysis} />
+        </>
       )}
     </div>
   );

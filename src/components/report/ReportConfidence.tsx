@@ -18,7 +18,7 @@ export const ReportConfidence = React.memo(function ReportConfidence({ total }: 
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: i < filled ? '#3B82F6' : 'rgba(148,163,184,0.12)',
+              background: i < filled ? '#67e8f9' : 'rgba(148,163,184,0.1)',
             }}
           />
         ))}

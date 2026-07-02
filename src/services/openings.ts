@@ -147,14 +147,14 @@ export function renderMetricLabel(label: string, helpText: string): string {
 export const FORMAT_LABELS = {
   timeClass: (value: string): string => {
     const map: Record<string, string> = {
-      all: 'toutes cadences',
-      bullet: 'bullet',
-      blitz: 'blitz',
-      rapid: 'rapide',
-      classical: 'classique',
-      daily: 'correspondance',
+      all: 'Toutes cadences',
+      bullet: 'Bullet',
+      blitz: 'Blitz',
+      rapid: 'Rapide',
+      classical: 'Classique',
+      daily: 'Correspondance',
     };
-    return map[value] || value || 'toutes cadences';
+    return map[value] || value || 'Toutes cadences';
   },
   color: (value: PlayerColor): string => value === 'black' ? 'Noirs' : 'Blancs',
   monthRange: (value?: string): string => {
@@ -167,8 +167,8 @@ export const FORMAT_LABELS = {
   },
   elo: (min: number, max: number): string => {
     if (min > 0 && max < 3000) return `${min}-${max} Elo`;
-    if (min > 0) return `>= ${min} Elo`;
-    if (max < 3000) return `<= ${max} Elo`;
+    if (min > 0) return `${min}+ Elo`;
+    if (max < 3000) return `-${max} Elo`;
     return 'tous Elo';
   },
 };

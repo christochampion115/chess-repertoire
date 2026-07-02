@@ -34,7 +34,6 @@ export const btnSecondary: React.CSSProperties = {
   gap: 6,
   background: 'transparent',
   border: 'none',
-  boxShadow: 'inset 0 0 0 1px rgba(148,163,184,0.15)',
   color: '#94a3b8',
   padding: '7px 14px',
   borderRadius: 8,
@@ -42,7 +41,7 @@ export const btnSecondary: React.CSSProperties = {
   fontWeight: 600,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
-  transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease',
+  transition: 'background 0.2s ease, color 0.2s ease',
 };
 
 export const btnGhost: React.CSSProperties = {
