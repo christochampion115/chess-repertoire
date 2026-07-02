@@ -28,7 +28,6 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   const startMove = getMoveNumberFromFen(rootFen);
   const repertoires = useRepertoireStore((s) => s.repertoires);
   const reportColor = useReportStore((s) => s.params.color);
-  console.log('[DEBUG ReportGroupCard] reportColor:', reportColor, 'flipped:', reportColor === 'black');
   const repInfo = useMemo(() => repertoires.map((r) => ({ name: r.name, fen: r.fen })), [repertoires]);
 
   const openInApp = useCallback(() => {
@@ -78,7 +77,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
       }}
     >
       <div style={{ padding: '14px 24px 16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: 16, alignItems: 'start' }}>
+        <div className="report-group-content-grid">
           <div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               {variant === 'weakness' && <ReportPriorityBadge badge={groupBadge} />}

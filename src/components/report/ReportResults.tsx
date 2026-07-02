@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useTransition } from 'react';
 import type { ReportData, ReportGroup, ReportParams } from '@/types/report';
 import { FORMAT_LABELS } from '@/services/openings';
 import { ReportGroupCard } from './ReportGroupCard';
@@ -13,6 +13,25 @@ interface ReportResultsProps {
 
 export const ReportResults = React.memo(function ReportResults({ data, params, onNewAnalysis }: ReportResultsProps) {
   const [activeTab, setActiveTab] = useState<'priorities' | 'strengths'>('priorities');
+  // Lazy-mount : le panel est monté une seule fois au premier clic,
+  // puis conservé en DOM (display:none) pour éviter le coût de remontage.
+  const [mountedTabs, setMountedTabs] = useState<Set<'priorities' | 'strengths'>>(
+    new Set(['priorities'])
+  );
+  const [isPending, startTransition] = useTransition();
+
+  const handleSetTab = (tab: 'priorities' | 'strengths') => {
+    // startTransition : rendu en arrière-plan, l'UI reste réactive pendant le premier montage
+    startTransition(() => {
+      setActiveTab(tab);
+      setMountedTabs((prev) => {
+        if (prev.has(tab)) return prev;
+        const next = new Set(prev);
+        next.add(tab);
+        return next;
+      });
+    });
+  };
 
   const { totalGames, parsedGames, baselineScore, items, truncated, rootFen, positionFiltered, groups, honorables: rawHonorables } = data;
   const analyzed = parsedGames !== undefined ? parsedGames : totalGames;
@@ -201,7 +220,7 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
                 key={tab}
                 type="button"
                 className="rtab"
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleSetTab(tab)}
                 style={{
                   background: activeTab === tab
                     ? 'linear-gradient(180deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04))'
@@ -213,8 +232,9 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
                   fontSize: '0.85rem',
                   fontWeight: activeTab === tab ? 700 : 600,
                   color: activeTab === tab ? '#a5b4fc' : '#94a3b8',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease',
+                  cursor: isPending ? 'wait' : 'pointer',
+                  transition: 'background 0.2s ease, opacity 0.15s ease',
+                  opacity: isPending ? 0.65 : 1,
                 }}
               >
                 {tab === 'priorities' ? "Priorités d'entraînement" : 'Meilleures performances'}
@@ -222,7 +242,8 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
             ))}
           </div>
 
-          {activeTab === 'priorities' && (
+          <div style={{ display: activeTab === 'priorities' ? '' : 'none' }}>
+          {mountedTabs.has('priorities') && (
             <div>
               {positionFiltered ? (
                 worstItems
@@ -285,8 +306,10 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
               )}
             </div>
           )}
+          </div>
 
-          {activeTab === 'strengths' && (
+          <div style={{ display: activeTab === 'strengths' ? '' : 'none' }}>
+          {mountedTabs.has('strengths') && (
             <div>
               {!hasStrengths && (
                 <div
@@ -332,6 +355,7 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
                   ))}
             </div>
           )}
+          </div>
         </>
       )}
     </div>

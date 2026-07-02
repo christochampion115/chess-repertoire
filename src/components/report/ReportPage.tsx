@@ -263,7 +263,7 @@ export const ReportPage = React.memo(function ReportPage() {
 
   if (!user && !isGuestMode) {
     return (
-      <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', padding: '32px 24px 80px' }}>
+      <div style={{ maxWidth: 1400, width: '100%', margin: '0 auto', padding: '32px 24px 80px' }}>
         <SplashScreen />
       </div>
     );
@@ -272,7 +272,7 @@ export const ReportPage = React.memo(function ReportPage() {
   return (
     <div
       style={{
-        maxWidth: 1200,
+        maxWidth: 1400,
         width: '100%',
         margin: '0 auto',
         padding: '24px 24px 40px',

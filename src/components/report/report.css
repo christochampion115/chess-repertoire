@@ -208,3 +208,27 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 .report-period-section {
   margin-top: 18px;
 }
+
+/* ── Group card content grid ────────────────────────────── */
+.report-group-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REPORT — RESPONSIVE DESKTOP
+════════════════════════════════════════════════════════════════ */
+
+/* ≥ 1400px : écrans larges — colonne board légèrement plus large,
+   plus d'espace entre form et board */
+@media (min-width: 1400px) {
+  .report-group-content-grid {
+    grid-template-columns: 1fr 300px;
+    gap: 24px;
+  }
+  .report-form-outer {
+    gap: 40px;
+  }
+}
