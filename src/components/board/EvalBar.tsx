@@ -32,9 +32,6 @@ export const EvalBar = React.memo(function EvalBar({ cpValue, mateIn, boardFlipp
   const fillStyle: React.CSSProperties = {
     height: `${whitePct}%`,
     ...(boardFlipped ? { top: 0 } : { bottom: 0 }),
-    background: whiteWinning
-      ? 'linear-gradient(90deg, #f8fafc 0%, #e2e8f0 75%, rgba(0,0,0,0.02) 100%)'
-      : 'linear-gradient(90deg, #94a3b8 0%, #64748b 75%, rgba(0,0,0,0.05) 100%)',
   };
 
   const scoreStyle: React.CSSProperties = {

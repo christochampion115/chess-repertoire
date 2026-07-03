@@ -17,9 +17,13 @@ export function cpToWhitePct(cp: number): number {
 
 /** Formats a number as a short string: 1500 → '1.5K', 1000000 → '1M'. */
 export function formatNumberShort(n: number): string {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1).replace('.0', '') + 'Md';
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.0', '') + 'M';
-  if (n >= 1_000) return (n / 1_000).toFixed(1).replace('.0', '') + 'K';
+  const fmt = (val: number, suffix: string) => {
+    if (val >= 100) return Math.round(val) + suffix;
+    return val.toFixed(1).replace('.0', '') + suffix;
+  };
+  if (n >= 1_000_000_000) return fmt(n / 1_000_000_000, 'Md');
+  if (n >= 1_000_000) return fmt(n / 1_000_000, 'M');
+  if (n >= 1_000) return fmt(n / 1_000, 'K');
   return n.toString();
 }
 

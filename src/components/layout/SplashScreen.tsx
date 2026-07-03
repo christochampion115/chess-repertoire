@@ -65,7 +65,8 @@ export const SplashScreen = React.memo(function SplashScreen() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box', marginBottom: 12 }}
+              className="splash-input"
+              style={{ marginBottom: 12 }}
               autoFocus
             />
             <input
@@ -74,7 +75,8 @@ export const SplashScreen = React.memo(function SplashScreen() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box', marginBottom: 12 }}
+              className="splash-input"
+              style={{ marginBottom: 12 }}
             />
             {error && <div style={{ color: '#fb7185', fontSize: '0.85rem', marginBottom: 8 }}>{error}</div>}
             <button
@@ -109,7 +111,8 @@ export const SplashScreen = React.memo(function SplashScreen() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box', marginBottom: 12 }}
+              className="splash-input"
+              style={{ marginBottom: 12 }}
               autoFocus
             />
             <input
@@ -118,7 +121,8 @@ export const SplashScreen = React.memo(function SplashScreen() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box', marginBottom: 12 }}
+              className="splash-input"
+              style={{ marginBottom: 12 }}
             />
             {error && <div style={{ color: '#fb7185', fontSize: '0.85rem', marginBottom: 8 }}>{error}</div>}
             <button
