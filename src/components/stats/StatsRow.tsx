@@ -46,7 +46,7 @@ export const StatsRow = React.memo(function StatsRow({
       className={`stats-row${isActive ? ' active' : ''}`}
       data-move-uci={move.uci}
       data-move-san={move.san}
-      style={{ display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', gap: '4px', padding: '8px 4px' }}
+      style={{ display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', gap: '4px', padding: '10px 4px' }}
       onClick={onClick}
       onContextMenu={onContextMenu}
       onMouseEnter={(e) => {

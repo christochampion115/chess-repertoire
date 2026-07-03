@@ -130,6 +130,7 @@ function VariantItem({
           repRoot={repRoot}
           repExpanded={repExpanded}
           toggleRepExpanded={toggleRepExpanded}
+          currentNodeId={currentNodeId}
         />
       )}
     </>
