@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useTransition } from 'react';
 import type { ReportData, ReportGroup, ReportParams } from '@/types/report';
-import { summarizeParams } from '@/services/openings';
+import { FORMAT_LABELS } from '@/services/openings';
 import { ReportGroupCard } from './ReportGroupCard';
+import { cardLg } from './reportStyles';
+import './report.css';
 
 interface ReportResultsProps {
   data: ReportData;
@@ -11,6 +13,25 @@ interface ReportResultsProps {
 
 export const ReportResults = React.memo(function ReportResults({ data, params, onNewAnalysis }: ReportResultsProps) {
   const [activeTab, setActiveTab] = useState<'priorities' | 'strengths'>('priorities');
+  // Lazy-mount : le panel est monté une seule fois au premier clic,
+  // puis conservé en DOM (display:none) pour éviter le coût de remontage.
+  const [mountedTabs, setMountedTabs] = useState<Set<'priorities' | 'strengths'>>(
+    new Set(['priorities'])
+  );
+  const [isPending, startTransition] = useTransition();
+
+  const handleSetTab = (tab: 'priorities' | 'strengths') => {
+    // startTransition : rendu en arrière-plan, l'UI reste réactive pendant le premier montage
+    startTransition(() => {
+      setActiveTab(tab);
+      setMountedTabs((prev) => {
+        if (prev.has(tab)) return prev;
+        const next = new Set(prev);
+        next.add(tab);
+        return next;
+      });
+    });
+  };
 
   const { totalGames, parsedGames, baselineScore, items, truncated, rootFen, positionFiltered, groups, honorables: rawHonorables } = data;
   const analyzed = parsedGames !== undefined ? parsedGames : totalGames;
@@ -46,34 +67,61 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
-        <div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc' }}>
-            Rapport d'analyse
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '0 24px',
+              background: 'rgba(15,23,42,0.6)',
+              borderRadius: 10,
+              border: '1px solid rgba(148,163,184,0.08)',
+            }}
+          >
+            <span style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              Filtres :
+            </span>
+            <span style={{ color: '#475569', fontSize: '0.9rem' }}>|</span>
+            <span style={{ color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}>{FORMAT_LABELS.color(params.color)}</span>
+            <span style={{ color: '#475569', fontSize: '0.9rem' }}>|</span>
+            <span style={{ color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}>{FORMAT_LABELS.timeClass(params.timeClass)}</span>
+            <span style={{ color: '#475569', fontSize: '0.9rem' }}>|</span>
+            <span style={{ color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}>{FORMAT_LABELS.elo(params.eloMin, params.eloMax)}</span>
+            {data.positionFiltered && (
+              <>
+                <span style={{ color: '#475569', fontSize: '0.9rem' }}>|</span>
+                <span style={{ color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}>Position filtrée</span>
+              </>
+            )}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.45 }}>
-            {summarizeParams(params, data)}
-          </div>
-        </div>
-        <button
+          <button
           type="button"
           onClick={onNewAnalysis}
+          className="rbtn-secondary"
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
-            background: 'none',
-            border: '1px solid rgba(148,163,184,0.18)',
-            color: '#94a3b8',
-            padding: '7px 14px',
-            borderRadius: 7,
-            fontSize: '0.82rem',
+            justifyContent: 'center',
+            gap: 10,
+            padding: '14px 28px',
+            background: 'linear-gradient(135deg, #2dd4bf, #6366f1)',
+            color: '#030712',
+            border: 'none',
+            borderRadius: 10,
+            fontSize: '0.95rem',
+            fontWeight: 800,
             cursor: 'pointer',
+            boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.2), 0 2px 10px rgba(45,212,191,0.3)',
             whiteSpace: 'nowrap',
+            transition: 'transform 0.18s ease, box-shadow 0.18s ease',
           }}
         >
           ← Nouvelle analyse
         </button>
+        </div>
       </div>
 
       <div
@@ -85,11 +133,10 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
         }}
       >
         <div
+          className="rcard"
           style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
-            padding: 16,
+            ...cardLg,
+            padding: '22px 16px',
             textAlign: 'center',
           }}
         >
@@ -99,11 +146,10 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
           </div>
         </div>
         <div
+          className="rcard"
           style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
-            padding: 16,
+            ...cardLg,
+            padding: '22px 16px',
             textAlign: 'center',
           }}
         >
@@ -115,15 +161,14 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
           </div>
         </div>
         <div
+          className="rcard"
           style={{
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(251,113,133,.22)',
-            borderRadius: 10,
-            padding: 16,
+            ...cardLg,
+            padding: '22px 16px',
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f9a8b8', marginBottom: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f8fafc', marginBottom: 4 }}>
             {Math.round(Math.abs(totalImpact))} pts elo
           </div>
           <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -150,12 +195,11 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
 
       {!hasPriorities && !hasStrengths && (
         <div
+          className="rcard"
           style={{
+            ...cardLg,
             textAlign: 'center',
             padding: '48px 24px',
-            background: 'rgba(17,24,39,0.96)',
-            border: '1px solid rgba(148,163,184,0.18)',
-            borderRadius: 10,
           }}
         >
           <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎉</div>
@@ -170,22 +214,27 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
 
       {hasPriorities && (
         <>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid rgba(148,163,184,0.18)' }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
             {(['priorities', 'strengths'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
-                onClick={() => setActiveTab(tab)}
+                className="rtab"
+                onClick={() => handleSetTab(tab)}
                 style={{
-                  background: 'none',
+                  background: activeTab === tab
+                    ? 'linear-gradient(180deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04))'
+                    : 'none',
                   border: 'none',
-                  borderBottom: `3px solid ${activeTab === tab ? '#7aaecb' : 'transparent'}`,
+                  borderBottom: `2px solid ${activeTab === tab ? '#6366F1' : 'transparent'}`,
                   marginBottom: -2,
-                  padding: '8px 16px',
+                  padding: '10px 20px',
                   fontSize: '0.85rem',
-                  fontWeight: 600,
-                  color: activeTab === tab ? '#7aaecb' : '#94a3b8',
-                  cursor: 'pointer',
+                  fontWeight: activeTab === tab ? 700 : 600,
+                  color: activeTab === tab ? '#a5b4fc' : '#94a3b8',
+                  cursor: isPending ? 'wait' : 'pointer',
+                  transition: 'background 0.2s ease, opacity 0.15s ease',
+                  opacity: isPending ? 0.65 : 1,
                 }}
               >
                 {tab === 'priorities' ? "Priorités d'entraînement" : 'Meilleures performances'}
@@ -193,7 +242,8 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
             ))}
           </div>
 
-          {activeTab === 'priorities' && (
+          <div style={{ display: activeTab === 'priorities' ? '' : 'none' }}>
+          {mountedTabs.has('priorities') && (
             <div>
               {positionFiltered ? (
                 worstItems
@@ -256,17 +306,18 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
               )}
             </div>
           )}
+          </div>
 
-          {activeTab === 'strengths' && (
+          <div style={{ display: activeTab === 'strengths' ? '' : 'none' }}>
+          {mountedTabs.has('strengths') && (
             <div>
               {!hasStrengths && (
                 <div
+                  className="rcard"
                   style={{
+                    ...cardLg,
                     textAlign: 'center',
                     padding: '48px 24px',
-                    background: 'rgba(17,24,39,0.96)',
-                    border: '1px solid rgba(148,163,184,0.18)',
-                    borderRadius: 10,
                   }}
                 >
                   <div style={{ fontSize: '2rem', marginBottom: 8 }}>🏆</div>
@@ -304,6 +355,7 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
                   ))}
             </div>
           )}
+          </div>
         </>
       )}
     </div>

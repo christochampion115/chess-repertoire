@@ -286,9 +286,10 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
             position: 'absolute',
             top: '100%',
             left: 0,
-            right: 0,
+            left: 0,
             zIndex: 50,
             marginTop: 4,
+            width: 280,
           }}
         >
           <div className="stats-filter-panel-head">

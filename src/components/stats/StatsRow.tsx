@@ -83,7 +83,7 @@ export const StatsRow = React.memo(function StatsRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '40px 30px 36px 1fr 30px',
+          gridTemplateColumns: '40px 30px 41px 1fr 30px',
           alignItems: 'center',
           gap: '1px',
           paddingRight: '2px',

@@ -126,19 +126,21 @@ export async function fetchChesscomReportJSON(params: ReportParams): Promise<Rep
 export async function saveReportToServer(params: ReportParams, data: ReportData) {
   const base = getApiBase();
   const token = useAuthStore.getState().token;
-  if (!token) return null;
+  if (!token) {
+    console.warn('[saveReport] Aucun token — utilisateur non connecté');
+    return { missingAuth: true };
+  }
   const url = `${base}/chesscom/report/save`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ params, data }),
   });
-  if (!res.ok) throw new Error('Erreur lors de la sauvegarde du rapport');
-  const text = await res.text();
-  if (!(res.headers.get('content-type') || '').includes('application/json')) {
-    throw new Error('Réponse invalide du serveur (sauvegarde)');
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || `Erreur ${res.status} lors de la sauvegarde du rapport`);
   }
-  return JSON.parse(text);
+  return res.json();
 }
 
 export async function fetchSavedReports(): Promise<SavedReportMeta[]> {

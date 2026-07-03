@@ -8,6 +8,8 @@ import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { ReportChildCard } from './ReportChildCard';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useReportStore } from '@/stores/reportStore';
+import { cardLg, btnSecondary } from './reportStyles';
+import './report.css';
 
 interface ReportGroupCardProps {
   group: ReportGroup;
@@ -26,7 +28,6 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   const startMove = getMoveNumberFromFen(rootFen);
   const repertoires = useRepertoireStore((s) => s.repertoires);
   const reportColor = useReportStore((s) => s.params.color);
-  console.log('[DEBUG ReportGroupCard] reportColor:', reportColor, 'flipped:', reportColor === 'black');
   const repInfo = useMemo(() => repertoires.map((r) => ({ name: r.name, fen: r.fen })), [repertoires]);
 
   const openInApp = useCallback(() => {
@@ -42,12 +43,10 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   }, [group.fen, group.key, rootFen, reportColor]);
 
   const hPct = (group.groupScore * 100).toFixed(0);
-  const basePct = (baselineScore * 100).toFixed(0);
   const gapVal = group.groupGap * 100;
   const gapDisplay = gapVal.toFixed(0);
   const fullPath = group.key ? group.key.split(' ') : [];
   const pgnHtml = pathToPgn(fullPath, false, startMove);
-  const lossPct = group.total > 0 ? ((group.losses / group.total) * 100).toFixed(0) : '—';
 
   const groupBadge = useMemo((): PriorityBadge => {
     if (gapVal >= 8) return { badgeClass: 'badge-critical', itemClass: 'report-item--critical', label: 'CRITIQUE', rank: 3 };
@@ -56,84 +55,54 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   }, [gapVal]);
 
   const borderColor = variant === 'weakness'
-    ? gapVal >= 8 ? 'rgba(251,113,133,0.55)' : gapVal >= 6 ? 'rgba(251,191,36,0.55)' : 'rgba(253,230,138,0.45)'
-    : '#6ee7b7';
+    ? gapVal >= 8 ? 'rgba(99,102,241,0.4)' : gapVal >= 6 ? 'rgba(99,102,241,0.25)' : 'rgba(148,163,184,0.15)'
+    : 'rgba(34,211,238,0.3)';
 
   const allChildren = [...(group.problematicLines || []), ...(group.compensatingLines || [])];
   const hasChildren = allChildren.length > 0;
 
-  let explanation = '';
   const isStrength = variant === 'strength';
-
-  if (hasChildren) {
-    const childShare = allChildren.reduce((s, c) => s + (isStrength ? c.wins : c.losses), 0);
-    const totalShare = isStrength ? group.wins : group.losses;
-    const ratio = childShare / Math.max(1, totalShare);
-    if (ratio > 0.7) {
-      explanation = isStrength
-        ? `🏆 ${(ratio * 100).toFixed(0)}% de vos victoires dans ce groupe sont concentrées dans ${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''} spécifique${allChildren.length > 1 ? 's' : ''}.`
-        : `⚠️ ${(ratio * 100).toFixed(0)}% de vos défaites dans cette ouverture sont concentrées dans ${allChildren.length} ligne${allChildren.length > 1 ? 's' : ''} spécifique${allChildren.length > 1 ? 's' : ''}.`;
-    } else if (ratio > 0.3) {
-      explanation = isStrength
-        ? `📊 ${(ratio * 100).toFixed(0)}% des victoires sont capturées par ces lignes spécifiques.`
-        : `📊 ${(ratio * 100).toFixed(0)}% des défaites sont capturées par ces lignes spécifiques.`;
-    } else {
-      explanation = isStrength
-        ? '📊 Les gains sont répartis uniformément.'
-        : '📊 Les pertes sont réparties uniformément.';
-    }
-  } else {
-    const rate = (isStrength ? group.wins : group.losses) / Math.max(1, group.total);
-    const baselineRate = isStrength ? baselineScore : (1 - baselineScore);
-    if (rate > baselineRate * 1.3) {
-      explanation = isStrength
-        ? `🏆 Score anormalement élevé (${lossPct}% de victoires).`
-        : `⚠️ Score anormalement bas (${lossPct}% de défaites).`;
-    } else {
-      explanation = isStrength
-        ? '📊 Légère surperformance globale.'
-        : '📊 Légère sous-performance globale.';
-    }
-  }
 
   return (
     <div
+      className="rcard"
       style={{
-        background: 'rgba(17,24,39,0.96)',
-        border: `1px solid rgba(148,163,184,0.18)`,
+        ...cardLg,
         borderLeft: `4px solid ${borderColor}`,
-        borderRadius: 10,
+        borderRight: 'none',
+        borderTop: 'none',
+        borderBottom: 'none',
         marginBottom: 10,
         overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 16, alignItems: 'start' }}>
+      <div style={{ padding: '14px 24px 16px' }}>
+        <div className="report-group-content-grid">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               {variant === 'weakness' && <ReportPriorityBadge badge={groupBadge} />}
               {variant === 'strength' && (
                 <span
                   style={{
-                    fontSize: '0.65rem',
+                    fontSize: '0.75rem',
                     fontWeight: 800,
                     textTransform: 'uppercase',
                     letterSpacing: '.06em',
-                    padding: '2px 8px',
+                    padding: '3px 10px',
                     borderRadius: 100,
-                    background: 'rgba(74,222,128,.10)',
-                    color: '#86efac',
-                    border: '1px solid rgba(74,222,128,.22)',
+                    background: 'rgba(34,211,238,.12)',
+                    color: '#67e8f9',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
                   }}
                 >
                   FORT
                 </span>
               )}
-              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f8fafc', flex: 1 }}>
+              <div style={{ fontSize: '1.0rem', fontWeight: 700, color: '#f8fafc', flex: 1 }}>
                 {getOpeningNameByPath(fullPath, group.fen ?? undefined, repInfo)}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                {group.total} parties · {lossPct}% de défaites
+              <div style={{ fontSize: '0.9rem', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                {group.total} parties
               </div>
             </div>
 
@@ -143,19 +112,19 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                   fontFamily: "'Courier New',monospace",
                   fontSize: '0.82rem',
                   color: '#94a3b8',
-                  background: 'rgba(15,23,42,0.96)',
-                  borderRadius: 6,
+                  background: 'rgba(8,16,29,0.7)',
+                  borderRadius: 8,
                   padding: '6px 10px',
-                  marginBottom: 14,
+                  marginBottom: 16,
                   lineHeight: 1.6,
                 }}
                 dangerouslySetInnerHTML={{ __html: pgnHtml }}
               />
             )}
 
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: parseInt(hPct) < parseInt(basePct) ? '#f9a8b8' : '#f8fafc' }}>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc' }}>
                   {hPct}%
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -163,7 +132,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fca5a5' }}>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: variant === 'weakness' ? '#cbd5e1' : '#67e8f9' }}>
                   {gapVal >= 0 ? `−${gapDisplay}%` : `+${Math.abs(gapVal).toFixed(0)}%`}
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -171,42 +140,50 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fdba74' }}>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#cbd5e1' }}>
                   {Math.round(Math.abs(group.impactElo))} pts
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>
-                  Pertes Evitables
+                  Pertes évitables
                 </div>
               </div>
             </div>
 
             <ReportWdlBar wins={group.wins} draws={group.draws} losses={group.losses} />
 
-            <div style={{ fontSize: '0.78rem', color: '#94a3b8', padding: '6px 0', lineHeight: 1.45 }}>
-              {explanation}
-            </div>
+            {group.fen && (
+              <div style={{ marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={openInApp}
+                  className="rbtn-secondary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    width: '100%',
+                    padding: '12px 20px',
+                    background: 'linear-gradient(180deg, rgba(70,150,255,0.18), rgba(70,150,255,0.1))',
+                    boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2)',
+                    border: 'none',
+                    borderRadius: 10,
+                    color: '#fff',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'background 0.25s ease, box-shadow 0.25s ease',
+                  }}
+                >
+                  Créer/Inspecter le répertoire
+                </button>
+              </div>
+            )}
           </div>
 
-          {group.fen && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <ReportMiniBoard fen={group.fen} highlightUci={group.fenUci ?? undefined} size={20} flipped={reportColor === 'black'} />
-              <button
-                type="button"
-                onClick={openInApp}
-                title="Ouvrir cette position dans l'application"
-                style={{
-                  background: 'none',
-                  border: '1px solid rgba(148,163,184,0.18)',
-                  color: '#94a3b8',
-                  borderRadius: 6,
-                  padding: '4px 10px',
-                  fontSize: '0.68rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Ouvrir →
-              </button>
+            {group.fen && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginLeft: 10 }}>
+              <ReportMiniBoard fen={group.fen} highlightUci={group.fenUci ?? undefined} size={26} flipped={reportColor === 'black'} />
             </div>
           )}
         </div>
@@ -216,44 +193,27 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
         <>
           <button
             onClick={() => setExpanded(!expanded)}
+            className="rtoggle"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               width: '100%',
-              padding: '8px 16px',
-              background: 'rgba(15,23,42,0.5)',
+              padding: '16px 28px',
+              background: 'rgba(8,16,29,0.6)',
               border: 'none',
-              borderTop: '1px solid rgba(148,163,184,0.18)',
+              borderTop: '1px solid rgba(148,163,184,0.08)',
               color: '#e2e8f0',
-              fontSize: '0.80rem',
+              fontSize: '0.85rem',
               cursor: 'pointer',
               textAlign: 'left',
             }}
           >
             <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{expanded ? '▼' : '▶'}</span>
             <span style={{ fontWeight: 600 }}>{allChildren.length} ligne{allChildren.length > 1 ? `s ${variant === 'weakness' ? 'problématiques' : 'surperformantes'}` : ` ${variant === 'weakness' ? 'problématique' : 'surperformante'}`}</span>
-            {!expanded && (
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.04em',
-                  padding: '2px 8px',
-                  borderRadius: 100,
-                  background: 'rgba(251,113,133,0.15)',
-                  color: '#fca5a5',
-                  border: '1px solid rgba(251,113,133,0.25)',
-                }}
-              >
-                {allChildren.length} ligne{allChildren.length > 1 ? 's' : ''}
-              </span>
-            )}
           </button>
           {expanded && (
-            <div style={{ background: 'rgba(15,23,42,0.5)' }}>
+            <div style={{ background: 'rgba(8,16,29,0.5)' }}>
               {group.problematicLines.length > 0 && variant === 'weakness' && (
                 <>
                   {group.problematicLines.map((child, i) => (
@@ -263,7 +223,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
               )}
               {group.compensatingLines.length > 0 && (
                 <>
-                  <div style={{ padding: '10px 16px 4px 28px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8', opacity: 0.7 }}>
+                  <div style={{ padding: '10px 28px 4px 28px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#64748b', opacity: 0.8 }}>
                     {variant === 'weakness' ? 'Lignes compensatrices' : 'Lignes surperformantes'}
                   </div>
                   {group.compensatingLines.map((child, i) => (

@@ -1,17 +1,25 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ViewHome } from '@/components/layout/ViewHome';
 import { TopBar } from '@/components/layout/TopBar';
+import { BackgroundParticles } from '@/components/layout/BackgroundParticles';
 import { ModalPortal } from '@/components/modals/ModalPortal';
 import { ContextMenu } from '@/components/common/ContextMenu';
 import { TooltipProvider } from '@/contexts/TooltipContext';
 import { ReportPage } from '@/components/report/ReportPage';
+import { bootstrapSession } from '@/services/authService';
 
 export function App() {
+  useEffect(() => {
+    bootstrapSession();
+  }, []);
+
   return (
     <BrowserRouter>
       <TooltipProvider>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', position: 'relative' }}>
+          <BackgroundParticles />
           <TopBar />
           <Routes>
             <Route path="/" element={<ViewHome />} />

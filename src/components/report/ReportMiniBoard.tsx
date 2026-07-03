@@ -66,16 +66,16 @@ export const ReportMiniBoard = React.memo(function ReportMiniBoard({
   return (
     <div
       style={{
+        borderRadius: 6,
+        overflow: 'hidden',
         display: 'grid',
         gridTemplateColumns: `repeat(8, ${size}px)`,
         gridTemplateRows: `repeat(8, ${size}px)`,
         gap: 0,
         background: '#000',
         padding: 1,
-        overflow: 'hidden',
         width: boardSize + 2,
         height: boardSize + 2,
-        borderRadius: 2,
       }}
     >
       {Array.from({ length: 64 }, (_, idx) => {

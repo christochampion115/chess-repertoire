@@ -103,7 +103,7 @@ function VariantItem({
         <div className="sub-var-main">
           {hasChildren && (
             <div className="tree-toggle" onClick={handleToggle}>
-              {isExpanded ? '−' : '+'}
+              {isExpanded ? '–' : '+'}
             </div>
           )}
           <span style={{ flex: 1, minWidth: 0 }}>
@@ -130,6 +130,7 @@ function VariantItem({
           repRoot={repRoot}
           repExpanded={repExpanded}
           toggleRepExpanded={toggleRepExpanded}
+          currentNodeId={currentNodeId}
         />
       )}
     </>
@@ -243,6 +244,7 @@ function RepItem({
 }: RepItemProps) {
   const moveCount = useMemo(() => countPlayerMoves(rep, rep.color ?? 'w'), [rep]);
   const hasVariants = hasNamedDescendants(rep);
+  const isExpanded = repExpanded.has(rep.id);
   const medalMeta = useMemo(() => getMedalDisplayMeta(rep), [rep]);
   const isInSubVariant = useMemo(() => {
     if (!currentNodeId || currentNodeId === rep.id) return false;
@@ -255,6 +257,11 @@ function RepItem({
     }
     return walk(rep);
   }, [rep, currentNodeId]);
+
+  const handleToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleRepExpanded(rep.id);
+  }, [rep.id, toggleRepExpanded]);
 
   const handleContext = useCallback((e: React.MouseEvent) => {
     buildContextMenu(e, 'repertoire_item', rep, idx);
@@ -275,9 +282,11 @@ function RepItem({
     >
       <div className="rep-header">
         <div className="rep-row">
-          <span style={{ fontSize: '1.1em' }}>
-            {rep.color === 'b' ? '♚' : '♔'}
-          </span>
+          {hasVariants && (
+            <div className="tree-toggle" onClick={handleToggle}>
+              {isExpanded ? '–' : '+'}
+            </div>
+          )}
           <span style={{ flex: 1 }}>
             {rep.name ?? rep.san ?? '(Sans nom)'}
           </span>
@@ -298,7 +307,7 @@ function RepItem({
         </div>
       </div>
 
-      {hasVariants && (
+      {hasVariants && isExpanded && (
         <div className="rep-sub-variants">
           <VariantTree
             node={rep}

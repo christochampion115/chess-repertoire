@@ -3,19 +3,19 @@ import type { PriorityBadge } from '@/types/report';
 
 const BADGE_STYLES: Record<string, React.CSSProperties> = {
   'badge-critical': {
-    background: 'rgba(251,113,133,.14)',
-    color: '#fecdd3',
-    border: '1px solid rgba(251,113,133,.28)',
+    background: 'rgba(99,102,241,.12)',
+    color: '#a5b4fc',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.45)',
   },
   'badge-important': {
-    background: 'rgba(245,158,11,.14)',
-    color: '#fcd34d',
-    border: '1px solid rgba(245,158,11,.28)',
+    background: 'rgba(148,163,184,.1)',
+    color: '#cbd5e1',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.45)',
   },
   'badge-minor': {
-    background: 'rgba(234,179,8,.10)',
-    color: '#fde68a',
-    border: '1px solid rgba(234,179,8,.22)',
+    background: 'rgba(148,163,184,.1)',
+    color: '#94a3b8',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.45)',
   },
 };
 
@@ -27,11 +27,11 @@ export const ReportPriorityBadge = React.memo(function ReportPriorityBadge({ bad
   return (
     <span
       style={{
-        fontSize: '0.65rem',
+        fontSize: '0.75rem',
         fontWeight: 800,
         textTransform: 'uppercase',
         letterSpacing: '.06em',
-        padding: '2px 8px',
+        padding: '3px 10px',
         borderRadius: 100,
         ...BADGE_STYLES[badge.badgeClass],
       }}

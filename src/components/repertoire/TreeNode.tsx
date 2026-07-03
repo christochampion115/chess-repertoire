@@ -71,7 +71,7 @@ export const TreeNode = React.memo(function TreeNode({
               onToggle(node.id);
             }}
           >
-            {isExpanded ? '−' : '+'}
+            {isExpanded ? '–' : '+'}
           </div>
         )}
 
