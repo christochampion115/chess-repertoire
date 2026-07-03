@@ -263,21 +263,15 @@ export const ReportPage = React.memo(function ReportPage() {
 
   if (!user && !isGuestMode) {
     return (
-      <div style={{ maxWidth: 1400, width: '100%', margin: '0 auto', padding: '32px 24px 80px' }}>
+      <div className="report-page-root" style={{ padding: '32px 24px 80px' }}>
         <SplashScreen />
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 1400,
-        width: '100%',
-        margin: '0 auto',
-        padding: '24px 24px 40px',
-      }}
-    >
+    <div className="report-page-root" style={{ padding: '24px 24px 40px' }}>
+
       <div className="report-page-header">
         <span className="report-page-header-label" style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>
           {view === 'results' && params.username ? `Rapport : ${params.username}` : 'Rapport'}

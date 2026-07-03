@@ -209,6 +209,13 @@ input[type="number"]::-webkit-outer-spin-button:hover {
   margin-top: 18px;
 }
 
+/* ── Page root container (responsive) ─────────────────────── */
+.report-page-root {
+  width: min(100%, 1400px);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
 /* ── Group card content grid ────────────────────────────── */
 .report-group-content-grid {
   display: grid;
@@ -230,5 +237,52 @@ input[type="number"]::-webkit-outer-spin-button:hover {
   }
   .report-form-outer {
     gap: 40px;
+  }
+}
+
+/* ≥ 1920px : Full HD large — page s'élargit à 1700px */
+@media (min-width: 1920px) {
+  .report-page-root {
+    width: min(100%, 1700px);
+  }
+  .report-form-outer {
+    gap: 48px;
+  }
+  .report-2col-grid {
+    column-gap: 32px;
+  }
+}
+
+/* ≥ 2560px : QHD — page s'élargit à 2100px */
+@media (min-width: 2560px) {
+  .report-page-root {
+    width: min(100%, 2100px);
+  }
+  .report-form-outer {
+    gap: 56px;
+  }
+  .report-2col-grid {
+    column-gap: 36px;
+  }
+  .report-group-content-grid {
+    grid-template-columns: 1fr 320px;
+    gap: 28px;
+  }
+}
+
+/* ≥ 3840px : 4K — page s'élargit à 2600px */
+@media (min-width: 3840px) {
+  .report-page-root {
+    width: min(100%, 2600px);
+  }
+  .report-form-outer {
+    gap: 64px;
+  }
+  .report-2col-grid {
+    column-gap: 40px;
+  }
+  .report-group-content-grid {
+    grid-template-columns: 1fr 340px;
+    gap: 32px;
   }
 }
