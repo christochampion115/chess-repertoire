@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { ModalBox } from './ModalBox';
 import { fetchPlayerStatsLoad, scheduleStatsReload } from '@/services/stats';
+import { btnSecondary } from '@/components/report/reportStyles';
 
 const LOADING_MESSAGES = [
   'Premier scan en cours',
@@ -161,7 +162,11 @@ export function PlayerStatsModal() {
   }
 
   function handleClose() {
-    if (!loading) closeModal();
+    if (loading) {
+      handleAbort();
+    } else {
+      closeModal();
+    }
   }
 
   if (!token) {
@@ -186,23 +191,61 @@ export function PlayerStatsModal() {
   return (
     <ModalBox title="Statistiques joueur (Chess.com)" onClose={handleClose}>
       {loading ? (
-        <div className="ps-progress">
-          <p className="ps-progress__title">Chargement des parties de @{username}…</p>
-          <div className="ps-progress__bar-wrap">
-            <div
-              className="ps-progress__bar-fill"
-              style={{ width: `${progress}%` }}
-            />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 36, padding: '20px 0', width: '100%', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+            <div className="report-loading-knight" style={{ fontSize: '3.5rem' }}>♞</div>
+            <div className="report-loading-knight" style={{ fontSize: '3.5rem', animationDelay: '0.15s' }}>♞</div>
+            <div className="report-loading-knight" style={{ fontSize: '3.5rem', animationDelay: '0.3s' }}>♞</div>
           </div>
-          <p className="ps-progress__step">
-            {loadingPhase === 'conn'      && 'Connexion au serveur…'}
-            {loadingPhase === 'archive' && gamesTarget === 0 && LOADING_MESSAGES[Math.min(statusMsgIdx, 3)]}
-            {loadingPhase === 'archive' && gamesTarget > 0 && `${Math.floor(animatedGames)} partie(s) chargée(s)`}
-            {loadingPhase === 'positions' && `Précalcul des positions… (${positionsCurrent} / ${positionsTotal})`}
-            {loadingPhase === 'done'      && 'Terminé ✓'}
-          </p>
-          <div className="modal-actions">
-            <button className="ctrl-btn ctrl-btn--danger" onClick={handleAbort}>
+
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#f8fafc' }}>
+              Chargement des parties de @{username}…
+            </div>
+          </div>
+
+          <div style={{ width: '100%', padding: '0 8px' }}>
+            <div style={{
+              background: 'linear-gradient(160deg, rgba(15,25,50,0.6), rgba(8,16,29,0.7))',
+              boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+              borderRadius: 100,
+              height: 12,
+              overflow: 'hidden',
+              width: '100%',
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${progress}%`,
+                borderRadius: 100,
+                background: progress >= 100
+                  ? 'linear-gradient(90deg, #22c55e, #4ade80)'
+                  : 'linear-gradient(90deg, #22D3EE, #6366F1)',
+                transition: 'width 0.3s ease',
+              }} />
+            </div>
+
+            <div style={{
+              fontSize: '0.85rem',
+              color: '#94a3b8',
+              minHeight: 22,
+              marginTop: 12,
+              textAlign: 'center',
+            }}>
+              {loadingPhase === 'conn'      && 'Connexion au serveur…'}
+              {loadingPhase === 'archive' && gamesTarget === 0 && LOADING_MESSAGES[Math.min(statusMsgIdx, 3)]}
+              {loadingPhase === 'archive' && gamesTarget > 0 && `${Math.floor(animatedGames)} partie(s) chargée(s)`}
+              {loadingPhase === 'positions' && `Précalcul des positions… (${positionsCurrent} / ${positionsTotal})`}
+              {loadingPhase === 'done'      && 'Terminé ✓'}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={handleAbort}
+              className="ctrl-btn ctrl-btn--danger"
+              style={{ maxWidth: 200 }}
+            >
               Annuler
             </button>
           </div>
@@ -213,13 +256,25 @@ export function PlayerStatsModal() {
             <label className="ps-form__label" htmlFor="ps-username">Pseudo Chess.com</label>
             <input
               id="ps-username"
-              className="ps-form__input"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
               placeholder="ex: Hikaru"
               autoFocus
+              style={{
+                width: '100%',
+                background: 'rgba(15,23,42,0.92)',
+                border: 'none',
+                boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                borderRadius: 8,
+                color: '#e2e8f0',
+                colorScheme: 'dark',
+                padding: '10px 14px',
+                fontSize: '0.92rem',
+                outline: 'none',
+                transition: 'box-shadow 0.2s ease',
+              }}
             />
           </div>
 
@@ -251,9 +306,22 @@ export function PlayerStatsModal() {
             <label className="ps-form__label" htmlFor="ps-timeclass">Cadence</label>
             <select
               id="ps-timeclass"
-              className="ps-form__select"
               value={timeClass}
               onChange={(e) => setTimeClass(e.target.value)}
+              style={{
+                width: '100%',
+                background: 'rgba(15,23,42,0.92)',
+                border: 'none',
+                boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                borderRadius: 6,
+                color: '#e2e8f0',
+                colorScheme: 'dark',
+                padding: '9px 12px',
+                fontSize: '0.88rem',
+                outline: 'none',
+                cursor: 'pointer',
+                transition: 'box-shadow 0.2s ease',
+              }}
             >
               {TIME_CLASS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -274,20 +342,44 @@ export function PlayerStatsModal() {
                 <span className="ps-form__label">Date de début (AAAA / MM)</span>
                 <div className="ps-form__row">
                   <input
-                    className="ps-form__input"
                     type="text"
                     placeholder="2023"
                     value={fromYear}
                     onChange={(e) => setFromYear(e.target.value)}
                     maxLength={4}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15,23,42,0.92)',
+                      border: 'none',
+                      boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                      borderRadius: 8,
+                      color: '#e2e8f0',
+                      colorScheme: 'dark',
+                      padding: '10px 14px',
+                      fontSize: '0.92rem',
+                      outline: 'none',
+                      transition: 'box-shadow 0.2s ease',
+                    }}
                   />
                   <input
-                    className="ps-form__input"
                     type="text"
                     placeholder="01"
                     value={fromMonth}
                     onChange={(e) => setFromMonth(e.target.value)}
                     maxLength={2}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15,23,42,0.92)',
+                      border: 'none',
+                      boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                      borderRadius: 8,
+                      color: '#e2e8f0',
+                      colorScheme: 'dark',
+                      padding: '10px 14px',
+                      fontSize: '0.92rem',
+                      outline: 'none',
+                      transition: 'box-shadow 0.2s ease',
+                    }}
                   />
                 </div>
               </div>
@@ -295,20 +387,44 @@ export function PlayerStatsModal() {
                 <span className="ps-form__label">Date de fin (AAAA / MM)</span>
                 <div className="ps-form__row">
                   <input
-                    className="ps-form__input"
                     type="text"
                     placeholder="2024"
                     value={toYear}
                     onChange={(e) => setToYear(e.target.value)}
                     maxLength={4}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15,23,42,0.92)',
+                      border: 'none',
+                      boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                      borderRadius: 8,
+                      color: '#e2e8f0',
+                      colorScheme: 'dark',
+                      padding: '10px 14px',
+                      fontSize: '0.92rem',
+                      outline: 'none',
+                      transition: 'box-shadow 0.2s ease',
+                    }}
                   />
                   <input
-                    className="ps-form__input"
                     type="text"
                     placeholder="12"
                     value={toMonth}
                     onChange={(e) => setToMonth(e.target.value)}
                     maxLength={2}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15,23,42,0.92)',
+                      border: 'none',
+                      boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                      borderRadius: 8,
+                      color: '#e2e8f0',
+                      colorScheme: 'dark',
+                      padding: '10px 14px',
+                      fontSize: '0.92rem',
+                      outline: 'none',
+                      transition: 'box-shadow 0.2s ease',
+                    }}
                   />
                 </div>
               </div>
@@ -316,22 +432,46 @@ export function PlayerStatsModal() {
                 <span className="ps-form__label">Elo adversaire (min – max)</span>
                 <div className="ps-form__row">
                   <input
-                    className="ps-form__input"
                     type="number"
                     placeholder="0"
                     value={eloMin}
                     onChange={(e) => setEloMin(e.target.value)}
                     min={0}
                     max={3000}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15,23,42,0.92)',
+                      border: 'none',
+                      boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                      borderRadius: 8,
+                      color: '#e2e8f0',
+                      colorScheme: 'dark',
+                      padding: '10px 14px',
+                      fontSize: '0.92rem',
+                      outline: 'none',
+                      transition: 'box-shadow 0.2s ease',
+                    }}
                   />
                   <input
-                    className="ps-form__input"
                     type="number"
                     placeholder="3000"
                     value={eloMax}
                     onChange={(e) => setEloMax(e.target.value)}
                     min={0}
                     max={3000}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15,23,42,0.92)',
+                      border: 'none',
+                      boxShadow: 'inset 0 1px 2px rgba(70,150,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.06)',
+                      borderRadius: 8,
+                      color: '#e2e8f0',
+                      colorScheme: 'dark',
+                      padding: '10px 14px',
+                      fontSize: '0.92rem',
+                      outline: 'none',
+                      transition: 'box-shadow 0.2s ease',
+                    }}
                   />
                 </div>
               </div>
