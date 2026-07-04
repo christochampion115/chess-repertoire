@@ -27,7 +27,27 @@ export function BoardThemeModal() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {THEMES.map((t) => (
           <button key={t.id} className="ctrl-btn" onClick={() => handleSelect(t.light, t.dark)}>
-            {t.label}
+            <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              width: 150,
+            }}>
+              <span style={{
+                display: 'inline-grid',
+                gridTemplateColumns: '14px 14px',
+                gap: 1,
+                borderRadius: 3,
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}>
+                <span style={{ width: 14, height: 14, background: t.light }} />
+                <span style={{ width: 14, height: 14, background: t.dark }} />
+                <span style={{ width: 14, height: 14, background: t.dark }} />
+                <span style={{ width: 14, height: 14, background: t.light }} />
+              </span>
+              {t.label}
+            </span>
           </button>
         ))}
       </div>

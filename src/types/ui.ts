@@ -14,6 +14,7 @@ export type ActiveModal =
   | { type: 'training-victory'; report: SurvivalReport }
   | { type: 'training-defeat'; report: SurvivalReport }
   | { type: 'comment'; nodeId: string }
+  | { type: 'home-training' }
   | { type: 'board-theme' }
   | { type: 'auth' }
   | { type: 'profile' }

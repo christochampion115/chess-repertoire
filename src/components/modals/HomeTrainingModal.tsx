@@ -109,7 +109,7 @@ export function HomeTrainingModal() {
   };
 
   return (
-    <ModalBox title="Lancer un entraînement" onClose={closeModal} width={540}>
+    <ModalBox title="Lancer un entraînement" onClose={closeModal} width={480} maxHeight={520}>
       <div className="modal-body">
         {repertoires.length === 0 ? (
           <div className="htr-status-msg">

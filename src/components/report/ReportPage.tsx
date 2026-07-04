@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
+import { useSearchParams } from 'react-router-dom';
 import { useReportStore } from '@/stores/reportStore';
 import { fetchChesscomReport, saveReportToServer, fetchSavedReportById } from '@/services/report';
 import { ensureOpeningsLoaded } from '@/services/openings';
@@ -25,9 +26,10 @@ export const ReportPage = React.memo(function ReportPage() {
   const user = useAuthStore((s) => s.user);
   const isGuestMode = useAuthStore((s) => s.isGuestMode);
   const token = useAuthStore((s) => s.token);
+  const [searchParams] = useSearchParams();
   const [loadingPct, setLoadingPct] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState<'idle' | 'conn' | 'load' | 'blunders' | 'done'>('idle');
-  const [formTab, setFormTab] = useState<'analyze' | 'saved'>('analyze');
+  const [formTab, setFormTab] = useState<'analyze' | 'saved'>(searchParams.get('tab') === 'saved' ? 'saved' : 'analyze');
   const [gamesTarget, setGamesTarget] = useState(0);
   const animatedGames = useAnimatedCounter(gamesTarget);
   const [statusMsgIdx, setStatusMsgIdx] = useState(0);

@@ -7,10 +7,11 @@ interface ModalBoxProps {
   children: ReactNode;
   onClose?: () => void;
   width?: number;
+  maxHeight?: number;
   id?: string;
 }
 
-export function ModalBox({ title, children, onClose, width, id }: ModalBoxProps) {
+export function ModalBox({ title, children, onClose, width, maxHeight, id }: ModalBoxProps) {
   const closeModal = useUiStore((s) => s.closeModal);
   const handleClose = onClose ?? closeModal;
   const pointerDownInside = useRef(false);
@@ -31,7 +32,7 @@ export function ModalBox({ title, children, onClose, width, id }: ModalBoxProps)
       <div
         id={id}
         className="modal-box"
-        style={{ display: 'block', width, maxWidth: width }}
+        style={{ display: 'block', width, maxWidth: width, maxHeight, overflowY: maxHeight ? 'auto' : undefined }}
         onPointerDown={(e) => {
           pointerDownInside.current = true;
           e.stopPropagation();

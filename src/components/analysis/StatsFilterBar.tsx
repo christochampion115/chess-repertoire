@@ -184,58 +184,48 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
             >
               Joueur
             </button>
-          ) : !savedPlayerStats ? (
-            // Connecté mais pas de stats sauvegardées → ouvre la modale
-            <button
-              type="button"
-              id="stats-filter-player-btn"
-              className={`stats-filter-btn${isPlayer ? ' active' : ''}`}
-              onClick={() => openModal({ type: 'player-stats' })}
-              title="Analyser les parties d'un joueur Chess.com"
-            >
-              Joueur
-            </button>
           ) : (
-            // Connecté + stats sauvegardées → split button
-            <button
-              type="button"
-              id="stats-filter-player-btn"
-              className={`stats-filter-btn stats-filter-btn--split${isPlayer ? ' active' : ''}`}
-              onClick={switchToSavedPlayer}
-              title={`Stats de @${savedPlayerStats.filters.playerUsername}`}
-            >
-              <span className="stats-filter-btn-label">Joueur</span>
-              <span
-                style={{ fontSize: '1rem', opacity: 0.9, cursor: 'pointer' }}
-                title="Options"
-                onClick={(e) => { e.stopPropagation(); setPlayerDropdownOpen((v) => !v); }}
-              >
-                ▾
-              </span>
-            </button>
-          )}
-          {/* Dropdown (seulement si split button actif) */}
-          {isAuthenticated && savedPlayerStats && (
-            <div
-              className="stats-sort-menu"
-              hidden={!playerDropdownOpen}
-              style={{ minWidth: 160 }}
-            >
+            // Connecté → split button avec dropdown
+            <>
               <button
                 type="button"
-                className={`stats-sort-menu-item${isPlayer ? ' active' : ''}`}
-                onClick={() => { switchToSavedPlayer(); setPlayerDropdownOpen(false); }}
+                id="stats-filter-player-btn"
+                className={`stats-filter-btn stats-filter-btn--split${isPlayer ? ' active' : ''}`}
+                onClick={savedPlayerStats ? switchToSavedPlayer : () => openModal({ type: 'player-stats' })}
+                title={savedPlayerStats ? `Stats de @${savedPlayerStats.filters.playerUsername}` : 'Analyser les parties d\'un joueur Chess.com'}
               >
-                @{savedPlayerStats.filters.playerUsername}
+                <span className="stats-filter-btn-label">Joueur</span>
+                <span
+                  style={{ fontSize: '1rem', opacity: 0.9, cursor: 'pointer' }}
+                  title="Options"
+                  onClick={(e) => { e.stopPropagation(); setPlayerDropdownOpen((v) => !v); }}
+                >
+                  ▾
+                </span>
               </button>
-              <button
-                type="button"
-                className="stats-sort-menu-item"
-                onClick={() => { setPlayerDropdownOpen(false); openModal({ type: 'player-stats' }); }}
+              <div
+                className="stats-sort-menu"
+                hidden={!playerDropdownOpen}
+                style={{ minWidth: 180 }}
               >
-                Recharger / Autre compte
-              </button>
-            </div>
+                {savedPlayerStats && (
+                  <button
+                    type="button"
+                    className={`stats-sort-menu-item${isPlayer ? ' active' : ''}`}
+                    onClick={() => { switchToSavedPlayer(); setPlayerDropdownOpen(false); }}
+                  >
+                    @{savedPlayerStats.filters.playerUsername}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="stats-sort-menu-item"
+                  onClick={() => { setPlayerDropdownOpen(false); openModal({ type: 'player-stats' }); }}
+                >
+                  + Nouveau joueur
+                </button>
+              </div>
+            </>
           )}
           {isPlayer && savedPlayerStats && (
             <span className="stats-filter-sub-label">
