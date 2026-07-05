@@ -216,7 +216,7 @@ export async function signupWithCredentials({ username, password }: { username: 
     await finalizeAuthenticatedSession(response, true);
   } catch (error: any) {
     const msg = error?.message || '';
-    if (msg.toLowerCase().includes('username already')) {
+    if (error?.status === 409 || msg.toLowerCase().includes('username already')) {
       auth.setError('Ce nom d\'utilisateur est déjà pris.');
     } else if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('mot de passe')) {
       auth.setError('Le mot de passe doit contenir au moins 8 caractères.');
