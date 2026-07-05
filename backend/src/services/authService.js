@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
+const repertoireModel = require('../models/repertoireModel');
 const { jwtSecret, tokenTTL } = require('../config');
 const { getDb, run, get } = require('../db');
 
@@ -44,7 +45,7 @@ function buildAuthResponse(user) {
 
 function buildInternalEmail(username) {
   const encodedUsername = Buffer.from(String(username || '').trim(), 'utf8').toString('hex') || 'user';
-  return `user_${encodedUsername}@alpha-chess.local`;
+  return `user_${encodedUsername}@blundertale.local`;
 }
 
 async function signup({ username, email, password }) {
@@ -93,9 +94,24 @@ function logout(token) {
   }
 }
 
+// Conversion invité → compte (P1-C) : insère les répertoires locaux en base
+async function convertGuest(userId, repertoires) {
+  let count = 0;
+  for (const rep of repertoires) {
+    try {
+      await repertoireModel.createRepertoire({ userId, data: rep });
+      count++;
+    } catch {
+      // best-effort
+    }
+  }
+  return { count };
+}
+
 module.exports = {
   signup,
   login,
   logout,
-  isTokenRevoked
+  isTokenRevoked,
+  convertGuest,
 };

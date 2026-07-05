@@ -3,6 +3,8 @@ import { apiRequest } from '@/services/api';
 import { loadState } from '@/services/storage';
 import { useAuthStore } from '@/stores/authStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
+import { useTrainingStore } from '@/stores/trainingStore';
+import { useStatsStore } from '@/stores/statsStore';
 import type { RepertoireNode } from '@/types/repertoire';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -10,6 +12,38 @@ import type { RepertoireNode } from '@/types/repertoire';
 export function isReadOnlyMode(): boolean {
   return typeof window !== 'undefined' &&
     window.location?.hostname === '127.0.0.1';
+}
+
+// ─── Serialize RepertoireNode tree → { rootId, nodes[] } ─────────────────
+
+function serializeRepertoire(root: RepertoireNode): { rootId: string; nodes: any[] } {
+  const nodes: any[] = [];
+  const walk = (node: RepertoireNode) => {
+    const n: any = {
+      id: node.id,
+      san: node.san,
+      fen: node.fen,
+      children: node.children.map((c) => c.id),
+      moveNum: node.moveNum,
+      turn: node.turn,
+    };
+    if (node.name)              n.name = node.name;
+    if (node.color)             n.color = node.color;
+    if (node.comment)           n.comment = node.comment;
+    if (node.varName)           n.varName = node.varName;
+    if (node.varAnnotation)     n.varAnnotation = node.varAnnotation;
+    if (node.annotation)        n.annotation = node.annotation;
+    if (node.createdAt != null) n.createdAt = node.createdAt;
+    if (node.updatedAt != null) n.updatedAt = node.updatedAt;
+    if (node.isTransposition)   n.isTransposition = true;
+    if (node.sourceNodeId != null) n.sourceNodeId = node.sourceNodeId;
+    if (node.folderId)          n.folderId = node.folderId;
+    if (node.isExample)         n.isExample = true;
+    nodes.push(n);
+    for (const child of node.children) walk(child);
+  };
+  walk(root);
+  return { rootId: root.id, nodes };
 }
 
 // ─── Deserialize server format ({ rootId, nodes[] }) → RepertoireNode ─────
@@ -64,10 +98,21 @@ function deserializeFromServer(raw: any): RepertoireNode | null {
   return map.get(rootId) || null;
 }
 
+// ─── Session boundary reset ─────────────────────────────────────────────
+
+function resetAllUserStores(): void {
+  useRepertoireStore.persist.clearStorage();
+  useRepertoireStore.getState().reset();
+  useTrainingStore.getState().endTraining();
+  useStatsStore.persist.clearStorage();
+  useStatsStore.getState().reset();
+}
+
 // ─── Bootstrap (appelé au démarrage) ─────────────────────────────────────
 
 export async function bootstrapSession(): Promise<void> {
   const auth = useAuthStore.getState();
+  auth.setStatus('loading');
   let token = auth.token;
 
   if (!token) {
@@ -92,25 +137,42 @@ export async function bootstrapSession(): Promise<void> {
     auth.setStatus('logged');
 
     const repResponse = await apiRequest('/repertoires', { token });
-    const remoteReps = repResponse?.repertoires || [];
-
-    const loaded: RepertoireNode[] = [];
-    for (const entry of remoteReps) {
-      const data = entry?.data;
-      if (!data) continue;
-      const rep = deserializeFromServer(data);
-      if (rep) loaded.push(rep);
-    }
-
-    if (loaded.length > 0) {
-      useRepertoireStore.getState().setRepertoires(loaded);
-    }
+    await _applyServerRepertoires(repResponse?.repertoires || []);
   } catch (error: any) {
     if (error?.status === 401) {
       auth.setToken('');
       auth.setUser(null);
       auth.setStatus('guest');
+      resetAllUserStores();
+    } else {
+      auth.setSyncStatus('error', 'Serveur injoignable — données locales affichées');
     }
+  }
+}
+
+// ─── Helper : appliquer les répertoires serveur dans le store ───────────────────
+
+async function _applyServerRepertoires(remoteReps: any[]): Promise<void> {
+  const loaded: RepertoireNode[] = [];
+  const serverIdMap: Record<string, number> = {};
+  const serverUpdatedAtMap: Record<string, string> = {};
+
+  for (const entry of remoteReps) {
+    const data = entry?.data;
+    if (!data) continue;
+    const rep = deserializeFromServer(data);
+    if (!rep) continue;
+    loaded.push(rep);
+    if (entry.serverId) serverIdMap[rep.id] = entry.serverId;
+    if (entry.updatedAt) serverUpdatedAtMap[rep.id] = entry.updatedAt;
+  }
+
+  const store = useRepertoireStore.getState();
+  store.setRepertoires(loaded);
+  store.setServerIdMap(serverIdMap);
+  // Update serverUpdatedAtMap without clearing (setServerUpdatedAt per entry)
+  for (const [localId, updatedAt] of Object.entries(serverUpdatedAtMap)) {
+    store.setServerUpdatedAt(localId, updatedAt);
   }
 }
 
@@ -126,7 +188,7 @@ export async function loginWithCredentials({ email, password }: { email: string;
       method: 'POST',
       body: { email, password },
     });
-    await finalizeAuthenticatedSession(response);
+    await finalizeAuthenticatedSession(response, false);
   } catch (error: any) {
     const msg = error?.message || '';
     if (msg.toLowerCase().includes('invalid credentials')) {
@@ -151,7 +213,7 @@ export async function signupWithCredentials({ username, password }: { username: 
       method: 'POST',
       body: { username, password },
     });
-    await finalizeAuthenticatedSession(response);
+    await finalizeAuthenticatedSession(response, true);
   } catch (error: any) {
     const msg = error?.message || '';
     if (msg.toLowerCase().includes('username already')) {
@@ -168,7 +230,7 @@ export async function signupWithCredentials({ username, password }: { username: 
 
 // ─── Finalize session (partagé login + signup) ────────────────────────────
 
-async function finalizeAuthenticatedSession(response: any): Promise<void> {
+async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): Promise<void> {
   const token = response?.token || '';
   const user = response?.user || null;
 
@@ -176,26 +238,39 @@ async function finalizeAuthenticatedSession(response: any): Promise<void> {
     throw new Error('Réponse de connexion invalide');
   }
 
+  // Capturer les répertoires invités AVANT resetAllUserStores (P1-C)
+  const guestReps = isNewUser
+    ? useRepertoireStore.getState().repertoires.slice()
+    : [];
+
   const auth = useAuthStore.getState();
   auth.setToken(token);
   auth.setUser(user);
   auth.setStatus('logged');
   auth.setGuestMode(false);
 
+  resetAllUserStores();
+
   try {
     const repResponse = await apiRequest('/repertoires', { token });
-    const remoteReps = repResponse?.repertoires || [];
+    await _applyServerRepertoires(repResponse?.repertoires || []);
 
-    const loaded: RepertoireNode[] = [];
-    for (const entry of remoteReps) {
-      const data = entry?.data;
-      if (!data) continue;
-      const rep = deserializeFromServer(data);
-      if (rep) loaded.push(rep);
-    }
-
-    if (loaded.length > 0) {
-      useRepertoireStore.getState().setRepertoires(loaded);
+    // P1-C : migration des répertoires invités après signup
+    if (isNewUser && guestReps.length > 0) {
+      try {
+        const serialized = guestReps.map(serializeRepertoire);
+        const result = await apiRequest('/auth/convert-guest', {
+          method: 'POST',
+          token,
+          body: { repertoires: serialized },
+        });
+        if (result?.count > 0) {
+          const updated = await apiRequest('/repertoires', { token });
+          await _applyServerRepertoires(updated?.repertoires || []);
+        }
+      } catch (err: any) {
+        console.warn('[sync] convert-guest failed:', err?.message);
+      }
     }
   } catch (error: any) {
     if (error?.status === 401) {
@@ -222,31 +297,175 @@ export async function logoutSession(): Promise<void> {
   } catch {
     // Silencieux — la déconnexion se fait quoi qu'il arrive
   } finally {
+    resetAllUserStores();
     useAuthStore.getState().logout();
   }
 }
 
-// ─── Sync répertoires (stub P1) ──────────────────────────────────────────
+// ─── Sync répertoires (P1-A) — dirty tracking + debounce + retry ─────────
+
+let _syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function _putWithRetry(
+  serverId: number,
+  data: { rootId: string; nodes: any[] },
+  clientUpdatedAt: string | undefined,
+  token: string,
+  maxRetries = 3,
+): Promise<{ updatedAt?: string }> {
+  let delay = 1000;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await apiRequest(`/repertoires/${serverId}`, {
+        method: 'PUT',
+        token,
+        body: clientUpdatedAt ? { data, clientUpdatedAt } : { data },
+      });
+      return response?.repertoire ?? {};
+    } catch (err: any) {
+      if (attempt === maxRetries) throw err;
+      // Ne pas réessayer sur les erreurs définitives
+      if (err?.status === 401 || err?.status === 404 || err?.status === 409) throw err;
+      await new Promise<void>((r) => setTimeout(r, delay));
+      delay *= 2;
+    }
+  }
+  return {};
+}
+
+async function _flushDirtyRepertoires(): Promise<void> {
+  const store = useRepertoireStore.getState();
+  const { token } = useAuthStore.getState();
+  if (!token || store.dirtyIds.size === 0) return;
+
+  const ids = [...store.dirtyIds];
+  for (const localId of ids) {
+    const rep = store.repertoires.find((r) => r.id === localId);
+    const serverId = store.serverIdMap[localId];
+    if (!rep || !serverId) {
+      store.clearDirty(localId);
+      continue;
+    }
+    store.clearDirty(localId);
+
+    const data = serializeRepertoire(rep);
+    const clientUpdatedAt = store.serverUpdatedAtMap[localId];
+    try {
+      const result = await _putWithRetry(serverId, data, clientUpdatedAt, token);
+      if (result.updatedAt) store.setServerUpdatedAt(localId, result.updatedAt);
+      useAuthStore.getState().setSyncStatus('idle');
+    } catch (err: any) {
+      if (err?.status === 409) {
+        // P1-B : conflit — déléguer à la modale
+        const { openModal } = await import('@/stores/uiStore').then((m) => m.useUiStore.getState());
+        openModal({ type: 'conflict', localRepId: localId, serverId, serverRep: err?.serverData ?? null });
+      } else {
+        // Remettre en dirty pour la prochaine tentative (sauf 401/404)
+        if (err?.status !== 401 && err?.status !== 404) {
+          store.markDirty(localId);
+        }
+        console.warn('[sync] PUT failed:', err?.message);
+        useAuthStore.getState().setSyncStatus('error', 'Sauvegarde échouée — sera retentée');
+      }
+    }
+  }
+}
 
 export function scheduleRepertoireSync(): void {
-  // TODO P1 — dirty tracking + flush serveur
+  const store = useRepertoireStore.getState();
+  if (store.suppressSync) return;
+  const { token } = useAuthStore.getState();
+  if (!token) return;
+
+  const { repertoires, activeRepIndex } = store;
+  const activeRep = repertoires[activeRepIndex];
+  if (activeRep) store.markDirty(activeRep.id);
+
+  if (_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    _flushDirtyRepertoires().catch((err) => {
+      console.warn('[sync] flush error:', err?.message);
+    });
+  }, 2000);
 }
 
-export function registerCreatedRepertoire(rep: any): void {
-  if (!useAuthStore.getState().token) return;
-  apiRequest('/repertoires', {
-    method: 'POST',
-    token: useAuthStore.getState().token,
-    body: rep,
-  }).catch(() => {});
+export async function registerCreatedRepertoire(rep: RepertoireNode): Promise<void> {
+  const token = useAuthStore.getState().token;
+  if (!token) return;
+  const data = serializeRepertoire(rep);
+  try {
+    const response = await apiRequest('/repertoires', {
+      method: 'POST',
+      token,
+      body: { data },
+    });
+    const serverId = response?.repertoire?.serverId;
+    const updatedAt = response?.repertoire?.updatedAt;
+    if (serverId) {
+      useRepertoireStore.getState().setServerId(rep.id, serverId);
+      if (updatedAt) useRepertoireStore.getState().setServerUpdatedAt(rep.id, updatedAt);
+    }
+  } catch (err: any) {
+    console.warn('[sync] registerCreatedRepertoire failed:', err?.message);
+    useAuthStore.getState().setSyncStatus('error', 'Sauvegarde du répertoire échouée');
+  }
 }
 
-export function deleteRepertoireFromBackend(rep: any): void {
-  if (!useAuthStore.getState().token || !rep?.id) return;
-  apiRequest(`/repertoires/${rep.id}`, {
+export function deleteRepertoireFromBackend(rep: RepertoireNode): void {
+  const token = useAuthStore.getState().token;
+  if (!token || !rep) return;
+  const store = useRepertoireStore.getState();
+  const serverId = store.serverIdMap[rep.id];
+  if (!serverId) return;
+  store.removeServerMapping(rep.id);
+  apiRequest(`/repertoires/${serverId}`, {
     method: 'DELETE',
-    token: useAuthStore.getState().token,
-  }).catch(() => {});
+    token,
+  }).catch((err: any) => {
+    console.warn('[sync] deleteRepertoireFromBackend failed:', err?.message);
+    useAuthStore.getState().setSyncStatus('error', 'Suppression du répertoire échouée');
+  });
+}
+
+// ─── Résolution de conflit (P1-B) ─────────────────────────────────────────
+
+export async function resolveConflict(
+  localRepId: string,
+  serverId: number,
+  action: 'overwrite' | 'keep-server',
+  serverRep: any,
+): Promise<void> {
+  const { token } = useAuthStore.getState();
+  const store = useRepertoireStore.getState();
+
+  if (action === 'keep-server') {
+    const node = serverRep ? deserializeFromServer(serverRep) : null;
+    if (node) {
+      const reps = store.repertoires.map((r) => (r.id === localRepId ? node : r));
+      store.setRepertoires(reps);
+    }
+    store.clearDirty(localRepId);
+    return;
+  }
+
+  // 'overwrite' : force PUT sans clientUpdatedAt
+  const rep = store.repertoires.find((r) => r.id === localRepId);
+  if (rep && token) {
+    const data = serializeRepertoire(rep);
+    try {
+      const result = await apiRequest(`/repertoires/${serverId}`, {
+        method: 'PUT',
+        token,
+        body: { data },
+      });
+      const updatedAt = result?.repertoire?.updatedAt;
+      if (updatedAt) store.setServerUpdatedAt(localRepId, updatedAt);
+      store.clearDirty(localRepId);
+    } catch (err: any) {
+      console.warn('[sync] conflict overwrite failed:', err?.message);
+      useAuthStore.getState().setSyncStatus('error', 'Écrasement impossible');
+    }
+  }
 }
 
 export function syncUserSettings(): void {
@@ -256,5 +475,7 @@ export function syncUserSettings(): void {
     method: 'PUT',
     token: useAuthStore.getState().token,
     body: { repFolders: folders },
-  }).catch(() => {});
+  }).catch((err) => {
+    console.warn('[sync] syncUserSettings failed:', err?.message);
+  });
 }

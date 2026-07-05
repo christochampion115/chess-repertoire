@@ -37,6 +37,13 @@ async function updateRepertoire(req, res, next) {
     const updated = await repertoireService.updateRepertoire(req.user.id, id, payload);
     res.json({ repertoire: updated });
   } catch (error) {
+    if (error.statusCode === 409) {
+      return res.status(409).json({
+        error: 'Conflict',
+        message: 'Le répertoire a été modifié ailleurs.',
+        serverData: error.serverData,
+      });
+    }
     next(error);
   }
 }

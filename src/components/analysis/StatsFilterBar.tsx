@@ -4,7 +4,6 @@ import { useUiStore } from '@/stores/uiStore';
 import { scheduleStatsReload } from '@/services/stats';
 import type { StatsSortBy } from '@/types/stats';
 import { useAuthStore } from '@/stores/authStore';
-import type { SavedPlayerStats } from '@/types/stats';
 
 const ELO_MIN = 0;
 const ELO_MAX = 3000;

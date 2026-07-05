@@ -1,7 +1,7 @@
 {
-  "name": "alpha-chess-backend",
+  "name": "blundertale-backend",
   "version": "1.0.0",
-  "description": "Backend API for Alpha Chess with JWT authentication and repertoire CRUD.",
+  "description": "Backend API for Blundertale with JWT authentication and repertoire CRUD.",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {

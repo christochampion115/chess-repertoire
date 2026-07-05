@@ -86,7 +86,7 @@ export const useStatsStore = create<StatsState & StatsActions>()(
   setLastStatsRequestKey: (key) => set({ lastStatsRequestKey: key }),
   setLichessStats: (stats) => set({ lichessStats: stats }),
   setSavedPlayerStats: (s) => set({ savedPlayerStats: s }),
-  reset: () => set({ data: null, loading: false, error: null, selectedUci: '' }),
+  reset: () => set({ data: null, loading: false, error: null, selectedUci: '', savedPlayerStats: null, filters: { ...DEFAULT_FILTERS } }),
     }),
     {
       name: 'alphaChess.statsFilters',     // même clé que l'app vanilla

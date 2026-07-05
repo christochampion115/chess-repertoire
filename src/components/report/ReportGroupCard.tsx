@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { ReportGroup, PriorityBadge } from '@/types/report';
-import { getOpeningNameByPath, pathToPgn, getMoveNumberFromFen } from '@/services/openings';
+import { getOpeningNameByPath, getMoveNumberFromFen } from '@/services/openings';
 import { ReportMiniBoard } from './ReportMiniBoard';
 import { ReportWdlBar } from './ReportWdlBar';
 
@@ -46,7 +46,6 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
   const gapVal = group.groupGap * 100;
   const gapDisplay = gapVal.toFixed(0);
   const fullPath = group.key ? group.key.split(' ') : [];
-  const pgnHtml = pathToPgn(fullPath, false, startMove);
 
   const groupBadge = useMemo((): PriorityBadge => {
     if (gapVal >= 8) return { badgeClass: 'badge-critical', itemClass: 'report-item--critical', label: 'CRITIQUE', rank: 3 };
@@ -106,7 +105,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
               </div>
             </div>
 
-            {pgnHtml && (
+            {fullPath.length > 0 && (
               <div
                 style={{
                   fontFamily: "'Courier New',monospace",
@@ -118,8 +117,16 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                   marginBottom: 16,
                   lineHeight: 1.6,
                 }}
-                dangerouslySetInnerHTML={{ __html: pgnHtml }}
-              />
+              >
+                {fullPath.map((move, i) => (
+                  <React.Fragment key={i}>
+                    {i % 2 === 0 && (
+                      <span className="pgn-movenum">{startMove + Math.floor(i / 2)}.</span>
+                    )}
+                    <span>{move}</span>{' '}
+                  </React.Fragment>
+                ))}
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>

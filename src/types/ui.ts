@@ -28,6 +28,7 @@ export type ActiveModal =
   | { type: 'annotation' }
   | { type: 'patch-notes' }
   | { type: 'select-repertoire'; repChoices: { repIndex: number; nodeId: string; repName: string }[] }
+  | { type: 'conflict'; localRepId: string; serverId: number; serverRep: any }
   | null;
 
 export interface OpenPanels {

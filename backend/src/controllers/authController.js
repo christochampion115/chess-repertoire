@@ -1,5 +1,6 @@
 const authService = require('../services/authService');
 const { signupSchema, loginSchema } = require('../validators/authValidator');
+const { repertoireSyncSchema } = require('../validators/repertoireValidator');
 
 async function signup(req, res, next) {
   try {
@@ -38,9 +39,20 @@ function me(req, res, next) {
   }
 }
 
+async function convertGuest(req, res, next) {
+  try {
+    const { repertoires } = repertoireSyncSchema.parse(req.body);
+    const result = await authService.convertGuest(req.user.id, repertoires);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   signup,
   login,
   logout,
-  me
+  me,
+  convertGuest,
 };

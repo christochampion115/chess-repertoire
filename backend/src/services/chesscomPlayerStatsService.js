@@ -14,7 +14,7 @@ const RESULT_CACHE_MAX = 500; // entrées max dans resultCache
 function buildChesscomHeaders() {
   return {
     Accept: 'application/json',
-    'User-Agent': 'AlphaChess/1.0 (contact: christophe)'
+    'User-Agent': 'Blundertale/1.0 (contact: christophe)'
   };
 }
 
@@ -288,7 +288,7 @@ async function ensureGamesLoaded(filters, onProgress = null) {
     if (truncated) break;
   }
 
-  console.log(`[chesscom] ${playerUsername} | archives: ${toFetch.length} | filtrées: ${totalFiltered} | parsées: ${parseOk} | échecs: ${parseFail} | tronquées: ${truncated}`);
+  console.log(`[chesscom] archives: ${toFetch.length} | filtrées: ${totalFiltered} | parsées: ${parseOk} | échecs: ${parseFail} | tronquées: ${truncated}`);
 
   // totalFiltered = parties qui ont passé les filtres (couleur/cadence/elo)
   // parsedGames.length peut être inférieur : parties sans PGN ou parsing échoué

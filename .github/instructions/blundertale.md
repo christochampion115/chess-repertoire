@@ -1,4 +1,4 @@
-# Alpha Chess — Conventions & Architecture
+# Blundertale — Conventions & Architecture
 
 ## Stack
 Vite 8.0.11 | React 19.2.0 | TypeScript 5.9 | Zustand 5 | React Router 7 | Vitest 4.1 | chess.js (npm ESM) | @mliebelt/pgn-parser 1.4.19 | ESLint 9 flat config
@@ -55,5 +55,5 @@ src/
 - CSS legacy — ne pas modifier
 
 ## Environnement
-- `window.ALPHA_CHESS_API_URL` — config dans `index.html`, lu par `services/api.ts`
+- `window.BLUNDERTALE_API_URL` — config dans `index.html`, lu par `services/api.ts`
 - `window.LICHESS_STATS_PROXY_URL` — config dans `index.html`, lu par `services/stats.ts`

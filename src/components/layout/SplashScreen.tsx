@@ -35,7 +35,7 @@ export const SplashScreen = React.memo(function SplashScreen() {
         <div id="splash-welcome" className={`splash-section${step !== 'welcome' ? ' hidden' : ''}`}>
           <div className="splash-header">
             <div className="splash-logo">A</div>
-            <div className="splash-title">Alpha Chess</div>
+            <div className="splash-title">Blundertale</div>
             <div className="splash-subtitle">Répertoire &amp; analyse</div>
             <div className="splash-tagline">Préparez vos variantes d'ouverture</div>
           </div>

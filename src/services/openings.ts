@@ -117,7 +117,7 @@ export function pathToPgn(path: string[], highlightLast = false, startMove = 1):
     }
     const isLast = i === path.length - 1;
     const cls = (isLast && highlightLast) ? ' class="pgn-player-move"' : '';
-    html += `<span${cls}>${path[i]}</span> `;
+    html += `<span${cls}>${escapeHtml(path[i])}</span> `;
   }
   return html.trimEnd();
 }
@@ -141,7 +141,7 @@ export const METRIC_HELP: Record<string, string> = {
 };
 
 export function renderMetricLabel(label: string, helpText: string): string {
-  return `<span class="metric-help">${label}<span class="metric-help-icon">i</span><span class="metric-help-bubble">${escapeHtml(helpText)}</span></span>`;
+  return `<span class="metric-help">${escapeHtml(label)}<span class="metric-help-icon">i</span><span class="metric-help-bubble">${escapeHtml(helpText)}</span></span>`;
 }
 
 export const FORMAT_LABELS = {

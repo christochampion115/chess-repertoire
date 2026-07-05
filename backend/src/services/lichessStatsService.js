@@ -7,7 +7,7 @@ const RATING_MAX = 3000;
 function buildHeaders() {
   const headers = {
     Accept: 'application/json',
-    'User-Agent': 'AlphaChess/1.0 (contact: christophe)'
+    'User-Agent': 'Blundertale/1.0 (contact: christophe)'
   };
   if (explorerToken) {
     headers['Authorization'] = `Bearer ${explorerToken}`;

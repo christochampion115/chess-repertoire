@@ -11,6 +11,8 @@ const {
 } = require('../services/chesscomPlayerStatsService');
 const authMiddleware = require('../middleware/authMiddleware');
 const { optionalAuthMiddleware } = require('../middleware/authMiddleware');
+const { statsLimiter, reportLimiter, batchLimiter, sseLimiter } = require('../middleware/rateLimiters');
+const { handleError, handleSseError } = require('../utils/errorHandler');
 const db = require('../db');
 
 const router = express.Router();
@@ -18,6 +20,29 @@ const router = express.Router();
 const ALLOWED_COLORS      = new Set(['white', 'black']);
 const ALLOWED_TIMECLASSES = new Set(['all', 'bullet', 'blitz', 'rapid', 'daily', 'classical']);
 const BATCH_MAX_FENS      = 500;
+
+// ── Per-IP SSE connection tracking ────────────────────────────────────────
+const _sseConnections = new Map(); // IP → active count
+const MAX_SSE_PER_IP = 3;
+
+function _getClientIp(req) {
+  return (String(req.headers['x-forwarded-for'] || req.ip || '')).split(',')[0].trim();
+}
+
+function _acquireSseSlot(req, res) {
+  const ip = _getClientIp(req);
+  const count = _sseConnections.get(ip) || 0;
+  if (count >= MAX_SSE_PER_IP) return false;
+  _sseConnections.set(ip, count + 1);
+  const release = () => {
+    const c = _sseConnections.get(ip) || 1;
+    if (c <= 1) _sseConnections.delete(ip);
+    else _sseConnections.set(ip, c - 1);
+  };
+  res.on('close', release);
+  res.on('finish', release);
+  return true;
+}
 
 // Helper : parse les filtres communs depuis req.query (sans fen).
 function parseFiltersFromQuery(query) {
@@ -43,7 +68,7 @@ function parseFiltersFromQuery(query) {
   };
 }
 
-router.get('/stats', optionalAuthMiddleware, async (req, res) => {
+router.get('/stats', statsLimiter, optionalAuthMiddleware, async (req, res) => {
   const fen = typeof req.query.fen === 'string' ? req.query.fen.trim() : '';
   if (!fen) return res.status(400).json({ error: 'Paramètre fen requis' });
 
@@ -61,8 +86,7 @@ router.get('/stats', optionalAuthMiddleware, async (req, res) => {
     const stats = await getChesscomPlayerStats(fen, filters);
     res.json(stats);
   } catch (error) {
-    console.error('[chesscom proxy] fetch error', error);
-    res.status(error.status || 502).json({ error: error.message || 'Erreur Chess.com proxy' });
+    handleError(res, error, 'Erreur Chess.com proxy');
   }
 });
 
@@ -71,12 +95,15 @@ router.get('/stats', optionalAuthMiddleware, async (req, res) => {
 //   data: {"type":"archive","current":3,"total":15,"gamesInArchive":45}
 //   data: {"type":"complete","data":{moves:[],totalGames:500,…}}
 //   data: {"type":"error","error":"…"}
-router.get('/stats/stream', optionalAuthMiddleware, async (req, res) => {
+router.get('/stats/stream', sseLimiter, optionalAuthMiddleware, async (req, res) => {
   const fen = typeof req.query.fen === 'string' ? req.query.fen.trim() : '';
   if (!fen) return res.status(400).json({ error: 'Paramètre fen requis' });
 
   const filters = parseFiltersFromQuery(req.query);
   if (filters.error) return res.status(filters.status).json({ error: filters.error });
+
+  if (!_acquireSseSlot(req, res))
+    return res.status(429).json({ error: 'Trop de connexions SSE simultanées depuis cette IP' });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -106,8 +133,7 @@ router.get('/stats/stream', optionalAuthMiddleware, async (req, res) => {
     });
     safeWrite(`data: ${JSON.stringify({ type: 'complete', data: stats })}\n\n`);
   } catch (error) {
-    console.error('[chesscom stream] error', error);
-    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur Chess.com proxy' })}\n\n`);
+    handleSseError(safeWrite, error, 'Erreur Chess.com proxy');
   }
   if (!isClosed) res.end();
 });
@@ -118,9 +144,12 @@ router.get('/stats/stream', optionalAuthMiddleware, async (req, res) => {
 //   data: {"type":"positions","current":200,"total":1000}
 //   data: {"type":"complete","cacheKey":"…","totalPositions":1000,"totalGames":5000}
 //   data: {"type":"error","error":"…"}
-router.get('/stats/load/stream', authMiddleware, async (req, res) => {
+router.get('/stats/load/stream', sseLimiter, authMiddleware, async (req, res) => {
   const filters = parseFiltersFromQuery(req.query);
   if (filters.error) return res.status(filters.status).json({ error: filters.error });
+
+  if (!_acquireSseSlot(req, res))
+    return res.status(429).json({ error: 'Trop de connexions SSE simultanées depuis cette IP' });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -152,15 +181,14 @@ router.get('/stats/load/stream', authMiddleware, async (req, res) => {
     );
     safeWrite(`data: ${JSON.stringify({ type: 'complete', ...result })}\n\n`);
   } catch (error) {
-    console.error('[chesscom load/stream] error', error);
-    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur Chess.com load' })}\n\n`);
+    handleSseError(safeWrite, error, 'Erreur Chess.com load');
   }
   if (!isClosed) res.end();
 });
 
 // Batch : reçoit un tableau de FENs, retourne { [fen]: stats } en une seule passe mémoire.
 // Les parties doivent être déjà en cache côté backend (appelé après /stats).
-router.post('/batchstats', async (req, res) => {
+router.post('/batchstats', batchLimiter, async (req, res) => {
   const { fens, username, color, timeClass, dateFrom, dateTo, eloMin, eloMax } = req.body || {};
 
   if (!Array.isArray(fens) || fens.length === 0)
@@ -193,8 +221,7 @@ router.post('/batchstats', async (req, res) => {
     });
     res.json(results);
   } catch (error) {
-    console.error('[chesscom batch] error', error);
-    res.status(error.status || 502).json({ error: error.message || 'Erreur batch Chess.com' });
+    handleError(res, error, 'Erreur batch Chess.com');
   }
 });
 
@@ -206,8 +233,7 @@ router.post('/report/save', authMiddleware, async (req, res) => {
     const saved = await db.saveReport(req.user.id, JSON.stringify(params), JSON.stringify(data));
     res.json({ success: true, ...saved });
   } catch (error) {
-    console.error('[chesscom report save] error', error);
-    res.status(500).json({ error: error.message || 'Erreur sauvegarde rapport' });
+    handleError(res, error, 'Erreur sauvegarde rapport');
   }
 });
 
@@ -228,8 +254,7 @@ router.get('/report/saved', authMiddleware, async (req, res) => {
     });
     res.json(enriched);
   } catch (error) {
-    console.error('[chesscom report saved list] error', error);
-    res.status(500).json({ error: error.message || 'Erreur liste rapports' });
+    handleError(res, error, 'Erreur liste rapports');
   }
 });
 
@@ -240,8 +265,7 @@ router.get('/report/saved/:id', authMiddleware, async (req, res) => {
     if (!report) return res.status(404).json({ error: 'Rapport introuvable' });
     res.json({ params: JSON.parse(report.params), data: JSON.parse(report.data), createdAt: report.createdAt });
   } catch (error) {
-    console.error('[chesscom report saved get] error', error);
-    res.status(500).json({ error: error.message || 'Erreur chargement rapport' });
+    handleError(res, error, 'Erreur chargement rapport');
   }
 });
 
@@ -251,13 +275,12 @@ router.delete('/report/saved/:id', authMiddleware, async (req, res) => {
     await db.deleteSavedReport(req.user.id, req.params.id);
     res.json({ success: true });
   } catch (error) {
-    console.error('[chesscom report saved delete] error', error);
-    res.status(500).json({ error: error.message || 'Erreur suppression rapport' });
+    handleError(res, error, 'Erreur suppression rapport');
   }
 });
 
 // ── GET /report — Rapport de priorités d'entraînement ────────────────────────
-router.get('/report', async (req, res) => {
+router.get('/report', reportLimiter, async (req, res) => {
   const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
   const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
 
@@ -294,13 +317,12 @@ router.get('/report', async (req, res) => {
     );
     res.json(report);
   } catch (error) {
-    console.error('[chesscom report] error', error);
-    res.status(error.status || 502).json({ error: error.message || 'Erreur rapport Chess.com' });
+    handleError(res, error, 'Erreur rapport Chess.com');
   }
 });
 
 // SSE : résultat du rapport de priorités d'entraînement (sans progression temps réel).
-router.get('/report/stream', async (req, res) => {
+router.get('/report/stream', sseLimiter, optionalAuthMiddleware, async (req, res) => {
   const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
   const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
 
@@ -320,6 +342,9 @@ router.get('/report/stream', async (req, res) => {
 
   const minFreqRaw  = Number.parseInt(req.query.minFreq,  10);
   const minFreq     = Number.isFinite(minFreqRaw)  ? Math.max(2, Math.min(30, minFreqRaw))  : 5;
+
+  if (!_acquireSseSlot(req, res))
+    return res.status(429).json({ error: 'Trop de connexions SSE simultanées depuis cette IP' });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -350,8 +375,7 @@ router.get('/report/stream', async (req, res) => {
     );
     safeWrite(`data: ${JSON.stringify({ type: 'complete', data: report })}\n\n`);
   } catch (error) {
-    console.error('[chesscom report stream] error', error);
-    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Erreur rapport Chess.com' })}\n\n`);
+    handleSseError(safeWrite, error, 'Erreur rapport Chess.com');
   }
   if (!isClosed) res.end();
 });

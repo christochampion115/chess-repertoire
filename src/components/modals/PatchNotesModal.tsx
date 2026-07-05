@@ -46,7 +46,7 @@ export function PatchNotesModal() {
   return (
     <ModalBox title="Notes de mise à jour" width={700}>
       <p style={{ marginTop: 0, marginBottom: 12, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-        Consultez l'historique des évolutions d'Alpha Chess.
+        Consultez l'historique des évolutions de Blundertale.
       </p>
       <div className="patch-notes-list">
         {[...PATCH_NOTES].reverse().map((note) => (

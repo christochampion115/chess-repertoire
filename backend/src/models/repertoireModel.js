@@ -74,7 +74,7 @@ function listByUser(userId) {
 
 async function listPayloadsByUser(userId) {
   const rows = await listByUser(userId);
-  return rows.map(row => ({ serverId: row.id, data: parsePayload(row) }));
+  return rows.map(row => ({ serverId: row.id, updatedAt: row.updatedAt, data: parsePayload(row) }));
 }
 
 async function createRepertoire({ userId, data }) {
@@ -92,13 +92,14 @@ async function createRepertoire({ userId, data }) {
 async function replaceAllByUser(userId, payloads) {
   const now = new Date().toISOString();
 
-  await withTransaction(async (client) => {
-    await client.query('DELETE FROM repertoires WHERE "userId" = $1', [userId]);
+  await withTransaction(async () => {
+    await run(getDb(), 'DELETE FROM repertoires WHERE "userId" = ?', [userId]);
 
     for (const payload of payloads) {
       const stored = getStoredFieldsFromSerializedData(payload);
-      await client.query(
-        'INSERT INTO repertoires ("userId", name, color, fen, san, comment, payload, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      await run(
+        getDb(),
+        'INSERT INTO repertoires ("userId", name, color, fen, san, comment, payload, "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [userId, stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, now, now]
       );
     }
@@ -111,6 +112,18 @@ async function updateRepertoire(id, userId, updates) {
   const existing = await findByIdAndUser(id, userId);
   if (!existing) {
     return null;
+  }
+
+  // P1-B : détection de conflit
+  if (updates.clientUpdatedAt && existing.updatedAt) {
+    const clientTime = new Date(updates.clientUpdatedAt).getTime();
+    const serverTime = new Date(existing.updatedAt).getTime();
+    if (clientTime < serverTime) {
+      const conflict = new Error('Conflict: server has a newer version');
+      conflict.statusCode = 409;
+      conflict.serverData = parsePayload(existing);
+      throw conflict;
+    }
   }
 
   let stored;
@@ -134,7 +147,7 @@ async function updateRepertoire(id, userId, updates) {
     [stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, updatedAt, id, userId]
   );
 
-  return { serverId: id, data: updates.data };
+  return { serverId: id, data: updates.data, updatedAt };
 }
 
 async function deleteRepertoire(id, userId) {
