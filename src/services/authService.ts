@@ -3,6 +3,8 @@ import { apiRequest } from '@/services/api';
 import { loadState } from '@/services/storage';
 import { useAuthStore } from '@/stores/authStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
+import { useTrainingStore } from '@/stores/trainingStore';
+import { useStatsStore } from '@/stores/statsStore';
 import type { RepertoireNode } from '@/types/repertoire';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -64,10 +66,21 @@ function deserializeFromServer(raw: any): RepertoireNode | null {
   return map.get(rootId) || null;
 }
 
+// ─── Session boundary reset ─────────────────────────────────────────────
+
+function resetAllUserStores(): void {
+  useRepertoireStore.persist.clearStorage();
+  useRepertoireStore.getState().reset();
+  useTrainingStore.getState().endTraining();
+  useStatsStore.persist.clearStorage();
+  useStatsStore.getState().reset();
+}
+
 // ─── Bootstrap (appelé au démarrage) ─────────────────────────────────────
 
 export async function bootstrapSession(): Promise<void> {
   const auth = useAuthStore.getState();
+  auth.setStatus('loading');
   let token = auth.token;
 
   if (!token) {
@@ -102,14 +115,15 @@ export async function bootstrapSession(): Promise<void> {
       if (rep) loaded.push(rep);
     }
 
-    if (loaded.length > 0) {
-      useRepertoireStore.getState().setRepertoires(loaded);
-    }
+    useRepertoireStore.getState().setRepertoires(loaded);
   } catch (error: any) {
     if (error?.status === 401) {
       auth.setToken('');
       auth.setUser(null);
       auth.setStatus('guest');
+      resetAllUserStores();
+    } else {
+      auth.setSyncStatus('error', 'Serveur injoignable — données locales affichées');
     }
   }
 }
@@ -182,6 +196,8 @@ async function finalizeAuthenticatedSession(response: any): Promise<void> {
   auth.setStatus('logged');
   auth.setGuestMode(false);
 
+  resetAllUserStores();
+
   try {
     const repResponse = await apiRequest('/repertoires', { token });
     const remoteReps = repResponse?.repertoires || [];
@@ -194,9 +210,7 @@ async function finalizeAuthenticatedSession(response: any): Promise<void> {
       if (rep) loaded.push(rep);
     }
 
-    if (loaded.length > 0) {
-      useRepertoireStore.getState().setRepertoires(loaded);
-    }
+    useRepertoireStore.getState().setRepertoires(loaded);
   } catch (error: any) {
     if (error?.status === 401) {
       auth.setToken('');
@@ -222,6 +236,7 @@ export async function logoutSession(): Promise<void> {
   } catch {
     // Silencieux — la déconnexion se fait quoi qu'il arrive
   } finally {
+    resetAllUserStores();
     useAuthStore.getState().logout();
   }
 }
@@ -238,7 +253,10 @@ export function registerCreatedRepertoire(rep: any): void {
     method: 'POST',
     token: useAuthStore.getState().token,
     body: rep,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.warn('[sync] registerCreatedRepertoire failed:', err?.message);
+    useAuthStore.getState().setSyncStatus('error', 'Sauvegarde du répertoire échouée');
+  });
 }
 
 export function deleteRepertoireFromBackend(rep: any): void {
@@ -246,7 +264,10 @@ export function deleteRepertoireFromBackend(rep: any): void {
   apiRequest(`/repertoires/${rep.id}`, {
     method: 'DELETE',
     token: useAuthStore.getState().token,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.warn('[sync] deleteRepertoireFromBackend failed:', err?.message);
+    useAuthStore.getState().setSyncStatus('error', 'Suppression du répertoire échouée');
+  });
 }
 
 export function syncUserSettings(): void {
@@ -256,5 +277,7 @@ export function syncUserSettings(): void {
     method: 'PUT',
     token: useAuthStore.getState().token,
     body: { repFolders: folders },
-  }).catch(() => {});
+  }).catch((err) => {
+    console.warn('[sync] syncUserSettings failed:', err?.message);
+  });
 }

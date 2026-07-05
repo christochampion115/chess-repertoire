@@ -14,7 +14,7 @@ const dbPath = process.env.DB_PATH ||
 
 module.exports = {
   jwtSecret,
-  tokenTTL: '8h',
+  tokenTTL: '24h',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   dbPath
 };

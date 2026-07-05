@@ -7,7 +7,7 @@ const lichessStatsRoutes = require('./routes/lichessStatsRoutes');
 const chesscomStatsRoutes = require('./routes/chesscomStatsRoutes');
 const trainingStatsRoutes = require('./routes/trainingStatsRoutes');
 const userSettingsRoutes = require('./routes/userSettingsRoutes');
-const { initDb } = require('./db');
+const { initDb, run, getDb } = require('./db');
 const { corsOrigin } = require('./config');
 const { handleError } = require('./utils/errorHandler');
 
@@ -39,6 +39,16 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000;
 initDb()
+  .then(() => {
+    // Nettoyage périodique des tokens révoqués expirés (toutes les 6h)
+    setInterval(async () => {
+      try {
+        await run(getDb(), 'DELETE FROM revoked_tokens WHERE "expiresAt" < ?', [new Date().toISOString()]);
+      } catch (e) {
+        console.warn('[maintenance] Cleanup revoked_tokens failed:', e.message);
+      }
+    }, 6 * 60 * 60 * 1000);
+  })
   .catch((error) => {
     console.warn('[dev] Database unavailable — auth/repertoires routes will fail:', error.message);
   })

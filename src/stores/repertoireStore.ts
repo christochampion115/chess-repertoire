@@ -54,6 +54,7 @@ interface RepertoireActions {
   setSuppressSync: (val: boolean) => void;
   setSuppressSnapshot: (val: boolean) => void;
   setVarNameConflictConfirmed: (val: boolean) => void;
+  reset: () => void;
 }
 
 export const useRepertoireStore = create<RepertoireState & RepertoireActions>()(
@@ -113,6 +114,19 @@ export const useRepertoireStore = create<RepertoireState & RepertoireActions>()(
   setSuppressSync: (val) => set({ suppressSync: val }),
   setSuppressSnapshot: (val) => set({ suppressSnapshot: val }),
   setVarNameConflictConfirmed: (val) => set({ varNameConflictConfirmed: val }),
+  reset: () => set({
+    repertoires: [],
+    activeRepIndex: -1,
+    currentNodeId: null,
+    redoStack: [],
+    menuTargetId: null,
+    freePlayRoot: null,
+    treeExpanded: new Set(),
+    repExpanded: new Set(),
+    repFolders: {},
+    suppressSync: false,
+    suppressSnapshot: false,
+  }),
     }),
     {
       name: 'alphaChess-repertoire',

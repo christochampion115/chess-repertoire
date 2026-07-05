@@ -92,13 +92,14 @@ async function createRepertoire({ userId, data }) {
 async function replaceAllByUser(userId, payloads) {
   const now = new Date().toISOString();
 
-  await withTransaction(async (client) => {
-    await client.query('DELETE FROM repertoires WHERE "userId" = $1', [userId]);
+  await withTransaction(async () => {
+    await run(getDb(), 'DELETE FROM repertoires WHERE "userId" = ?', [userId]);
 
     for (const payload of payloads) {
       const stored = getStoredFieldsFromSerializedData(payload);
-      await client.query(
-        'INSERT INTO repertoires ("userId", name, color, fen, san, comment, payload, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      await run(
+        getDb(),
+        'INSERT INTO repertoires ("userId", name, color, fen, san, comment, payload, "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [userId, stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, now, now]
       );
     }
