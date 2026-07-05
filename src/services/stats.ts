@@ -147,8 +147,10 @@ function buildProxyCandidates(apiPath = '/api/lichess/stats') {
   if (window.location && /^https?:$/.test(window.location.protocol)) {
     candidates.push(`${window.location.origin}${apiPath}`);
   }
-  candidates.push(`http://localhost:4000${apiPath}`);
-  candidates.push(`http://127.0.0.1:4000${apiPath}`);
+  if (import.meta.env.DEV) {
+    candidates.push(`http://localhost:4000${apiPath}`);
+    candidates.push(`http://127.0.0.1:4000${apiPath}`);
+  }
   return Array.from(new Set(candidates.map(normalizeBaseUrl).filter(Boolean)));
 }
 
@@ -175,16 +177,24 @@ export async function fetchLichessStats(fen: string, ratingsRange: any = { min: 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
         console.error('[stats] backend error', response.status, text);
+        if (response.status < 500) {
+          const error = new Error(`Backend error ${response.status}: ${text}`) as any;
+          error.status = response.status;
+          throw error;
+        }
         throw new Error(`Backend error ${response.status}`);
       }
       return await response.json();
     } catch (error: any) {
+      if (error?.status && error.status < 500) throw error;
       const message = error?.message || 'Unknown fetch error';
       networkErrors.push(`${proxyEndpoint}: ${message}`);
     }
   }
   throw new Error(
-    `Impossible de joindre le backend de statistiques. Verifie que le serveur Node.js est demarre sur le port 4000. Détails: ${networkErrors.join(' | ')}`
+    import.meta.env.DEV
+      ? `Impossible de joindre le backend de statistiques. Vérifiez que le serveur est démarré sur le port 4000. Détails: ${networkErrors.join(' | ')}`
+      : `Impossible de joindre le serveur de statistiques. Détails: ${networkErrors.join(' | ')}`,
   );
 }
 

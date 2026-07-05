@@ -11,7 +11,8 @@ function buildApiBase(): string {
   if (window.location && /^https?:$/.test(window.location.protocol)) {
     return `${window.location.origin}/api`;
   }
-  return 'http://localhost:4000/api';
+  if (import.meta.env.DEV) return 'http://localhost:4000/api';
+  throw new Error('VITE_API_URL est absent de la configuration de production');
 }
 
 let apiBase: string | undefined;
