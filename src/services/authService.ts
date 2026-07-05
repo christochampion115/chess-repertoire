@@ -228,31 +228,6 @@ export async function signupWithCredentials({ username, password }: { username: 
   }
 }
 
-// ─── Helper : appliquer les répertoires serveur dans le store ─────────────
-
-async function _applyServerRepertoires(remoteReps: any[]): Promise<void> {
-  const loaded: RepertoireNode[] = [];
-  const serverIdMap: Record<string, number> = {};
-  const serverUpdatedAtMap: Record<string, string> = {};
-
-  for (const entry of remoteReps) {
-    const data = entry?.data;
-    if (!data) continue;
-    const rep = deserializeFromServer(data);
-    if (!rep) continue;
-    loaded.push(rep);
-    if (entry.serverId) serverIdMap[rep.id] = entry.serverId;
-    if (entry.updatedAt) serverUpdatedAtMap[rep.id] = entry.updatedAt;
-  }
-
-  const store = useRepertoireStore.getState();
-  store.setRepertoires(loaded);
-  store.setServerIdMap(serverIdMap);
-  for (const [localId, updatedAt] of Object.entries(serverUpdatedAtMap)) {
-    store.setServerUpdatedAt(localId, updatedAt);
-  }
-}
-
 // ─── Finalize session (partagé login + signup) ────────────────────────────
 
 async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): Promise<void> {

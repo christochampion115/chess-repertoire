@@ -6,7 +6,6 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { ModalBox } from './ModalBox';
 import { fetchPlayerStatsLoad, scheduleStatsReload } from '@/services/stats';
-import { btnSecondary } from '@/components/report/reportStyles';
 
 const LOADING_MESSAGES = [
   'Premier scan en cours',

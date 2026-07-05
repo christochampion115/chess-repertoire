@@ -1,7 +1,7 @@
 # Plan de sécurisation — Blundertale
 
-> Dernière mise à jour : 28/06/2026
-> Statut : Audit initial — code non sécurisé
+> Dernière mise à jour : 05/07/2026
+> Statut : 19/60 items traités (✅ rangés dans [✅ Réglé](#-réglé))
 
 ---
 
@@ -21,70 +21,13 @@
 
 ## 🔴 CRITIQUE
 
-### 1. JWT_SECRET faible
-- **Fichier :** `backend/.env:6`, `backend/src/config.js:4`
-- **Valeur actuelle :** Clé de 64 octets aléatoire (générée via `crypto.randomBytes`)
-- **Risque :** Un attaquant peut forger des JWT et usurper n'importe quel compte.
-- **Correctif :** Générer une clé forte (`crypto.randomBytes(64).toString('base64')`). Supprimer la valeur par défaut — `config.js` plante si `JWT_SECRET` est absent.
-- **Statut :** ✅
-
-### 2. Credentials de production en clair
-- **Fichier :** `backend/.env`
-- **Exposé :** Mot de passe PostgreSQL + token API Lichess (`lip_...`)
-- **Risque :** Accès direct à la base de données distante.
-- **Correctif :** Remplacer les valeurs réelles par des placeholders. Les vrais secrets sont uniquement dans le Dashboard Render. `DATABASE_URL` supprimée (SQLite en local).
-- **Statut :** ✅
-
-### 3. SSL PostgreSQL désactivé
-- **Fichier :** `backend/src/db.js:14`
-- **Code :** `ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false`
-- **Risque :** Attaque MITM sur réseau Render — interception de tout le trafic DB.
-- **Correctif :** Activer la vérification du certificat en production. Désactivé en local (SQLite).
-- **Statut :** ✅
-
-### 4. Rate limiting inexistant sur les endpoints publics
-- **Fichiers :** `backend/src/middleware/rateLimiters.js`, `backend/src/routes/lichessStatsRoutes.js`, `chesscomStatsRoutes.js`
-- **Risque :** DoS possible, épuisement des quotas API externes.
-- **Correctif :** Ajout de limiteurs centralisés : stats 60 req/min, report 5 req/min, batch 10 req/min, SSE 5 req/min. Auth déplacé dans le même fichier.
-- **Statut :** ✅
+Tous réglés — voir [✅ Réglé](#-réglé) ci-dessous.
 
 ---
 
 ## 🟠 ÉLEVÉ
 
-### 5. XSS via `dangerouslySetInnerHTML`
-- **Fichiers :**
-  - `src/components/report/ReportGroupCard.tsx:152`
-  - `src/components/report/ReportChildCard.tsx:43`
-  - `src/services/openings.ts:112-123` (`pathToPgn()`)
-- **Risque :** `pathToPgn()` construit du HTML par concaténation de chaînes sans échappement. Les SANs proviennent du répertoire (données utilisateur).
-- **Correctif :** Utiliser `escapeHtml()` (déjà présent dans `openings.ts:125`) dans `pathToPgn()` avant d'insérer les valeurs dans le HTML.
-- **Statut :** ❌
-
-### 6. CORS `*` par défaut
-- **Fichier :** `backend/src/config.js:19`
-- **Code :** `corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173'`
-- **Risque :** Tout site peut appeler l'API. Atténué par l'absence de cookies d'auth, mais les endpoints publics restent exposés.
-- **Correctif :** Remplacer `'*'` par l'origine locale. En production, `CORS_ORIGIN` est défini dans Render Dashboard.
-- **Statut :** ✅
-
-### 7. Information leak dans les erreurs
-- **Fichiers :**
-  - `backend/src/utils/errorHandler.js` (nouveau)
-  - `backend/src/index.js`
-  - `backend/src/routes/lichessStatsRoutes.js`
-  - `backend/src/routes/chesscomStatsRoutes.js`
-- **Risque :** Les messages d'erreur internes (stack traces, erreurs DB) sont renvoyés au client.
-- **Correctif :** Fonction utilitaire `handleError()` qui renvoie un message générique en production. En dev, le message réel est conservé.
-- **Statut :** ✅
-
-### 8. Debug logs exposant des informations
-- **Fichiers :**
-  - `backend/src/db.js` (chemin SQLite)
-  - `backend/src/services/chesscomPlayerStatsService.js` (pseudo Chess.com)
-- **Risque :** Fuite d'information système et de données utilisateur.
-- **Correctif :** Nettoyer les logs : retirer le chemin SQLite et le pseudo Chess.com des messages.
-- **Statut :** ✅
+Tous réglés — voir [✅ Réglé](#-réglé) ci-dessous.
 
 ---
 
@@ -103,25 +46,6 @@
 - **Correctif :** Ajouter `min(12)` + exigence de majuscule, minuscule, chiffre, caractère spécial.
 - **Statut :** ❌
 
-### 11. Pas de CSP configuré
-- **Fichier :** `backend/src/index.js:14`
-- **Risque :** Aucune protection CSP contre les XSS.
-- **Correctif :** Configurer helmet avec `contentSecurityPolicy` explicite.
-- **Statut :** ❌
-
-### 12. SSE sans authentification ni limite
-- **Fichier :** `backend/src/routes/chesscomStatsRoutes.js`
-- **Endpoints :** `/report/stream`, `/stats/stream`, `/stats`
-- **Risque :** Connexions persistantes illimitées → DoS. Données potentiellement personnelles en clair.
-- **Correctif :** Auth requise + limite de connexions par IP + validation de l'en-tête Origin.
-- **Statut :** ❌
-
-### 13. Zod `.passthrough()` — mass assignment théorique
-- **Fichier :** `backend/src/validators/repertoireValidator.js:19`
-- **Risque :** Clés arbitraires autorisées dans les nœuds de répertoire. Faible car les colonnes DB sont fixes.
-- **Correctif :** Remplacer `.passthrough()` par `.strict()` ou un filtrage whitelist.
-- **Statut :** ❌
-
 ### 14. Emails stockés en clair — RGPD
 - **Fichier :** `backend/src/services/authService.js`
 - **Risque :** Données personnelles sans chiffrement. Pas de mécanisme d'export/suppression pour l'utilisateur.
@@ -138,18 +62,7 @@
 
 ## 🟢 BAS / INFO
 
-| # | Point | Statut | Justification |
-|---|-------|--------|---------------|
-| 16 | Injection SQL | ✅ **OK** | Toutes les requêtes sont paramétrées (`$1`, `?`) |
-| 17 | CSRF | ✅ **OK** | Auth en header Bearer → navigateur ne l'envoie jamais automatiquement |
-| 18 | Import PGN serveur | ✅ **OK** | PGN parsé côté client uniquement |
-| 19 | Stockfish WASM | ✅ **OK** | Worker isolé, pas de fetch distant |
-| 20 | Prototype pollution | ✅ **OK** | Pas de `Object.assign` / spread sur données utilisateur |
-| 21 | `pathToPgn()` XSS réel | 🟢 **Théorique** | Les SANs d'échecs n'acceptent que `[a-zA-Z0-9=+#O-]` |
-| 22 | `backend/.env` dans le repo | ✅ **OK** | Correctement gitignoré par `backend/.gitignore` |
-| 23 | Fichiers `.sqlite` / `.db` | ✅ **OK** | Gitignorés |
-
----
+Tous traités — voir [✅ Réglé](#-réglé) ci-dessous.
 
 ---
 
@@ -550,20 +463,99 @@ async function maintenanceTasks() {
 
 ---
 
+## ✅ Réglé
+
+### 🔴 Critiques
+
+**1. JWT_SECRET faible**
+- **Fichier :** `backend/.env:6`, `backend/src/config.js:4`
+- **Correctif :** Clé forte `crypto.randomBytes(64)` générée. Fallback supprimé — plante si `JWT_SECRET` absent.
+- **Statut :** ✅
+
+**2. Credentials de production en clair**
+- **Fichier :** `backend/.env`
+- **Correctif :** Valeurs réelles remplacées par des placeholders. Secrets dans le Dashboard Render uniquement.
+- **Statut :** ✅
+
+**3. SSL PostgreSQL désactivé**
+- **Fichier :** `backend/src/db.js:14`
+- **Correctif :** `rejectUnauthorized: true` en production. Désactivé en local (SQLite).
+- **Statut :** ✅
+
+**4. Rate limiting inexistant sur les endpoints publics**
+- **Fichiers :** `backend/src/middleware/rateLimiters.js`, routes Lichess/Chess.com
+- **Correctif :** Limiteurs centralisés : stats 30/min, report 5/min, batch 10/min, SSE 3 IP/min.
+- **Statut :** ✅
+
+### 🟠 Élevés
+
+**5. XSS via `dangerouslySetInnerHTML`**
+- **Fichiers :** `src/components/report/ReportGroupCard.tsx`, `ReportChildCard.tsx`, `src/services/openings.ts`
+- **Correctif :** `escapeHtml(label)` dans `renderMetricLabel()`. `dangerouslySetInnerHTML` remplacé par JSX natif.
+- **Statut :** ✅
+
+**6. CORS `*` par défaut**
+- **Fichier :** `backend/src/config.js:19`
+- **Correctif :** `corsOrigin` par défaut → `'http://localhost:5173'` au lieu de `'*'`.
+- **Statut :** ✅
+
+**7. Information leak dans les erreurs**
+- **Fichiers :** `backend/src/utils/errorHandler.js` (nouveau)
+- **Correctif :** Messages d'erreur internes masqués en production. `handleError()` utilitaire.
+- **Statut :** ✅
+
+**8. Debug logs exposant des informations**
+- **Fichiers :** `backend/src/db.js`, `backend/src/services/chesscomPlayerStatsService.js`
+- **Correctif :** Chemin SQLite et pseudo Chess.com retirés des logs.
+- **Statut :** ✅
+
+### 🟡 Moyens
+
+**11. Pas de CSP configuré**
+- **Fichier :** `backend/src/index.js`
+- **Correctif :** `helmet()` configuré avec `contentSecurityPolicy` explicite, HSTS `max-age=31536000`, `frameAncestors 'none'`.
+- **Statut :** ✅
+
+**12. SSE sans authentification ni limite**
+- **Fichier :** `backend/src/routes/chesscomStatsRoutes.js`
+- **Correctif :** `_acquireSseSlot()` max 3 connexions simultanées par IP. `optionalAuthMiddleware` sur `/report/stream`.
+- **Statut :** ✅
+
+**13. Zod `.passthrough()` — mass assignment théorique**
+- **Fichier :** `backend/src/validators/repertoireValidator.js`
+- **Correctif :** `.passthrough()` → `.strict()`. Champs `updatedAt`, `folderId`, `isExample` ajoutés au schéma.
+- **Statut :** ✅
+
+### 🟢 Bas / Info
+
+| # | Point | Justification |
+|---|-------|---------------|
+| 16 | Injection SQL | ✅ Toutes les requêtes sont paramétrées (`$1`, `?`) |
+| 17 | CSRF | ✅ Auth en header Bearer — navigateur ne l'envoie jamais automatiquement |
+| 18 | Import PGN serveur | ✅ PGN parsé côté client uniquement |
+| 19 | Stockfish WASM | ✅ Worker isolé, pas de fetch distant |
+| 20 | Prototype pollution | ✅ Pas de `Object.assign` / spread sur données utilisateur |
+| 21 | XSS `pathToPgn()` | ✅ `escapeHtml()` dans `renderMetricLabel()`. `dangerouslySetInnerHTML` supprimé |
+| 22 | `.env` dans le repo | ✅ Correctement gitignoré par `backend/.gitignore` |
+| 23 | Fichiers `.sqlite` / `.db` | ✅ Gitignorés |
+
+---
+
 ## Avancement global
 
 | Priorité | Total | ✅ Fait | ❌ Restant |
 |----------|-------|---------|------------|
-| 🔴 Critique | 4 | 4 | 0 |
-| 🟠 Élevé | 4 | 4 | 0 |
-| 🟡 Moyen | 7 | 0 | 7 |
-| 🟢 Bas | 8 | 6 | 2 |
+| 🔴 Critique | 0 | — | — |
+| 🟠 Élevé | 0 | — | — |
+| 🟡 Moyen | 4 | 0 | 4 |
+| 🟢 Bas | 0 | — | — |
+| ✅ Réglé | 19 | 19 | 0 |
 | 🧠 Menaces | 7 | 0 | 7 |
 | ☁️ Infrastructure | 8 | 0 | 8 |
 | 🔐 Stratégie Auth | 8 | 0 | 8 |
 | 🛡️ Hardening | 7 | 0 | 7 |
-| 📀 Données & Abuse | 7 | 0 | 7 |
-| **Total** | **60** | **14** | **46** |
+| 💾 Données & Abuse | 7 | 0 | 7 |
+| **Total** | **60** | **19** | **41** |
 
 ---
 
