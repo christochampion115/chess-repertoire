@@ -1,7 +1,8 @@
 function handleError(res, error, defaultMessage = 'Erreur interne du serveur') {
   const statusCode = error.statusCode || error.status || 500;
   console.error(`[error] ${statusCode} —`, error.message);
-  if (process.env.NODE_ENV === 'production') {
+  // En prod, cacher uniquement les erreurs 5xx — les 4xx gardent leur message
+  if (process.env.NODE_ENV === 'production' && statusCode >= 500) {
     return res.status(statusCode).json({ error: defaultMessage });
   }
   return res.status(statusCode).json({ error: error.message || defaultMessage });

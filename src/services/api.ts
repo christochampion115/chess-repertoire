@@ -88,7 +88,7 @@ export async function apiRequest(
       preferredApiBaseUrl = baseUrl;
       return contentType.includes('application/json') ? response.json() : null;
     } catch (error: any) {
-      if (error?.status === 401) throw error;
+      if (error?.status === 401 || error?.status === 409) throw error;
       networkErrors.push(`${url}: ${error?.message || 'Network error'}`);
     }
   }
