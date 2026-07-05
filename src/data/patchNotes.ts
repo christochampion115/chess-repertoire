@@ -111,9 +111,9 @@ Cette version pose les bases d'une meilleure communication autour des évolution
   {
     id: 'v1.0.0',
     date: '01/03/2026',
-    title: 'Lancement officiel d\'Alpha Chess',
+    title: 'Lancement officiel de Blundertale',
     excerpt: 'Première version publique avec répertoire d\'ouvertures, éditeur de coups et tableau de bord.',
-    content: `Première version publique de la plateforme Alpha Chess :
+    content: `Première version publique de la plateforme Blundertale :
 
 • **Répertoire d'ouvertures** : créez et gérez votre répertoire personnel d'ouvertures avec une interface arborescente.
 • **Tableau de bord** : vue d'ensemble de votre progression, statistiques et accès rapide aux dernières parties.

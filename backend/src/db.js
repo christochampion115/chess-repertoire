@@ -11,7 +11,9 @@ async function initPg() {
   const { Pool } = require('pg');
   db = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: process.env.NODE_ENV === 'production'
+      ? { rejectUnauthorized: true }
+      : false,
   });
 
   await db.query('SELECT NOW()');
@@ -97,7 +99,7 @@ async function initSqlite() {
 
   db = new Database(dbPath);
   await sqliteRun('PRAGMA journal_mode=WAL');
-  console.log('DB OK (SQLite) —', dbPath);
+  console.log('DB OK (SQLite)');
 
   for (const ddl of SQLITE_DDLS) {
     await sqliteRun(ddl);

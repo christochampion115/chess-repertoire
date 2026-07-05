@@ -109,7 +109,7 @@ export const TopBar = React.memo(function TopBar() {
       <div className="brand-group" role="button" tabIndex={0} onClick={goHome} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goHome(); }}>
         <div className="brand-logo">A</div>
         <div className="brand-label">
-          <div className="brand-title">Alpha Chess</div>
+          <div className="brand-title">Blundertale</div>
           <div className="brand-subtitle">Répertoire &amp; analyse</div>
         </div>
       </div>

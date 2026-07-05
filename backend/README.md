@@ -1,6 +1,6 @@
-# Alpha Chess Backend
+# Blundertale Backend
 
-Backend API for Alpha Chess using Node.js, Express, SQLite, JWT authentication and Zod validation.
+Backend API for Blundertale using Node.js, Express, SQLite, JWT authentication and Zod validation.
 
 ## Installation
 

@@ -44,7 +44,7 @@ function buildAuthResponse(user) {
 
 function buildInternalEmail(username) {
   const encodedUsername = Buffer.from(String(username || '').trim(), 'utf8').toString('hex') || 'user';
-  return `user_${encodedUsername}@alpha-chess.local`;
+  return `user_${encodedUsername}@blundertale.local`;
 }
 
 async function signup({ username, email, password }) {

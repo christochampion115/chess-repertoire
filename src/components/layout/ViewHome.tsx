@@ -134,7 +134,7 @@ export const ViewHome = React.memo(function ViewHome() {
       </section>
 
       <footer className="home-footer">
-        Alpha Chess — Répertoire &amp; analyse
+        Blundertale — Répertoire &amp; analyse
       </footer>
     </div>
   );

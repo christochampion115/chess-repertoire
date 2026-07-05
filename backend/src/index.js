@@ -9,6 +9,7 @@ const trainingStatsRoutes = require('./routes/trainingStatsRoutes');
 const userSettingsRoutes = require('./routes/userSettingsRoutes');
 const { initDb } = require('./db');
 const { corsOrigin } = require('./config');
+const { handleError } = require('./utils/errorHandler');
 
 const app = express();
 app.use(helmet());
@@ -30,14 +31,10 @@ app.use('/api/training-stats', trainingStatsRoutes);
 app.use('/api/user-settings', userSettingsRoutes);
 
 app.use((err, req, res, next) => {
-  console.error(err);
-
   if (err.name === 'ZodError') {
     return res.status(400).json({ error: 'Validation failed', details: err.errors });
   }
-
-  const statusCode = err.statusCode || 500;
-  return res.status(statusCode).json({ error: err.message || 'Internal Server Error' });
+  handleError(res, err);
 });
 
 const PORT = process.env.PORT || 4000;
@@ -47,6 +44,6 @@ initDb()
   })
   .finally(() => {
     app.listen(PORT, () => {
-      console.log(`Alpha Chess backend listening on http://localhost:${PORT}`);
+      console.log(`Blundertale backend listening on http://localhost:${PORT}`);
     });
   });

@@ -92,6 +92,6 @@ export async function apiRequest(
   }
 
   throw new Error(
-    `Impossible de joindre le backend Alpha Chess. Vérifie que le serveur Node.js est démarré sur le port 4000. Détails: ${networkErrors.join(' | ')}`,
+    `Impossible de joindre le backend Blundertale. Vérifie que le serveur Node.js est démarré sur le port 4000. Détails: ${networkErrors.join(' | ')}`,
   );
 }

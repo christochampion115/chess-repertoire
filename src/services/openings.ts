@@ -117,7 +117,7 @@ export function pathToPgn(path: string[], highlightLast = false, startMove = 1):
     }
     const isLast = i === path.length - 1;
     const cls = (isLast && highlightLast) ? ' class="pgn-player-move"' : '';
-    html += `<span${cls}>${path[i]}</span> `;
+    html += `<span${cls}>${escapeHtml(path[i])}</span> `;
   }
   return html.trimEnd();
 }
