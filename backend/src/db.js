@@ -1,6 +1,11 @@
 const path = require('path');
 const fs = require('fs');
 
+// ─── Guard production ───────────────────────────────────────────────────────
+if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+  throw new Error('[fatal] DATABASE_URL must be set in production. SQLite is not available in production.');
+}
+
 // ─── Detection ─────────────────────────────────────────────────────────────
 const USE_PG = !!process.env.DATABASE_URL;
 

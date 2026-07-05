@@ -175,7 +175,9 @@ export const ReportPage = React.memo(function ReportPage() {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       let msg = err instanceof Error ? err.message : 'Erreur inconnue';
       if (err instanceof TypeError && msg === 'Failed to fetch') {
-        msg = `Impossible de contacter le serveur (http://localhost:4000/api). Vérifiez que le backend est lancé.`;
+        msg = import.meta.env.DEV
+          ? `Impossible de contacter le serveur (http://localhost:4000/api). Vérifiez que le backend est lancé.`
+          : `Impossible de contacter le serveur. Vérifiez votre connexion.`;
       }
       setLoadingPct(0);
       setLoadingPhase('idle');

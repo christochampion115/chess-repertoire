@@ -75,6 +75,10 @@ initDb()
     }, 6 * 60 * 60 * 1000);
   })
   .catch((error) => {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[fatal] Database initialization failed:', error.message);
+      process.exit(1);
+    }
     console.warn('[dev] Database unavailable — auth/repertoires routes will fail:', error.message);
   })
   .finally(() => {
