@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
+const repertoireModel = require('../models/repertoireModel');
 const { jwtSecret, tokenTTL } = require('../config');
 const { getDb, run, get } = require('../db');
 
@@ -93,9 +94,24 @@ function logout(token) {
   }
 }
 
+// Conversion invité → compte (P1-C) : insère les répertoires locaux en base
+async function convertGuest(userId, repertoires) {
+  let count = 0;
+  for (const rep of repertoires) {
+    try {
+      await repertoireModel.createRepertoire({ userId, data: rep });
+      count++;
+    } catch {
+      // best-effort
+    }
+  }
+  return { count };
+}
+
 module.exports = {
   signup,
   login,
   logout,
-  isTokenRevoked
+  isTokenRevoked,
+  convertGuest,
 };

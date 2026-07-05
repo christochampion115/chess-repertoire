@@ -21,6 +21,7 @@ import { MedalsModal } from './MedalsModal';
 import { AnnotationModal } from './AnnotationModal';
 import { PatchNotesModal } from './PatchNotesModal';
 import { SelectRepModal } from './SelectRepModal';
+import { ConflictModal } from './ConflictModal';
 
 const modalComponents: Record<string, React.FC> = {
   'new-repertoire': NewRepModal,
@@ -46,6 +47,7 @@ const modalComponents: Record<string, React.FC> = {
   'annotation': AnnotationModal,
   'patch-notes': PatchNotesModal,
   'select-repertoire': SelectRepModal,
+  'conflict': ConflictModal,
 };
 
 export function ModalPortal() {

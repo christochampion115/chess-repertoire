@@ -21,6 +21,29 @@ const ALLOWED_COLORS      = new Set(['white', 'black']);
 const ALLOWED_TIMECLASSES = new Set(['all', 'bullet', 'blitz', 'rapid', 'daily', 'classical']);
 const BATCH_MAX_FENS      = 500;
 
+// ── Per-IP SSE connection tracking ────────────────────────────────────────
+const _sseConnections = new Map(); // IP → active count
+const MAX_SSE_PER_IP = 3;
+
+function _getClientIp(req) {
+  return (String(req.headers['x-forwarded-for'] || req.ip || '')).split(',')[0].trim();
+}
+
+function _acquireSseSlot(req, res) {
+  const ip = _getClientIp(req);
+  const count = _sseConnections.get(ip) || 0;
+  if (count >= MAX_SSE_PER_IP) return false;
+  _sseConnections.set(ip, count + 1);
+  const release = () => {
+    const c = _sseConnections.get(ip) || 1;
+    if (c <= 1) _sseConnections.delete(ip);
+    else _sseConnections.set(ip, c - 1);
+  };
+  res.on('close', release);
+  res.on('finish', release);
+  return true;
+}
+
 // Helper : parse les filtres communs depuis req.query (sans fen).
 function parseFiltersFromQuery(query) {
   const username = typeof query.username === 'string' ? query.username.trim() : '';
@@ -79,6 +102,9 @@ router.get('/stats/stream', sseLimiter, optionalAuthMiddleware, async (req, res)
   const filters = parseFiltersFromQuery(req.query);
   if (filters.error) return res.status(filters.status).json({ error: filters.error });
 
+  if (!_acquireSseSlot(req, res))
+    return res.status(429).json({ error: 'Trop de connexions SSE simultanées depuis cette IP' });
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -121,6 +147,9 @@ router.get('/stats/stream', sseLimiter, optionalAuthMiddleware, async (req, res)
 router.get('/stats/load/stream', sseLimiter, authMiddleware, async (req, res) => {
   const filters = parseFiltersFromQuery(req.query);
   if (filters.error) return res.status(filters.status).json({ error: filters.error });
+
+  if (!_acquireSseSlot(req, res))
+    return res.status(429).json({ error: 'Trop de connexions SSE simultanées depuis cette IP' });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -293,7 +322,7 @@ router.get('/report', reportLimiter, async (req, res) => {
 });
 
 // SSE : résultat du rapport de priorités d'entraînement (sans progression temps réel).
-router.get('/report/stream', sseLimiter, async (req, res) => {
+router.get('/report/stream', sseLimiter, optionalAuthMiddleware, async (req, res) => {
   const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
   const color    = typeof req.query.color    === 'string' ? req.query.color.trim()    : '';
 
@@ -313,6 +342,9 @@ router.get('/report/stream', sseLimiter, async (req, res) => {
 
   const minFreqRaw  = Number.parseInt(req.query.minFreq,  10);
   const minFreq     = Number.isFinite(minFreqRaw)  ? Math.max(2, Math.min(30, minFreqRaw))  : 5;
+
+  if (!_acquireSseSlot(req, res))
+    return res.status(429).json({ error: 'Trop de connexions SSE simultanées depuis cette IP' });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',

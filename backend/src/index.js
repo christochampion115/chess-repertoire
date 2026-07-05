@@ -12,7 +12,32 @@ const { corsOrigin } = require('./config');
 const { handleError } = require('./utils/errorHandler');
 
 const app = express();
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+      workerSrc: ["'self'", "blob:"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://images.chesscomfiles.com"],
+      connectSrc: [
+        "'self'",
+        "https://explorer.lichess.org",
+        "https://api.chess.com",
+        "https://lichess.org",
+      ],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  noSniff: true,
+  xFrameOptions: { action: "deny" },
+}));
 app.use(express.json({ limit: '20mb' }));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', corsOrigin);

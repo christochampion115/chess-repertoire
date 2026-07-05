@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ReportItem } from '@/types/report';
-import { pathToPgn, getMoveNumberFromFen } from '@/services/openings';
+import { getMoveNumberFromFen } from '@/services/openings';
 import { ReportPriorityBadge } from './ReportPriorityBadge';
 import { getPriorityBadge } from './reportUtils';
 import { cardLg } from './reportStyles';
@@ -19,7 +19,6 @@ export const ReportChildCard = React.memo(function ReportChildCard({
 }: ReportChildCardProps) {
   const fullPath = [...item.contextPath, item.playerMove];
   const startMove = getMoveNumberFromFen(rootFen);
-  const pgnHtml = pathToPgn(fullPath, true, startMove);
   const linePct = (item.score * 100).toFixed(0);
   const gapPct = (item.gap * 100).toFixed(0);
   const pts = Math.round(Math.abs(item.impactElo));
@@ -41,8 +40,16 @@ export const ReportChildCard = React.memo(function ReportChildCard({
           lineHeight: 1.5,
           marginBottom: 4,
         }}
-        dangerouslySetInnerHTML={{ __html: pgnHtml }}
-      />
+      >
+        {fullPath.map((move, i) => (
+          <React.Fragment key={i}>
+            {i % 2 === 0 && (
+              <span className="pgn-movenum">{startMove + Math.floor(i / 2)}.</span>
+            )}
+            <span className={i === fullPath.length - 1 ? 'pgn-player-move' : undefined}>{move}</span>{' '}
+          </React.Fragment>
+        ))}
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.75rem', flexWrap: 'wrap' }}>
         {variant === 'weakness' && <ReportPriorityBadge badge={badge} />}
         {variant === 'strength' && (

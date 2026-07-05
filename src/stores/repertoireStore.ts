@@ -34,6 +34,12 @@ interface RepertoireState {
   suppressSync: boolean;
   /** true pendant les imports PGN en masse (évite O(n) clones + rebuilds) */
   suppressSnapshot: boolean;
+  /** IDs locaux des répertoires modifiés depuis le dernier sync (non persisté) */
+  dirtyIds: Set<string>;
+  /** localRootId → server DB id (non persisté, reconstruit au bootstrap) */
+  serverIdMap: Record<string, number>;
+  /** localRootId → dernier updatedAt server connu ISO (non persisté) */
+  serverUpdatedAtMap: Record<string, string>;
 }
 
 interface RepertoireActions {
@@ -54,6 +60,12 @@ interface RepertoireActions {
   setSuppressSync: (val: boolean) => void;
   setSuppressSnapshot: (val: boolean) => void;
   setVarNameConflictConfirmed: (val: boolean) => void;
+  markDirty: (id: string) => void;
+  clearDirty: (id: string) => void;
+  setServerIdMap: (map: Record<string, number>) => void;
+  setServerId: (localId: string, serverId: number) => void;
+  removeServerMapping: (localId: string) => void;
+  setServerUpdatedAt: (localId: string, updatedAt: string) => void;
   reset: () => void;
 }
 
@@ -80,8 +92,21 @@ export const useRepertoireStore = create<RepertoireState & RepertoireActions>()(
   ignoreOverlayClose: false,
   suppressSync: false,
   suppressSnapshot: false,
+  dirtyIds: new Set<string>(),
+  serverIdMap: {},
+  serverUpdatedAtMap: {},
 
   setRepertoires: (reps) => set({ repertoires: reps }),
+  markDirty: (id) => set((s) => { const next = new Set(s.dirtyIds); next.add(id); return { dirtyIds: next }; }),
+  clearDirty: (id) => set((s) => { const next = new Set(s.dirtyIds); next.delete(id); return { dirtyIds: next }; }),
+  setServerIdMap: (map) => set({ serverIdMap: map }),
+  setServerId: (localId, serverId) => set((s) => ({ serverIdMap: { ...s.serverIdMap, [localId]: serverId } })),
+  removeServerMapping: (localId) => set((s) => {
+    const { [localId]: _sid, ...restIds } = s.serverIdMap;
+    const { [localId]: _sat, ...restAt } = s.serverUpdatedAtMap;
+    return { serverIdMap: restIds, serverUpdatedAtMap: restAt };
+  }),
+  setServerUpdatedAt: (localId, updatedAt) => set((s) => ({ serverUpdatedAtMap: { ...s.serverUpdatedAtMap, [localId]: updatedAt } })),
   setActiveRepIndex: (idx) => set({ activeRepIndex: idx }),
   setCurrentNodeId: (id) => set({ currentNodeId: id }),
   setFreePlayRoot: (node) => set({ freePlayRoot: node }),
@@ -126,6 +151,9 @@ export const useRepertoireStore = create<RepertoireState & RepertoireActions>()(
     repFolders: {},
     suppressSync: false,
     suppressSnapshot: false,
+    dirtyIds: new Set<string>(),
+    serverIdMap: {},
+    serverUpdatedAtMap: {},
   }),
     }),
     {

@@ -13,10 +13,13 @@ const serializedRepertoireNodeSchema = z.object({
   moveNum: z.number().int().min(0).optional(),
   turn: z.enum(['w', 'b']).optional(),
   createdAt: z.union([z.number(), z.string()]).optional(),
+  updatedAt: z.union([z.number(), z.string()]).optional(),
   isTransposition: z.boolean().optional(),
   sourceNodeId: z.string().nullable().optional(),
-  children: z.array(z.string()).optional()
-}).passthrough();
+  children: z.array(z.string()).optional(),
+  folderId: z.string().optional(),
+  isExample: z.boolean().optional(),
+}).strict();
 
 const serializedRepertoireSchema = z.object({
   rootId: z.string().min(1),
@@ -27,13 +30,10 @@ const repertoireSchema = z.object({
   data: serializedRepertoireSchema
 });
 
-const repertoireUpdateSchema = z
-  .object({
-    data: serializedRepertoireSchema
-  })
-  .refine((data) => Object.keys(data).length > 0, {
-    message: 'At least one field must be provided'
-  });
+const repertoireUpdateSchema = z.object({
+  data: serializedRepertoireSchema,
+  clientUpdatedAt: z.string().optional(),
+});
 
 const repertoireSyncSchema = z.object({
   repertoires: z.array(serializedRepertoireSchema)

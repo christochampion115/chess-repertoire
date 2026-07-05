@@ -74,7 +74,7 @@ function listByUser(userId) {
 
 async function listPayloadsByUser(userId) {
   const rows = await listByUser(userId);
-  return rows.map(row => ({ serverId: row.id, data: parsePayload(row) }));
+  return rows.map(row => ({ serverId: row.id, updatedAt: row.updatedAt, data: parsePayload(row) }));
 }
 
 async function createRepertoire({ userId, data }) {
@@ -114,6 +114,18 @@ async function updateRepertoire(id, userId, updates) {
     return null;
   }
 
+  // P1-B : détection de conflit
+  if (updates.clientUpdatedAt && existing.updatedAt) {
+    const clientTime = new Date(updates.clientUpdatedAt).getTime();
+    const serverTime = new Date(existing.updatedAt).getTime();
+    if (clientTime < serverTime) {
+      const conflict = new Error('Conflict: server has a newer version');
+      conflict.statusCode = 409;
+      conflict.serverData = parsePayload(existing);
+      throw conflict;
+    }
+  }
+
   let stored;
   if (updates.data) {
     stored = getStoredFieldsFromSerializedData(updates.data);
@@ -135,7 +147,7 @@ async function updateRepertoire(id, userId, updates) {
     [stored.name, stored.color, stored.fen, stored.san, stored.comment, stored.payload, updatedAt, id, userId]
   );
 
-  return { serverId: id, data: updates.data };
+  return { serverId: id, data: updates.data, updatedAt };
 }
 
 async function deleteRepertoire(id, userId) {

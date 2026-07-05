@@ -1,5 +1,4 @@
 import React from 'react';
-import { escapeHtml } from '@/services/openings';
 
 interface ReportMetricHelpProps {
   label: string;
@@ -50,8 +49,9 @@ export const ReportMetricHelp = React.memo(function ReportMetricHelp({ label, he
           transition: 'opacity 0.16s ease 0.4s, visibility 0s linear 0.4s',
           zIndex: 5,
         }}
-        dangerouslySetInnerHTML={{ __html: escapeHtml(helpText) }}
-      />
+      >
+        {helpText}
+      </span>
     </span>
   );
 });
