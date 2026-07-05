@@ -6,6 +6,7 @@ import { useChessStore } from '@/stores/chessStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useStatsStore } from '@/stores/statsStore';
+import { initializeService } from '@/services/repertoire';
 import type { RepertoireNode } from '@/types/repertoire';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ export async function bootstrapSession(): Promise<void> {
 
     const repResponse = await apiRequest('/repertoires', { token });
     await _applyServerRepertoires(repResponse?.repertoires || []);
+    initializeService();
   } catch (error: any) {
     if (error?.status === 401) {
       auth.setToken('');
@@ -256,6 +258,7 @@ async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): 
   try {
     const repResponse = await apiRequest('/repertoires', { token });
     await _applyServerRepertoires(repResponse?.repertoires || []);
+    initializeService();
 
     // P1-C : migration des répertoires invités après signup
     if (isNewUser && guestReps.length > 0) {
