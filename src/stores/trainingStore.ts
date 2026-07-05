@@ -109,7 +109,24 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()((set) 
       feedback: null,
     }),
 
-  endTraining: () => set({ phase: 'idle', root: null, feedback: null }),
+  endTraining: () => set({
+    phase: 'idle',
+    root: null,
+    repColor: null,
+    mode: 'vertical',
+    label: '',
+    ...EMPTY_SETS(),
+    expectedChildId: null,
+    totalTargets: 0,
+    lives: SURVIVAL_LIVES,
+    maxLives: SURVIVAL_LIVES,
+    goldenHeart: false,
+    milestones: 0,
+    mistakes: [],
+    lastSurvivalReport: null,
+    lastVictoryReport: null,
+    feedback: null,
+  }),
 
   setFeedback: (feedback) => set({ feedback }),
 

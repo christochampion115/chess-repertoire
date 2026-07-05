@@ -2,6 +2,7 @@
 import { apiRequest } from '@/services/api';
 import { loadState } from '@/services/storage';
 import { useAuthStore } from '@/stores/authStore';
+import { useChessStore } from '@/stores/chessStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useStatsStore } from '@/stores/statsStore';
@@ -101,6 +102,7 @@ function deserializeFromServer(raw: any): RepertoireNode | null {
 // ─── Session boundary reset ─────────────────────────────────────────────
 
 function resetAllUserStores(): void {
+  useChessStore.getState().reset();
   useRepertoireStore.persist.clearStorage();
   useRepertoireStore.getState().reset();
   useTrainingStore.getState().endTraining();
