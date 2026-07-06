@@ -6,8 +6,9 @@ import { useChessStore } from '@/stores/chessStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useStatsStore } from '@/stores/statsStore';
+import { useAnalysisStore } from '@/stores/analysisStore';
 import { initializeService } from '@/services/repertoire';
-import type { RepertoireNode } from '@/types/repertoire';
+import type { RepertoireNode, RepFolders } from '@/types/repertoire';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -102,13 +103,71 @@ function deserializeFromServer(raw: any): RepertoireNode | null {
 
 // ─── Session boundary reset ─────────────────────────────────────────────
 
-function resetAllUserStores(): void {
+export function resetAllUserStores(): void {
   useChessStore.getState().reset();
   useRepertoireStore.persist.clearStorage();
   useRepertoireStore.getState().reset();
   useTrainingStore.getState().endTraining();
   useStatsStore.persist.clearStorage();
   useStatsStore.getState().reset();
+}
+
+// ─── Appliquer les settings distants ─────────────────────────────────────
+
+function applyRemoteSettings(settings: Record<string, unknown>): void {
+  if (!settings || typeof settings !== 'object') return;
+
+  // 1. Dossiers
+  if (settings.repFolders && typeof settings.repFolders === 'object') {
+    useRepertoireStore.getState().setRepFolders(settings.repFolders as RepFolders);
+  }
+
+  // 2. Ordre des répertoires
+  if (Array.isArray(settings.repOrder) && settings.repOrder.length > 0) {
+    const store = useRepertoireStore.getState();
+    const orderMap = new Map(
+      (settings.repOrder as string[]).map((id, i) => [id, i])
+    );
+    const sorted = [...store.repertoires].sort((a, b) => {
+      const ia = orderMap.get(a.id) ?? Infinity;
+      const ib = orderMap.get(b.id) ?? Infinity;
+      return ia - ib;
+    });
+    store.setRepertoires(sorted);
+  }
+
+  // 3. Thème du plateau
+  if (settings.boardTheme && typeof settings.boardTheme === 'object') {
+    const theme = settings.boardTheme as { light?: string; dark?: string };
+    if (typeof theme.light === 'string' && typeof theme.dark === 'string') {
+      useChessStore.getState().setBoardTheme({ light: theme.light, dark: theme.dark });
+    }
+  }
+
+  // 4. Paramètres d'analyse
+  if (settings.analysisSettings && typeof settings.analysisSettings === 'object') {
+    const as = settings.analysisSettings as Record<string, unknown>;
+    const patch: { multiPV?: number; showArrows?: boolean; arrowCount?: number } = {};
+    if (typeof as.multiPV === 'number') patch.multiPV = Math.min(5, Math.max(1, as.multiPV));
+    if (typeof as.showArrows === 'boolean') patch.showArrows = as.showArrows;
+    if (typeof as.arrowCount === 'number') patch.arrowCount = Math.min(5, Math.max(1, as.arrowCount));
+    if (Object.keys(patch).length > 0) {
+      useAnalysisStore.getState().updateSettings(patch);
+    }
+  }
+
+  // 5. Filtres stats
+  if (settings.statsFilters && typeof settings.statsFilters === 'object') {
+    const sf = settings.statsFilters as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    if (typeof sf.eloMin === 'number') patch.eloMin = sf.eloMin;
+    if (typeof sf.eloMax === 'number') patch.eloMax = sf.eloMax;
+    if (typeof sf.currentDatabase === 'string') patch.currentDatabase = sf.currentDatabase;
+    if (typeof sf.sortBy === 'string') patch.sortBy = sf.sortBy;
+    if (Object.keys(patch).length > 0) {
+      useStatsStore.getState().setFilters(patch as any);
+    }
+  }
 }
 
 // ─── Bootstrap (appelé au démarrage) ─────────────────────────────────────
@@ -141,22 +200,50 @@ export async function bootstrapSession(): Promise<void> {
 
     const repResponse = await apiRequest('/repertoires', { token });
     await _applyServerRepertoires(repResponse?.repertoires || []);
+    const settingsResp = await apiRequest('/user-settings', { token });
+    if (settingsResp?.settings) {
+      applyRemoteSettings(settingsResp.settings);
+    }
     initializeService();
   } catch (error: any) {
     if (error?.status === 401) {
+      const store = useRepertoireStore.getState();
+      if (store.dirtyIds.size > 0) {
+        _flushDirtyRepertoires().catch(() => {});
+      }
       auth.setToken('');
       auth.setUser(null);
       auth.setStatus('guest');
       resetAllUserStores();
+      auth.setError('Session expirée. Veuillez vous reconnecter.');
     } else {
-      auth.setSyncStatus('error', 'Serveur injoignable — données locales affichées');
+      auth.setSyncStatus('error', 'Connexion perdue, veuillez vous reconnecter');
+      // Garder les données locales (Zustand persist) plutôt que vider
     }
   }
+}
+
+// ─── Helpers merge ──────────────────────────────────────────────────────────
+
+function countNodes(node: RepertoireNode): number {
+  let count = 1;
+  for (const child of node.children) count += countNodes(child);
+  return count;
+}
+
+function shouldPreferLocal(local: RepertoireNode, remote: RepertoireNode): boolean {
+  const localNodes = countNodes(local);
+  const remoteNodes = countNodes(remote);
+  if (localNodes !== remoteNodes) return localNodes > remoteNodes;
+  return (local.updatedAt ?? 0) > (remote.updatedAt ?? 0);
 }
 
 // ─── Helper : appliquer les répertoires serveur dans le store ───────────────────
 
 async function _applyServerRepertoires(remoteReps: any[]): Promise<void> {
+  const store = useRepertoireStore.getState();
+  const localReps = store.repertoires;
+
   const loaded: RepertoireNode[] = [];
   const serverIdMap: Record<string, number> = {};
   const serverUpdatedAtMap: Record<string, string> = {};
@@ -166,15 +253,29 @@ async function _applyServerRepertoires(remoteReps: any[]): Promise<void> {
     if (!data) continue;
     const rep = deserializeFromServer(data);
     if (!rep) continue;
-    loaded.push(rep);
+
+    // B7 : garder la version locale si elle est plus récente / plus complète
+    const local = localReps.find((r) => r.id === rep.id);
+    if (local && shouldPreferLocal(local, rep)) {
+      loaded.push(local);
+      store.markDirty(local.id); // re-syncer vers le serveur
+    } else {
+      loaded.push(rep);
+    }
+
     if (entry.serverId) serverIdMap[rep.id] = entry.serverId;
     if (entry.updatedAt) serverUpdatedAtMap[rep.id] = entry.updatedAt;
   }
 
-  const store = useRepertoireStore.getState();
+  // Ajouter les répertoires locaux absents du serveur (créés hors-ligne)
+  for (const local of localReps) {
+    if (!loaded.find((r) => r.id === local.id)) {
+      loaded.push(local);
+    }
+  }
+
   store.setRepertoires(loaded);
   store.setServerIdMap(serverIdMap);
-  // Update serverUpdatedAtMap without clearing (setServerUpdatedAt per entry)
   for (const [localId, updatedAt] of Object.entries(serverUpdatedAtMap)) {
     store.setServerUpdatedAt(localId, updatedAt);
   }
@@ -258,6 +359,10 @@ async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): 
   try {
     const repResponse = await apiRequest('/repertoires', { token });
     await _applyServerRepertoires(repResponse?.repertoires || []);
+    const settingsResp = await apiRequest('/user-settings', { token });
+    if (settingsResp?.settings) {
+      applyRemoteSettings(settingsResp.settings);
+    }
     initializeService();
 
     // P1-C : migration des répertoires invités après signup
@@ -291,6 +396,21 @@ async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): 
 
 export async function logoutSession(): Promise<void> {
   const token = useAuthStore.getState().token;
+  const store = useRepertoireStore.getState();
+
+  // Attendre la sync si des changements sont en attente (B5)
+  if (store.dirtyIds.size > 0) {
+    try {
+      await Promise.race([
+        _flushDirtyRepertoires(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 5000),
+        ),
+      ]);
+    } catch {
+      console.warn('[logout] sync timeout ou échec, déconnexion forcée');
+    }
+  }
 
   try {
     if (token) {
@@ -310,6 +430,7 @@ export async function logoutSession(): Promise<void> {
 // ─── Sync répertoires (P1-A) — dirty tracking + debounce + retry ─────────
 
 let _syncTimer: ReturnType<typeof setTimeout> | null = null;
+let _settingsSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function _putWithRetry(
   serverId: number,
@@ -360,7 +481,12 @@ async function _flushDirtyRepertoires(): Promise<void> {
       if (result.updatedAt) store.setServerUpdatedAt(localId, result.updatedAt);
       useAuthStore.getState().setSyncStatus('idle');
     } catch (err: any) {
-      if (err?.status === 409) {
+      if (err?.status === 401) {
+        // Session expirée en cours de sync — informer l'utilisateur, ne pas remettre en dirty
+        useAuthStore.getState().setError('Connexion perdue, veuillez vous reconnecter');
+        store.clearDirty(localId);
+        continue;
+      } else if (err?.status === 409) {
         // P1-B : conflit — déléguer à la modale
         const { openModal } = await import('@/stores/uiStore').then((m) => m.useUiStore.getState());
         openModal({ type: 'conflict', localRepId: localId, serverId, serverRep: err?.serverData ?? null });
@@ -474,13 +600,32 @@ export async function resolveConflict(
 }
 
 export function syncUserSettings(): void {
-  const folders = useRepertoireStore.getState().repFolders;
-  if (!useAuthStore.getState().token) return;
-  apiRequest('/user-settings', {
-    method: 'PUT',
-    token: useAuthStore.getState().token,
-    body: { repFolders: folders },
-  }).catch((err) => {
-    console.warn('[sync] syncUserSettings failed:', err?.message);
-  });
+  const { token } = useAuthStore.getState();
+  if (!token) return;
+
+  if (_settingsSyncTimer) clearTimeout(_settingsSyncTimer);
+  _settingsSyncTimer = setTimeout(() => {
+    _settingsSyncTimer = null;
+    const repStore = useRepertoireStore.getState();
+    const analysisSettings = useAnalysisStore.getState().settings;
+    apiRequest('/user-settings', {
+      method: 'PUT',
+      token: useAuthStore.getState().token,
+      body: {
+        settings: {
+          repFolders:       repStore.repFolders,
+          repOrder:         repStore.repertoires.filter((r) => !r.isExample).map((r) => r.id),
+          boardTheme:       useChessStore.getState().boardTheme ?? null,
+          analysisSettings: {
+            multiPV:    analysisSettings.multiPV,
+            showArrows: analysisSettings.showArrows,
+            arrowCount: analysisSettings.arrowCount,
+          },
+          statsFilters: useStatsStore.getState().filters,
+        },
+      },
+    }).catch((err) => {
+      console.warn('[sync] syncUserSettings failed:', err?.message);
+    });
+  }, 600);
 }
