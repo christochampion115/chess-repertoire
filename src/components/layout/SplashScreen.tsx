@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { loginWithCredentials, signupWithCredentials } from '@/services/authService';
+import { loginWithCredentials, signupWithCredentials, resetAllUserStores } from '@/services/authService';
 
 type SplashStep = 'welcome' | 'login' | 'signup' | 'guest';
 
@@ -16,7 +16,9 @@ export const SplashScreen = React.memo(function SplashScreen() {
   const [password, setPassword] = useState('');
 
   const handleGuest = useCallback(() => {
-    setGuestMode(true);
+    resetAllUserStores();              // vide répertoires, stats, training
+    useAuthStore.getState().logout();  // vide auth + status='guest'
+    setGuestMode(true);                // flag invité
     setStatus('guest');
   }, [setGuestMode, setStatus]);
 
