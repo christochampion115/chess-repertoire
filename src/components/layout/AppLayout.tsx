@@ -34,7 +34,7 @@ export function AppLayout() {
   const isGuestMode = useAuthStore((s) => s.isGuestMode);
   const activeModal = useUiStore((s) => s.activeModal);
 
-  const showSplash  = status === 'guest' && activeModal?.type !== 'session-expired';
+  const showSplash  = status === 'guest' && !isGuestMode && activeModal?.type !== 'session-expired';
 
   /* ── Stats auto-load ─────────────────────────── */
   useStatsAutoLoad();
