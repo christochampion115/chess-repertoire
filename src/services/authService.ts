@@ -430,6 +430,7 @@ export async function logoutSession(): Promise<void> {
   } finally {
     resetAllUserStores();
     useAuthStore.getState().logout();
+    initializeService();
   }
 }
 

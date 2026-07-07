@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { loginWithCredentials, signupWithCredentials, resetAllUserStores } from '@/services/authService';
+import { initializeService } from '@/services/repertoire';
 
 type SplashStep = 'welcome' | 'login' | 'signup' | 'guest';
 
@@ -20,6 +21,7 @@ export const SplashScreen = React.memo(function SplashScreen() {
     useAuthStore.getState().logout();  // vide auth + status='guest'
     setGuestMode(true);                // flag invité
     setStatus('guest');
+    initializeService();
   }, [setGuestMode, setStatus]);
 
   const handleLogin = useCallback(async () => {
