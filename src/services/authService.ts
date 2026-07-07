@@ -8,6 +8,7 @@ import { useTrainingStore } from '@/stores/trainingStore';
 import { useStatsStore } from '@/stores/statsStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { initializeService } from '@/services/repertoire';
+import { retryStats } from '@/services/stats';
 import type { RepertoireNode, RepFolders } from '@/types/repertoire';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -370,6 +371,7 @@ async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): 
       applyRemoteSettings(settingsResp.settings);
     }
     initializeService();
+    retryStats();
 
     // P1-C : migration des répertoires invités après signup
     if (isNewUser && guestReps.length > 0) {
@@ -431,6 +433,7 @@ export async function logoutSession(): Promise<void> {
     resetAllUserStores();
     useAuthStore.getState().logout();
     initializeService();
+    retryStats();
   }
 }
 

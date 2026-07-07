@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { loginWithCredentials, signupWithCredentials, resetAllUserStores } from '@/services/authService';
 import { initializeService } from '@/services/repertoire';
+import { retryStats } from '@/services/stats';
 
 type SplashStep = 'welcome' | 'login' | 'signup' | 'guest';
 
@@ -22,6 +23,7 @@ export const SplashScreen = React.memo(function SplashScreen() {
     setGuestMode(true);                // flag invité
     setStatus('guest');
     initializeService();
+    retryStats();
   }, [setGuestMode, setStatus]);
 
   const handleLogin = useCallback(async () => {
