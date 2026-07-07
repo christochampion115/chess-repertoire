@@ -16,7 +16,7 @@ export function ConfirmDeleteModal() {
   function renderMessage() {
     if (modal?.type !== 'delete-confirm') return null;
 
-    if (modal.deleteType === 'repertoire') {
+    if (modal.deleteType === 'repertoire_item') {
       const rep = useRepertoireStore.getState().repertoires.find(r => r.id === modal.itemId);
       if (rep) {
         const total = countTotalChildren(rep);
