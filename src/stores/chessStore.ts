@@ -35,7 +35,7 @@ export const useChessStore = create<ChessState & ChessActions>()(
 
       flipBoard: () => set((s) => ({ boardFlipped: !s.boardFlipped })),
       selectSquare: (sq) => set({ selectedSq: sq }),
-      reset: () => set({ chess: new Chess(), selectedSq: null }),
+      reset: () => set({ chess: new Chess(), selectedSq: null, boardTheme: DEFAULT_THEME }),
       setPendingAnimation: (anim) => set({ pendingAnimation: anim }),
       setSkipNextAnimation: (skip) => set({ skipNextAnimation: skip }),
       setBoardTheme: (theme) => set({ boardTheme: theme }),

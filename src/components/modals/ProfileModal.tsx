@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
+import { logoutSession } from '@/services/authService';
 import { ModalBox } from './ModalBox';
 
 export function ProfileModal() {
@@ -22,7 +23,7 @@ export function ProfileModal() {
 }
 
 function ProfileModalInner({ user, onClose }: { user: NonNullable<ReturnType<typeof useAuthStore.getState>['user']>; onClose: () => void }) {
-  const logout = useAuthStore((s) => s.logout);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<'settings' | 'stats'>('settings');
   const [username, setUsername] = useState(user.username ?? '');
   const [email, setEmail] = useState(user.email ?? '');
@@ -34,9 +35,10 @@ function ProfileModalInner({ user, onClose }: { user: NonNullable<ReturnType<typ
   const saveEmail = () => setMessage({ text: "Association d'e-mail disponible prochainement." });
   const savePassword = () => setMessage({ text: 'Modification du mot de passe disponible prochainement.' });
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await logoutSession();
     onClose();
-    logout();
   };
 
   return (
@@ -111,7 +113,9 @@ function ProfileModalInner({ user, onClose }: { user: NonNullable<ReturnType<typ
 
       {/* Actions */}
       <div className="modal-actions" style={{ marginTop: 24 }}>
-        <button className="ctrl-btn danger" onClick={handleLogout}>Se déconnecter</button>
+        <button className="ctrl-btn danger" onClick={handleLogout} disabled={isLoggingOut}>
+          {isLoggingOut ? 'Déconnexion...' : 'Se déconnecter'}
+        </button>
         <button className="ctrl-btn" onClick={onClose}>Fermer</button>
       </div>
     </ModalBox>

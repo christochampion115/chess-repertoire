@@ -189,6 +189,8 @@ export async function bootstrapSession(): Promise<void> {
   }
 
   if (!token) {
+    resetAllUserStores();
+    initializeService();
     auth.setStatus('guest');
     return;
   }
@@ -298,8 +300,12 @@ export async function loginWithCredentials({ email, password }: { email: string;
     const msg = error?.message || '';
     if (msg.toLowerCase().includes('invalid credentials')) {
       auth.setError('Identifiants incorrects.');
+    } else if (error?.status === 429) {
+      auth.setError('Trop de tentatives. Réessayez dans quelques minutes.');
+    } else if (!error?.status) {
+      auth.setError('Serveur inaccessible. Vérifiez votre connexion.');
     } else {
-      auth.setError(msg || 'Connexion impossible.');
+      auth.setError('Connexion impossible. Réessayez ultérieurement.');
     }
   } finally {
     auth.setSubmitting(false);
@@ -464,6 +470,8 @@ async function _flushDirtyRepertoires(): Promise<void> {
   const { token } = useAuthStore.getState();
   if (!token || store.dirtyIds.size === 0) return;
 
+  useAuthStore.getState().setSyncStatus('syncing');
+  let hadError = false;
   const ids = [...store.dirtyIds];
   for (const localId of ids) {
     const rep = store.repertoires.find((r) => r.id === localId);
@@ -495,11 +503,14 @@ async function _flushDirtyRepertoires(): Promise<void> {
         if (err?.status !== 401 && err?.status !== 404) {
           store.markDirty(localId);
         }
+        hadError = true;
         console.warn('[sync] PUT failed:', err?.message);
         useAuthStore.getState().setSyncStatus('error', 'Sauvegarde échouée — sera retentée');
       }
     }
   }
+
+  useAuthStore.getState().setSyncStatus(hadError ? 'error' : 'idle');
 }
 
 export function scheduleRepertoireSync(): void {

@@ -178,11 +178,11 @@ export async function fetchLichessStats(fen: string, ratingsRange: any = { min: 
         const text = await response.text().catch(() => '');
         console.error('[stats] backend error', response.status, text);
         if (response.status < 500) {
-          const error = new Error(`Backend error ${response.status}: ${text}`) as any;
+          const error = new Error('Statistiques indisponibles. Réessayez ultérieurement.') as any;
           error.status = response.status;
           throw error;
         }
-        throw new Error(`Backend error ${response.status}`);
+        throw new Error('Statistiques indisponibles. Réessayez ultérieurement.');
       }
       return await response.json();
     } catch (error: any) {
@@ -193,8 +193,8 @@ export async function fetchLichessStats(fen: string, ratingsRange: any = { min: 
   }
   throw new Error(
     import.meta.env.DEV
-      ? `Impossible de joindre le backend de statistiques. Vérifiez que le serveur est démarré sur le port 4000. Détails: ${networkErrors.join(' | ')}`
-      : `Impossible de joindre le serveur de statistiques. Détails: ${networkErrors.join(' | ')}`,
+      ? `Impossible de joindre le backend de statistiques. Détails: ${networkErrors.join(' | ')}`
+      : 'Statistiques indisponibles. Vérifiez votre connexion.',
   );
 }
 
@@ -269,7 +269,7 @@ export async function fetchPlayerStats(fen: string, playerFilters: any = {}, sig
       if (!response.ok) {
         const text = await response.text().catch(() => '');
         console.error('[stats] chesscom backend error', response.status, text);
-        throw new Error(`Backend error ${response.status}`);
+        throw new Error('Statistiques Chess.com indisponibles. Réessayez ultérieurement.');
       }
       return await response.json();
     } catch (error: any) {
@@ -282,7 +282,9 @@ export async function fetchPlayerStats(fen: string, playerFilters: any = {}, sig
   }
 
   throw new Error(
-    `Impossible de joindre le backend Chess.com. Détails: ${networkErrors.join(' | ')}`
+    import.meta.env.DEV
+      ? `Impossible de joindre le backend Chess.com. Détails: ${networkErrors.join(' | ')}`
+      : 'Statistiques Chess.com indisponibles. Vérifiez votre connexion.',
   );
 }
 
@@ -382,5 +384,5 @@ export async function fetchPlayerStatsLoad(
       // essaie le candidat suivant
     }
   }
-  throw new Error('Impossible de joindre le backend pour le chargement des stats joueur');
+  throw new Error('Serveur indisponible. Réessayez ultérieurement.');
 }

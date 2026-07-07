@@ -70,7 +70,7 @@ export async function apiRequest(
       });
 
       if (!response.ok) {
-        if (response.status === 401 || response.status === 409) {
+        if (response.status === 401 || response.status === 409 || response.status === 429) {
           const error = new Error(await readErrorMessage(response)) as any;
           error.status = response.status;
           throw error;
@@ -95,7 +95,7 @@ export async function apiRequest(
 
   throw new Error(
     import.meta.env.DEV
-      ? `Impossible de joindre le backend. Vérifie que le serveur est démarré sur le port 4000. Détails: ${networkErrors.join(' | ')}`
-      : `Impossible de joindre le serveur Blundertale. Détails: ${networkErrors.join(' | ')}`,
+      ? `Impossible de joindre le backend. Détails: ${networkErrors.join(' | ')}`
+      : 'Le serveur est inaccessible. Vérifiez votre connexion.',
   );
 }

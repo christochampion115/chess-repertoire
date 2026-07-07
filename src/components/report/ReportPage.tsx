@@ -182,7 +182,7 @@ export const ReportPage = React.memo(function ReportPage() {
       setLoadingPct(0);
       setLoadingPhase('idle');
       await new Promise((r) => setTimeout(r, 600));
-      setError(`Erreur : ${msg}`);
+      setError(msg);
       setView('form');
     }
   }, [params, setView, setData, setError]);
