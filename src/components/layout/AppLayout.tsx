@@ -34,8 +34,6 @@ export function AppLayout() {
   const isGuestMode = useAuthStore((s) => s.isGuestMode);
   const activeModal = useUiStore((s) => s.activeModal);
 
-  if (status === 'loading') return null;
-
   const showSplash  = status === 'guest' && activeModal?.type !== 'session-expired';
 
   /* ── Stats auto-load ─────────────────────────── */
@@ -177,6 +175,8 @@ export function AppLayout() {
   const boardFlipped = useChessStore((s) => s.boardFlipped);
   const results     = useAnalysisStore((s) => s.results);
   const settings    = useAnalysisStore((s) => s.settings);
+
+  if (status === 'loading') return null;
 
   return (
     <div id="view-app">
