@@ -19,7 +19,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     (set) => ({
   user: null,
   token: '',
-  status: 'guest',
+  status: 'loading',
   error: '',
   isSubmitting: false,
   syncStatus: 'idle',
@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     set({
       user: null,
       token: '',
-      status: 'guest',
+      status: 'loading',
       error: '',
       syncStatus: 'idle',
       syncMessage: '',

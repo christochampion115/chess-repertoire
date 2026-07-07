@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiRequest } from '@/services/api';
-import { loadState } from '@/services/storage';
+import { loadState, clearState } from '@/services/storage';
 import { useAuthStore } from '@/stores/authStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
@@ -218,6 +218,8 @@ export async function bootstrapSession(): Promise<void> {
       auth.setToken('');
       auth.setUser(null);
       auth.setStatus('guest');
+      clearState('alphaChess.authToken');
+      clearState('alphaChess.authUser');
       resetAllUserStores();
       useUiStore.getState().openModal({ type: 'session-expired' });
     } else {
@@ -430,12 +432,14 @@ export async function logoutSession(): Promise<void> {
     }
   } catch {
     // Silencieux — la déconnexion se fait quoi qu'il arrive
-  } finally {
-    resetAllUserStores();
-    useAuthStore.getState().logout();
-    initializeService();
-    retryStats();
-  }
+    } finally {
+      clearState('alphaChess.authToken');
+      clearState('alphaChess.authUser');
+      resetAllUserStores();
+      useAuthStore.getState().logout();
+      initializeService();
+      retryStats();
+    }
 }
 
 // ─── Sync répertoires (P1-A) — dirty tracking + debounce + retry ─────────

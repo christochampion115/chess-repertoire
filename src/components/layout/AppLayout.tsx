@@ -29,9 +29,14 @@ import { useStatsAutoLoad } from '@/hooks/useStats';
  * Phase 6 : drag & drop.
  */
 export function AppLayout() {
+  const status      = useAuthStore((s) => s.status);
   const user        = useAuthStore((s) => s.user);
   const isGuestMode = useAuthStore((s) => s.isGuestMode);
-  const showSplash  = !user && !isGuestMode;
+  const activeModal = useUiStore((s) => s.activeModal);
+
+  if (status === 'loading') return null;
+
+  const showSplash  = status === 'guest' && activeModal?.type !== 'session-expired';
 
   /* ── Stats auto-load ─────────────────────────── */
   useStatsAutoLoad();
