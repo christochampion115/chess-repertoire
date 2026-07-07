@@ -34,30 +34,26 @@ export const SplashScreen = React.memo(function SplashScreen() {
     await signupWithCredentials({ username, password });
   }, [username, password]);
 
-  const showBlocked = error && step === 'welcome';
-
   return (
     <div id="splash-screen">
-      <div className="splash-content">
-        {showBlocked && (
-          <div className="splash-section">
-            <div className="splash-header">
-              <div className="splash-logo">A</div>
-              <div className="splash-title">Session expirée</div>
-              <div className="splash-subtitle" style={{ marginTop: 12, color: '#fb7185' }}>
-                {error}
-              </div>
-            </div>
-            <div className="splash-actions" style={{ marginTop: 24 }}>
-              <button
-                className="splash-btn primary"
-                onClick={() => { setError(''); setStep('login'); }}
-              >
-                Se connecter
-              </button>
-            </div>
+      {error && step === 'welcome' && (
+        <div id="session-expired-overlay" style={{
+          position: 'fixed', inset: 0, zIndex: 10002,
+          background: 'rgba(8,16,29,0.85)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div className="modal-box" style={{ display: 'block', maxWidth: 420, textAlign: 'center' }}>
+            <div className="splash-logo" style={{ marginBottom: 16 }}>A</div>
+            <h3 style={{ marginBottom: 12, color: '#f8fafc' }}>Session expirée</h3>
+            <p style={{ color: '#fb7185', marginBottom: 24, fontSize: '0.9rem' }}>{error}</p>
+            <button className="splash-btn primary" onClick={() => { setError(''); setStep('login'); }}>
+              Se connecter
+            </button>
           </div>
-        )}
+        </div>
+      )}
+      <div className="splash-content">
         {/* ── Welcome ── */}
         <div id="splash-welcome" className={`splash-section${step !== 'welcome' ? ' hidden' : ''}`}>
           <div className="splash-header">

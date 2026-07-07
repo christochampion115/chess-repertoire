@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
+import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -38,16 +39,36 @@ export function AppLayout() {
   /* ── Toasts syncStatus ───────────────────────── */
   const syncStatus = useAuthStore((s) => s.syncStatus);
   const prevSyncStatus = useRef(syncStatus);
+  const pendingDirtyCount = useRef(0);
   const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
     const prev = prevSyncStatus.current;
     prevSyncStatus.current = syncStatus;
 
-    if (prev === 'error' && syncStatus === 'idle') {
-      addToast('✓ Synchronisé', 'success');
-    } else if (prev !== 'error' && syncStatus === 'error') {
-      addToast('⚠ Échec de la sauvegarde', 'error');
+    // Capture dirtyCount au début d'un cycle de sync
+    if (prev !== 'syncing' && syncStatus === 'syncing') {
+      pendingDirtyCount.current = useRepertoireStore.getState().dirtyIds.size;
+    }
+
+    // Sync échouée
+    if (prev !== 'error' && syncStatus === 'error') {
+      const count = useRepertoireStore.getState().dirtyIds.size;
+      addToast(
+        count > 0
+          ? `⚠ Échec de la sauvegarde (${count} coup${count > 1 ? 's' : ''} non sauvegardé${count > 1 ? 's' : ''})`
+          : '⚠ Échec de la sauvegarde',
+        'error',
+      );
+    }
+
+    // Cycle de sync terminé avec succès (syncing → idle)
+    if (prev === 'syncing' && syncStatus === 'idle') {
+      const saved = pendingDirtyCount.current;
+      if (saved > 0) {
+        addToast(`✓ ${saved} coup${saved > 1 ? 's' : ''} sauvegardé${saved > 1 ? 's' : ''}`, 'success');
+      }
+      pendingDirtyCount.current = 0;
     }
   }, [syncStatus, addToast]);
 
