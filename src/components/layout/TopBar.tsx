@@ -2,7 +2,6 @@ import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
-import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useReportStore } from '@/stores/reportStore';
 import * as repertoireService from '@/services/repertoire';
 import { guardTrainingInterruption } from '@/services/training';
@@ -21,9 +20,6 @@ interface NavTab {
 
 export const TopBar = React.memo(function TopBar() {
   const user = useAuthStore((s) => s.user);
-  const syncStatus = useAuthStore((s) => s.syncStatus);
-  const syncMessage = useAuthStore((s) => s.syncMessage);
-  const dirtyCount = useRepertoireStore((s) => s.dirtyIds.size);
   const openModal = useUiStore((s) => s.openModal);
   const navigate = useNavigate();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -165,20 +161,7 @@ export const TopBar = React.memo(function TopBar() {
               <div className="account-avatar">
                 {user.username.slice(0, 2).toUpperCase()}
               </div>
-              <div className="account-details">
-                <div className="account-name">{user.username}</div>
-                <div className="account-status" style={
-                  syncStatus === 'error' ? { color: '#fb923c' } :
-                  syncStatus === 'syncing' || dirtyCount > 0 ? { color: '#94a3b8' } :
-                  { color: 'var(--text-muted)' }
-                }>
-                  {syncStatus === 'syncing' || (dirtyCount > 0 && syncStatus !== 'error')
-                    ? '⟳ Sauvegarde…'
-                    : syncStatus === 'error'
-                    ? `⚠ ${syncMessage || 'Sauvegarde échouée'}`
-                    : 'Connecté'}
-                </div>
-              </div>
+              <div className="account-name" style={{ fontSize: '0.78rem' }}>{user.username}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => openModal({ type: 'auth' })}>

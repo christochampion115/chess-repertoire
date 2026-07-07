@@ -34,9 +34,30 @@ export const SplashScreen = React.memo(function SplashScreen() {
     await signupWithCredentials({ username, password });
   }, [username, password]);
 
+  const showBlocked = error && step === 'welcome';
+
   return (
     <div id="splash-screen">
       <div className="splash-content">
+        {showBlocked && (
+          <div className="splash-section">
+            <div className="splash-header">
+              <div className="splash-logo">A</div>
+              <div className="splash-title">Session expirée</div>
+              <div className="splash-subtitle" style={{ marginTop: 12, color: '#fb7185' }}>
+                {error}
+              </div>
+            </div>
+            <div className="splash-actions" style={{ marginTop: 24 }}>
+              <button
+                className="splash-btn primary"
+                onClick={() => { setError(''); setStep('login'); }}
+              >
+                Se connecter
+              </button>
+            </div>
+          </div>
+        )}
         {/* ── Welcome ── */}
         <div id="splash-welcome" className={`splash-section${step !== 'welcome' ? ' hidden' : ''}`}>
           <div className="splash-header">

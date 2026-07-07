@@ -1,14 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useToastStore } from '@/stores/toastStore';
 import * as repertoireService from '@/services/repertoire';
 import { scheduleRepertoireSync } from '@/services/authService';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { RightPanel } from '@/components/layout/RightPanel';
 import { SplashScreen } from '@/components/layout/SplashScreen';
+import { ToastContainer } from '@/components/layout/ToastContainer';
 import { Board } from '@/components/board/Board';
 import { EngineArrows } from '@/components/board/EngineArrows';
 import { EvalBarConnected } from '@/components/board/EvalBarConnected';
@@ -33,6 +35,22 @@ export function AppLayout() {
   /* ── Stats auto-load ─────────────────────────── */
   useStatsAutoLoad();
 
+  /* ── Toasts syncStatus ───────────────────────── */
+  const syncStatus = useAuthStore((s) => s.syncStatus);
+  const prevSyncStatus = useRef(syncStatus);
+  const addToast = useToastStore((s) => s.addToast);
+
+  useEffect(() => {
+    const prev = prevSyncStatus.current;
+    prevSyncStatus.current = syncStatus;
+
+    if (prev === 'error' && syncStatus === 'idle') {
+      addToast('✓ Synchronisé', 'success');
+    } else if (prev !== 'error' && syncStatus === 'error') {
+      addToast('⚠ Échec de la sauvegarde', 'error');
+    }
+  }, [syncStatus, addToast]);
+
   /* ── Initialiser le worker Stockfish au montage ───────────── */
   const initWorker   = useAnalysisStore((s) => s.initWorker);
   const disposeWorker = useAnalysisStore((s) => s.disposeWorker);
@@ -46,6 +64,8 @@ export function AppLayout() {
   /* ── Détection offline/online ────────────────────────────────────── */
   useEffect(() => {
     const handleOffline = () => {
+      const { addToast: toast } = useToastStore.getState();
+      toast('⚠ Connexion perdue — modifications synchronisées à la reconnexion', 'error');
       useAuthStore.getState().setSyncStatus(
         'error', 'Connexion perdue — modifications synchronisées à la reconnexion',
       );
@@ -53,6 +73,8 @@ export function AppLayout() {
     const handleOnline = () => {
       const { token } = useAuthStore.getState();
       if (token) {
+        const { addToast: toast } = useToastStore.getState();
+        toast('✓ Connexion rétablie', 'success');
         useAuthStore.getState().setSyncStatus('idle', '');
         scheduleRepertoireSync();
       }
@@ -133,6 +155,7 @@ export function AppLayout() {
   return (
     <div id="view-app">
       {showSplash && <SplashScreen />}
+      <ToastContainer />
 
       <div className="main-layout">
         {/* ── Colonne gauche : répertoires + arbre ─── */}
