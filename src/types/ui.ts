@@ -29,6 +29,7 @@ export type ActiveModal =
   | { type: 'patch-notes' }
   | { type: 'select-repertoire'; repChoices: { repIndex: number; nodeId: string; repName: string }[] }
   | { type: 'conflict'; localRepId: string; serverId: number; serverRep: any }
+  | { type: 'session-expired' }
   | null;
 
 export interface OpenPanels {

@@ -36,23 +36,6 @@ export const SplashScreen = React.memo(function SplashScreen() {
 
   return (
     <div id="splash-screen">
-      {error && step === 'welcome' && (
-        <div id="session-expired-overlay" style={{
-          position: 'fixed', inset: 0, zIndex: 10002,
-          background: 'rgba(8,16,29,0.85)',
-          display: 'flex', justifyContent: 'center', alignItems: 'center',
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div className="modal-box" style={{ display: 'block', maxWidth: 420, textAlign: 'center' }}>
-            <div className="splash-logo" style={{ marginBottom: 16 }}>A</div>
-            <h3 style={{ marginBottom: 12, color: '#f8fafc' }}>Session expirée</h3>
-            <p style={{ color: '#fb7185', marginBottom: 24, fontSize: '0.9rem' }}>{error}</p>
-            <button className="splash-btn primary" onClick={() => { setError(''); setStep('login'); }}>
-              Se connecter
-            </button>
-          </div>
-        </div>
-      )}
       <div className="splash-content">
         {/* ── Welcome ── */}
         <div id="splash-welcome" className={`splash-section${step !== 'welcome' ? ' hidden' : ''}`}>

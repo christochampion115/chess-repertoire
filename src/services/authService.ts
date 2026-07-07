@@ -7,6 +7,7 @@ import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useStatsStore } from '@/stores/statsStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUiStore } from '@/stores/uiStore';
 import { initializeService } from '@/services/repertoire';
 import { retryStats } from '@/services/stats';
 import type { RepertoireNode, RepFolders } from '@/types/repertoire';
@@ -218,7 +219,7 @@ export async function bootstrapSession(): Promise<void> {
       auth.setUser(null);
       auth.setStatus('guest');
       resetAllUserStores();
-      auth.setError('Session expirée. Veuillez vous reconnecter.');
+      useUiStore.getState().openModal({ type: 'session-expired' });
     } else {
       auth.setSyncStatus('error', 'Connexion perdue, veuillez vous reconnecter');
       // Garder les données locales (Zustand persist) plutôt que vider

@@ -22,6 +22,7 @@ import { AnnotationModal } from './AnnotationModal';
 import { PatchNotesModal } from './PatchNotesModal';
 import { SelectRepModal } from './SelectRepModal';
 import { ConflictModal } from './ConflictModal';
+import { SessionExpiredModal } from './SessionExpiredModal';
 
 const modalComponents: Record<string, React.FC> = {
   'new-repertoire': NewRepModal,
@@ -48,6 +49,7 @@ const modalComponents: Record<string, React.FC> = {
   'patch-notes': PatchNotesModal,
   'select-repertoire': SelectRepModal,
   'conflict': ConflictModal,
+  'session-expired': SessionExpiredModal,
 };
 
 export function ModalPortal() {
