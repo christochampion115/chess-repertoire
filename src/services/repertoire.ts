@@ -64,9 +64,7 @@ function _rebuildFenIndex(): void {
 function _getFenIndex(): Map<string, RepertoireNode> {
   const root = _getActiveRoot();
   const rootId = root?.id ?? null;
-  if (!fenIndex || fenIndexRootId !== rootId) {
-    _rebuildFenIndex();
-  }
+  if (!fenIndex || fenIndexRootId !== rootId) _rebuildFenIndex();
   return fenIndex!;
 }
 
@@ -119,8 +117,8 @@ function _findTranspositionFast(
   const index = _getFenIndex();
   const nf = normalizeFen(fen);
   const candidate = index.get(nf);
-  if (!candidate || (candidate.createdAt ?? 0) >= currentTime) return null;
-  if (candidate.children.length === 0) return null;
+  if (!candidate) return null;
+  if ((candidate.createdAt ?? 0) >= currentTime) return null;
   if (_isNodeDescendantOf(candidate.id, parentId)) return null;
   return candidate;
 }
@@ -419,6 +417,12 @@ export function addMove(
   const parent = nodeMap.get(parentId);
   if (!parent) return null;
 
+  // Si le parent est une transposition, utiliser le nœud source à la place
+  const resolvedParent = parent.isTransposition && parent.sourceNodeId
+    ? (nodeMap.get(parent.sourceNodeId) ?? parent)
+    : parent;
+  const resolvedParentId = resolvedParent.id;
+
   const repStore0 = useRepertoireStore.getState();
   if (repStore0.activeRepIndex === -1) {
     let temp: RepertoireNode | undefined = parent;
@@ -439,7 +443,7 @@ export function addMove(
   if (!move) return null;
 
   const targetFen = tmp.fen();
-  const existing = parent.children.find(c => c.san === move.san);
+  const existing = resolvedParent.children.find(c => c.san === move.san);
   if (existing) {
     useRepertoireStore.setState({ currentNodeId: existing.id, redoStack: [] });
     return existing;
@@ -452,9 +456,9 @@ export function addMove(
     id: Math.random().toString(36).substr(2, 9),
     san: move.san,
     fen: targetFen,
-    parentId,
+    parentId: resolvedParentId,
     children: [],
-    moveNum: tmp.turn() === 'w' ? parent.moveNum : parent.moveNum + 1,
+    moveNum: tmp.turn() === 'w' ? resolvedParent.moveNum : resolvedParent.moveNum + 1,
     turn: tmp.turn() === 'b' ? 'w' : 'b',
     createdAt: now,
     annotation: transpo ? transpo.annotation : '',
@@ -468,7 +472,7 @@ export function addMove(
   if (options?.comment) node.comment = options.comment;
   if (options?.annotation && !node.annotation) node.annotation = options.annotation;
 
-  parent.children.push(node);
+  resolvedParent.children.push(node);
   nodeMap.set(node.id, node);
 
   // Swap transposition si le nouveau nœud est plus haut que le candidat
@@ -492,9 +496,10 @@ export function addMove(
 
   const repStore = useRepertoireStore.getState();
   const expanded = new Set(repStore.treeExpanded);
-  expanded.add(parentId);
+  expanded.add(resolvedParentId);
   repStore.setTreeExpanded(expanded);
-  useRepertoireStore.setState({ currentNodeId: node.id, redoStack: [] });
+  const targetNodeId = node.isTransposition && node.sourceNodeId ? node.sourceNodeId : node.id;
+  useRepertoireStore.setState({ currentNodeId: targetNodeId, redoStack: [] });
 
   if (!repStore.suppressSnapshot) {
     _writeRepertoireSnapshot();

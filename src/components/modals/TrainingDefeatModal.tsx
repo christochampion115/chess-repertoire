@@ -72,7 +72,7 @@ export function TrainingDefeatModal() {
 
       <div className="modal-actions">
         <button className="ctrl-btn" onClick={closeModal}>Abandonner</button>
-        <button className="ctrl-btn ctrl-btn--primary" onClick={() => { closeModal(); retrySurvivalTraining(); }}>Réessayer</button>
+        <button className="ctrl-btn ctrl-btn--primary" onClick={() => { closeModal(); retrySurvivalTraining(report); }}>Réessayer</button>
       </div>
     </ModalBox>
   );

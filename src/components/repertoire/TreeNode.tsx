@@ -46,9 +46,9 @@ export const TreeNode = React.memo(function TreeNode({
   if (!node.isTransposition) {
     while (chainCurrent.children.length === 1) {
       const next = chainCurrent.children[0]!;
-      if (next.isTransposition) break;
       chainNodes.push(next);
       chainCurrent = next;
+      if (next.isTransposition) break;
     }
   }
   const lastInChain = chainCurrent;
