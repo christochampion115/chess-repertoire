@@ -65,7 +65,7 @@ export function TrainingVictoryModal() {
 
       <div className="modal-actions">
         <button className="ctrl-btn" onClick={closeModal}>Abandonner</button>
-        <button className="ctrl-btn ctrl-btn--primary" onClick={() => { closeModal(); retrySurvivalVictory(); }}>Rejouer</button>
+        <button className="ctrl-btn ctrl-btn--primary" onClick={() => { closeModal(); retrySurvivalVictory(report); }}>Rejouer</button>
       </div>
     </ModalBox>
   );

@@ -166,9 +166,12 @@ function checkSurvivalLifeBonus(): void {
 }
 
 function navigateToNodeFen(node: RepertoireNode) {
-  useChessStore.setState({ chess: new Chess(node.fen), selectedSq: null });
-  useRepertoireStore.setState({ currentNodeId: node.id, version: Date.now() });
-  expandPathToCurrentNode(node.id);
+  const target = (node.isTransposition && node.sourceNodeId)
+    ? (nodeMap.get(node.sourceNodeId) ?? node)
+    : node;
+  useChessStore.setState({ chess: new Chess(target.fen), selectedSq: null });
+  useRepertoireStore.setState({ currentNodeId: target.id, version: Date.now() });
+  expandPathToCurrentNode(target.id);
 }
 
 function getTrainingNodeTurn(node: RepertoireNode): Color {
@@ -204,7 +207,17 @@ function isNodeInSubtree(node: RepertoireNode, subtreeRoot: RepertoireNode): boo
 export function collectMissingReplyNodes(root: RepertoireNode, repColor: Color): RepertoireNode[] {
   const missing: RepertoireNode[] = [];
   function walk(node: RepertoireNode) {
-    if (node.isTransposition && node.sourceNodeId) return;
+    if (node.isTransposition && node.sourceNodeId) {
+      const src = node.sourceNodeId ? nodeMap.get(node.sourceNodeId) : undefined;
+      if (src) {
+        const srcNextToPlay: Color = src.turn === 'w' ? 'b' : 'w';
+        if (srcNextToPlay === repColor && src.children.length === 0) {
+          const tmp = new Chess(node.fen);
+          if (!tmp.isGameOver()) missing.push(node);
+        }
+      }
+      return;
+    }
     const nextToPlay: Color = node.turn === 'w' ? 'b' : 'w';
     if (nextToPlay === repColor && node.children.length === 0) {
       const tmp = new Chess(node.fen);
@@ -478,6 +491,7 @@ function advanceAutoPlay(forcedDelay: number | null = null) {
   }
 
   const nextNode = selectedPath[0];
+  if (nextNode.isTransposition) ts.markVisited(nextNode.id);
   ts.setExpectedChildId(nextNode.id);
   const steps = selectedPath.length;
   const delay = forcedDelay !== null ? forcedDelay : delayForSteps(steps);
@@ -530,7 +544,7 @@ function handleLineComplete(node: RepertoireNode) {
         completed: snapshot.completed,
         progressPercent: snapshot.progressPercent,
       };
-      ts.setLastReports(report, null);
+      ts.setLastReports(null, report);
       tryUpgradeRepertoireMedal(aliv.root!, snapshot.progressPercent, aliv.repColor!);
       const token = useAuthStore.getState().token;
       if (token) {
@@ -615,11 +629,12 @@ export function checkTrainingMove(moveSan: string): void {
     // Alternative repertoire move — retry
     const sqs = getMoveSquares(node, moveSan);
     ts.setFeedback({ type: 'retry', from: sqs.from, to: sqs.to });
+    useChessStore.setState({ chess: new Chess(node.fen), selectedSq: null });
     setTimeout(() => {
       if (useTrainingStore.getState().phase === 'active') {
         useTrainingStore.getState().setFeedback(null);
       }
-    }, 420);
+    }, 700);
   } else if (ts.mode === 'survival') {
     // Coup incorrect en mode Survie → consomme une vie, passe à la suite
     const mistake: SurvivalMistake = {
@@ -635,6 +650,7 @@ export function checkTrainingMove(moveSan: string): void {
     ts.loseLife();
     const sqs = getMoveSquares(node, moveSan);
     ts.setFeedback({ type: 'wrong', from: sqs.from, to: sqs.to });
+    useChessStore.setState({ chess: new Chess(node.fen), selectedSq: null });
 
     const ts2 = useTrainingStore.getState();
     if (ts2.lives <= 0 && !ts2.goldenHeart) {
@@ -668,19 +684,19 @@ export function checkTrainingMove(moveSan: string): void {
         const a = useTrainingStore.getState();
         if (a.phase !== 'active') return;
         a.setFeedback(null);
-        checkSurvivalLifeBonus();
         advanceAutoPlay(50);
-      }, 500);
+      }, 700);
     }
   } else {
     // Coup incorrect en Vertical/Express/Randomizer → simple feedback, pas de skip
     const sqs = getMoveSquares(node, moveSan);
     ts.setFeedback({ type: 'wrong', from: sqs.from, to: sqs.to });
+    useChessStore.setState({ chess: new Chess(node.fen), selectedSq: null });
     setTimeout(() => {
       if (useTrainingStore.getState().phase === 'active') {
         useTrainingStore.getState().setFeedback(null);
       }
-    }, 500);
+    }, 700);
   }
 }
 
@@ -708,9 +724,9 @@ export function stopTraining(): void {
   useAnalysisStore.getState().evaluateFen(fen);
 }
 
-export function retrySurvivalTraining(): void {
+export function retrySurvivalTraining(report?: SurvivalReport): void {
   const ts = useTrainingStore.getState();
-  const rep = ts.lastSurvivalReport;
+  const rep = report ?? ts.lastSurvivalReport;
   if (!rep?.startNodeId) { useUiStore.getState().closeModal(); return; }
   const node = nodeMap.get(rep.startNodeId);
   if (!node) { useUiStore.getState().closeModal(); return; }
@@ -724,9 +740,9 @@ export function retrySurvivalTraining(): void {
   confirmTrainingStart();
 }
 
-export function retrySurvivalVictory(): void {
+export function retrySurvivalVictory(report?: SurvivalReport): void {
   const ts = useTrainingStore.getState();
-  const rep = ts.lastVictoryReport;
+  const rep = report ?? ts.lastVictoryReport;
   if (!rep?.startNodeId) { useUiStore.getState().closeModal(); return; }
   const node = nodeMap.get(rep.startNodeId);
   if (!node) { useUiStore.getState().closeModal(); return; }
