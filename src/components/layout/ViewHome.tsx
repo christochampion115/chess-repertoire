@@ -134,7 +134,16 @@ export const ViewHome = React.memo(function ViewHome() {
       </section>
 
       <footer className="home-footer">
-        Blundertale — Répertoire &amp; analyse
+        <div>Blundertale — Répertoire &amp; analyse</div>
+        <nav className="home-footer-links">
+          <span role="button" tabIndex={0} onClick={() => navigate('/mentions-legales')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/mentions-legales'); }}>
+            Mentions légales
+          </span>
+          <span className="home-footer-dot">·</span>
+          <span role="button" tabIndex={0} onClick={() => navigate('/confidentialite')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/confidentialite'); }}>
+            Politique de confidentialité
+          </span>
+        </nav>
       </footer>
     </div>
   );

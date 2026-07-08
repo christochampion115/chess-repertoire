@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ViewHome } from '@/components/layout/ViewHome';
+import { LegalPage } from '@/components/layout/LegalPage';
 import { TopBar } from '@/components/layout/TopBar';
 import { ModalPortal } from '@/components/modals/ModalPortal';
 import { ContextMenu } from '@/components/common/ContextMenu';
@@ -23,6 +24,8 @@ export function App() {
             <Route path="/" element={<ViewHome />} />
             <Route path="/app" element={<AppLayout />} />
             <Route path="/rapport" element={<ReportPage />} />
+            <Route path="/mentions-legales" element={<LegalPage title="Mentions légales" />} />
+            <Route path="/confidentialite" element={<LegalPage title="Politique de confidentialité" />} />
           </Routes>
           <ModalPortal />
           <ContextMenu />
