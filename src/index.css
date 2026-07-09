@@ -5406,9 +5406,6 @@ body::after {
 }
 
 @media (max-width: 480px) {
-  body {
-    min-width: unset;
-  }
   .top-bar {
     display: flex;
     flex-direction: row;
