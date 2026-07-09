@@ -193,12 +193,12 @@ export const TopBar = React.memo(function TopBar() {
               <div className="account-avatar">
                 {user.username.slice(0, 2).toUpperCase()}
               </div>
-              <div className="account-name" style={{ fontSize: '0.78rem' }}>{user.username}</div>
+              <div className="account-name">{user.username}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => openModal({ type: 'auth' })}>
-              <span style={{ fontSize: '1rem' }}>👤</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Connexion</span>
+              <span>👤</span>
+              <span style={{ fontWeight: 800 }}>Connexion</span>
             </div>
           )}
         </div>
@@ -244,24 +244,28 @@ export const TopBar = React.memo(function TopBar() {
             <div className="top-menu-separator" />
 
             <button className="top-menu-item" onClick={() => { openModal({ type: 'medals' }); setMobileMenuOpen(false); }}>
-              🏅 Médailles
+              Médailles
             </button>
             <button className="top-menu-item" onClick={() => { openModal({ type: 'patch-notes' }); setMobileMenuOpen(false); }}>
-              📝 Notes de mise à jour
+              Notes de mise à jour
             </button>
 
-            {user && (
+            {user ? (
               <button className="top-menu-item" onClick={() => { openModal({ type: 'profile' }); setMobileMenuOpen(false); }}>
-                👤 Profil — {user.username}
+                Profil — {user.username}
+              </button>
+            ) : (
+              <button className="top-menu-item" onClick={() => { openModal({ type: 'auth' }); setMobileMenuOpen(false); }}>
+                Se connecter
               </button>
             )}
 
             <div className="top-menu-separator" />
             <button className="top-menu-item" onClick={() => { navigate('/mentions-legales'); setMobileMenuOpen(false); }}>
-              ⚖ Mentions légales
+              Mentions légales
             </button>
             <button className="top-menu-item" onClick={() => { navigate('/confidentialite'); setMobileMenuOpen(false); }}>
-              🔒 Politique de confidentialité
+              Politique de confidentialité
             </button>
           </div>
         </div>,

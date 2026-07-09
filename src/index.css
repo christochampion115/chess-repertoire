@@ -5428,7 +5428,8 @@ body::after {
   .top-actions {
     gap: 12px;
   }
-  .top-action {
+  .top-action,
+  .top-account {
     font-size: 1.08rem;
     padding: 9px 15px;
   }
@@ -5439,6 +5440,11 @@ body::after {
     width: 33px;
     height: 33px;
     font-size: 0.9rem;
+  }
+  .brand-logo {
+    width: 46px;
+    height: 46px;
+    font-size: 1.15rem;
   }
   .brand-title {
     font-size: 1.15rem;
