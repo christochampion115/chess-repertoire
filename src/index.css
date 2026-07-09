@@ -5406,6 +5406,9 @@ body::after {
 }
 
 @media (max-width: 480px) {
+  body {
+    min-width: unset;
+  }
   .top-bar {
     display: flex;
     flex-direction: row;
@@ -5456,16 +5459,25 @@ body::after {
     white-space: nowrap;
   }
   .top-menu-item {
-    min-height: 66px;
-    font-size: 1.3rem;
-    padding: 18px 15px;
+    min-height: 88px;
+    font-size: 1.55rem;
+    padding: 22px 18px;
   }
   .top-menu-sub-item {
-    min-height: 60px;
-    font-size: 1.2rem;
+    min-height: 76px;
+    font-size: 1.4rem;
   }
   .top-menu-panel {
-    width: min(100%, 400px);
+    width: min(100%, 420px);
+    gap: 12px;
+  }
+  .top-menu-header {
+    margin-bottom: 20px;
+  }
+  .top-menu-close {
+    width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
   }
   .home-features-grid {
     grid-template-columns: repeat(2, 1fr);
