@@ -64,9 +64,8 @@ body {
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
-  min-width: 900px;
   margin: 0;
-  padding: 24px 5vw;
+  padding: clamp(12px, 4vw, 24px);
   user-select: none;
 }
 
@@ -5403,96 +5402,156 @@ body::after {
   .top-tab {
     padding: 6px 8px;
   }
+  /* ── Page d'accueil ──────────────────────────── */
+  .home-hero {
+    padding: 80px 20px 180px;
+    min-height: auto;
+  }
+  .home-hero-inner {
+    max-width: 100%;
+  }
+  .home-hero-title {
+    font-size: clamp(2rem, 7vw, 3rem);
+  }
+  .home-hero-subtitle {
+    font-size: 0.92rem;
+  }
+  .home-hero-cta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .home-cta-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+  }
+  .home-features {
+    padding: 0 16px;
+    margin-top: -140px;
+  }
+  .home-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .feature-card {
+    padding: 22px 18px;
+  }
+  /* ── Panneaux latéraux ───────────────────────── */
+  .left-panel,
+  .right-panel {
+    min-height: auto;
+  }
 }
 
 @media (max-width: 480px) {
+  /* ── Top bar ─────────────────────────────────── */
   .top-bar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .top-menu-btn {
     display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 24px;
-    min-height: 68px;
-    gap: 18px;
+    width: 40px;
+    height: 40px;
+    font-size: 1.3rem;
+    flex-shrink: 0;
   }
   .top-nav {
     display: none;
   }
-  .top-menu-btn {
-    display: flex;
-    width: 54px;
-    height: 54px;
-    font-size: 1.95rem;
+  /* Brand centré entre hamburger et compte */
+  .brand-group {
+    flex: 1;
+    justify-content: center;
+    position: static;
+    transform: none;
+    white-space: nowrap;
+  }
+  .brand-logo {
+    width: 24px;
+    height: 24px;
+    font-size: 0.72rem;
+  }
+  .brand-title {
+    font-size: 0.7rem;
   }
   .top-actions {
-    gap: 12px;
+    flex-shrink: 0;
+    gap: 4px;
   }
-  .top-action,
+  .top-action {
+    display: none;
+  }
   .top-account {
-    font-size: 1.08rem;
-    padding: 9px 15px;
+    font-size: 0.72rem;
+    padding: 5px 8px;
   }
   .account-name {
     display: none;
   }
   .account-avatar {
-    width: 33px;
-    height: 33px;
-    font-size: 0.9rem;
+    width: 26px;
+    height: 26px;
+    font-size: 0.65rem;
   }
-  .brand-logo {
-    width: 46px;
-    height: 46px;
-    font-size: 1.15rem;
-  }
-  .brand-title {
-    font-size: 1.15rem;
-  }
-  .brand-group {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-  }
-  .top-menu-item {
-    min-height: 88px;
-    font-size: 1.55rem;
-    padding: 22px 18px;
-  }
-  .top-menu-sub-item {
-    min-height: 76px;
-    font-size: 1.4rem;
-  }
+  /* ── Menu burger — tailles raisonnables ─────── */
   .top-menu-panel {
-    width: min(100%, 420px);
-    gap: 12px;
+    width: min(100%, 300px);
+    gap: 4px;
   }
   .top-menu-header {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
   }
   .top-menu-close {
-    width: 44px;
-    height: 44px;
-    font-size: 1.5rem;
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+  .top-menu-item {
+    min-height: 52px;
+    font-size: 0.92rem;
+    padding: 14px 12px;
+  }
+  .top-menu-sub-item {
+    min-height: 44px;
+    font-size: 0.85rem;
+  }
+  /* ── Page d'accueil — hero ───────────────────── */
+  .home-hero {
+    padding: 60px 16px 140px;
+  }
+  .home-hero-title {
+    font-size: clamp(1.6rem, 9vw, 2.2rem);
+  }
+  .home-hero-subtitle {
+    font-size: 0.85rem;
+  }
+  /* ── Feature cards — 2 colonnes compactes ────── */
+  .home-features {
+    padding: 0 10px;
+    margin-top: -110px;
   }
   .home-features-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+    gap: 10px;
   }
   .feature-card {
-    padding: 28px 20px;
-  }
-  .feature-card-title {
-    font-size: 1.6rem;
-  }
-  .feature-card-desc {
-    font-size: 1.3rem;
-    line-height: 1.6;
+    padding: 14px 10px;
+    gap: 8px;
   }
   .feature-card-icon {
-    width: 75px;
-    height: 75px;
-    font-size: 2.7rem;
+    width: 36px;
+    height: 36px;
+    font-size: 1.4rem;
+  }
+  .feature-card-title {
+    font-size: 0.85rem;
+  }
+  .feature-card-desc {
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+  .feature-card-link {
+    font-size: 0.75rem;
   }
 }
