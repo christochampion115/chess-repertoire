@@ -50,6 +50,7 @@ const sectionTitleStyle: React.CSSProperties = {
 
 export const ReportForm = React.memo(function ReportForm({ params, onParamsChange, onSubmit, error }: ReportFormProps) {
   const [posFilterActive, setPosFilterActive] = useState(false);
+  const [posCardOpen, setPosCardOpen] = useState(true);
   const years = useMemo(() => initYearOptions(), []);
 
   const now = new Date();
@@ -69,118 +70,117 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
 
   return (
     <div>
-      {/* ── outer flex: left column (grid + période) + right position card ── */}
       <div className="report-form-outer">
 
-        {/* ── LEFT COLUMN ── */}
+        { /* ── FORM FIELDS ── */}
         <div className="report-form-fields">
 
           <div className="report-2col-grid">
-            {/* Row 1 : section titles */}
-            <div className="report-section-title">Compte Chess.com</div>
-            <div className="report-section-title">Couleur</div>
-
-            {/* Row 2 : username  |  couleur buttons */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle} htmlFor="rapport-username">Pseudo Chess.com</label>
-              <input
-                id="rapport-username"
-                type="text"
-                value={params.username}
-                onChange={(e) => onParamsChange({ username: e.target.value })}
-                placeholder="ex: Magnus"
-                style={inputStyle}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </div>
-            <div style={{ marginBottom: 20 }} className="report-field-no-label">
-              <div style={{ display: 'flex', gap: 10 }}>
-                {(['white', 'black'] as const).map((c) => (
-                  <label
-                    key={c}
-                    className="rcolor-radio"
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      padding: 10,
-                      background: params.color === c
-                        ? 'linear-gradient(180deg, rgba(70,150,255,0.15), rgba(70,150,255,0.05))'
-                        : 'linear-gradient(180deg, rgba(70,150,255,0.04), rgba(70,150,255,0.01))',
-                      border: 'none',
-                      boxShadow: params.color === c ? 'inset 0 1px 2px rgba(70,150,255,0.2)' : 'inset 0 0 0 1px rgba(148,163,184,0.12)',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      color: params.color === c ? '#ffffff' : '#94a3b8',
-                      fontSize: '0.88rem',
-                      fontWeight: 600,
-                      transition: 'background 0.2s ease, box-shadow 0.2s ease',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="rapport-color"
-                      value={c}
-                      checked={params.color === c}
-                      onChange={() => onParamsChange({ color: c })}
-                      style={{ display: 'none' }}
-                    />
-                    {c === 'white' ? '♙ Blancs' : '♟ Noirs'}
-                  </label>
-                ))}
+            <div className="report-2col-cell">
+              <div className="report-section-title">Compte Chess.com</div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={labelStyle} htmlFor="rapport-username">Pseudo Chess.com</label>
+                <input
+                  id="rapport-username"
+                  type="text"
+                  value={params.username}
+                  onChange={(e) => onParamsChange({ username: e.target.value })}
+                  placeholder="ex: Magnus"
+                  style={inputStyle}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
               </div>
             </div>
-
-            {/* inter-group spacer */}
-            <div style={{ gridColumn: '1 / -1', height: 14 }} />
-            {/* Row 3 : section titles */}
-            <div className="report-section-title">Filtres de parties</div>
-            <div className="report-section-title">ELO adversaire</div>
-
-            {/* Row 4 : cadence  |  ELO inputs */}
-            <div>
-              <CustomSelect
-                value={params.timeClass}
-                options={[
-                  { value: 'all', label: 'Toutes' },
-                  { value: 'bullet', label: 'Bullet' },
-                  { value: 'blitz', label: 'Blitz' },
-                  { value: 'rapid', label: 'Rapide' },
-                  { value: 'classical', label: 'Classique' },
-                  { value: 'daily', label: 'Correspondance' },
-                ]}
-                onChange={(v) => onParamsChange({ timeClass: v as PlayerTimeClass })}
-                id="rapport-timeclass"
-              />
+            <div className="report-2col-cell">
+              <div className="report-section-title">Couleur</div>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {(['white', 'black'] as const).map((c) => (
+                    <label
+                      key={c}
+                      className="rcolor-radio"
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        padding: 10,
+                        background: params.color === c
+                          ? 'linear-gradient(180deg, rgba(70,150,255,0.15), rgba(70,150,255,0.05))'
+                          : 'linear-gradient(180deg, rgba(70,150,255,0.04), rgba(70,150,255,0.01))',
+                        border: 'none',
+                        boxShadow: params.color === c ? 'inset 0 1px 2px rgba(70,150,255,0.2)' : 'inset 0 0 0 1px rgba(148,163,184,0.12)',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        color: params.color === c ? '#ffffff' : '#94a3b8',
+                        fontSize: '0.88rem',
+                        fontWeight: 600,
+                        transition: 'background 0.2s ease, box-shadow 0.2s ease',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="rapport-color"
+                        value={c}
+                        checked={params.color === c}
+                        onChange={() => onParamsChange({ color: c })}
+                        style={{ display: 'none' }}
+                      />
+                      {c === 'white' ? '♙ Blancs' : '♟ Noirs'}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input
-                  type="number"
-                  placeholder="Min"
-                  min={0}
-                  max={3000}
-                  step={50}
-                  value={params.eloMin || ''}
-                  onChange={(e) => onParamsChange({ eloMin: parseInt(e.target.value) || 0 })}
-                  className="rinput"
-                  style={{ ...inputStyle, width: 100 }}
+            <div style={{ gridColumn: '1 / -1', height: 14 }} />
+            <div className="report-2col-cell">
+              <div className="report-section-title">Filtres de parties</div>
+              <div>
+                <CustomSelect
+                  value={params.timeClass}
+                  options={[
+                    { value: 'all', label: 'Toutes' },
+                    { value: 'bullet', label: 'Bullet' },
+                    { value: 'blitz', label: 'Blitz' },
+                    { value: 'rapid', label: 'Rapide' },
+                    { value: 'classical', label: 'Classique' },
+                    { value: 'daily', label: 'Correspondance' },
+                  ]}
+                  onChange={(v) => onParamsChange({ timeClass: v as PlayerTimeClass })}
+                  id="rapport-timeclass"
                 />
-                <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  min={0}
-                  max={3000}
-                  step={50}
-                  value={params.eloMax === 3000 ? '' : params.eloMax}
-                  onChange={(e) => onParamsChange({ eloMax: parseInt(e.target.value) || 3000 })}
-                  className="rinput"
-                  style={{ ...inputStyle, width: 100 }}
-                />
+              </div>
+            </div>
+            <div className="report-2col-cell">
+              <div className="report-section-title">ELO adversaire</div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    min={0}
+                    max={3000}
+                    step={50}
+                    value={params.eloMin || ''}
+                    onChange={(e) => onParamsChange({ eloMin: parseInt(e.target.value) || 0 })}
+                    className="rinput"
+                    style={{ ...inputStyle, width: 100 }}
+                  />
+                  <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    min={0}
+                    max={3000}
+                    step={50}
+                    value={params.eloMax === 3000 ? '' : params.eloMax}
+                    onChange={(e) => onParamsChange({ eloMax: parseInt(e.target.value) || 3000 })}
+                    className="rinput"
+                    style={{ ...inputStyle, width: 100 }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -230,6 +230,48 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
             </div>
           </div>
 
+          {/* ── POSITION CARD — accordéon ── */}
+          <div
+            className={"rcard pos-filter-card" + (posFilterActive ? " pos-active" : "") + (posCardOpen ? "" : " pos-collapsed")}
+            style={{
+              ...cardLg,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              opacity: posFilterActive ? 1 : 0.55,
+              border: 'none',
+              boxShadow: posFilterActive ? 'inset 0 1px 2px rgba(70,150,255,0.2)' : 'inset 0 0 0 1px rgba(148,163,184,0.12)',
+              transition: 'opacity 0.2s, box-shadow 0.2s',
+            }}
+          >
+            <div
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', cursor: 'pointer' }}
+              onClick={() => setPosCardOpen((v) => !v)}
+            >
+              <div className="report-section-title" style={{ marginBottom: 0, color: posFilterActive ? '#a5b4fc' : '#94a3b8' }}>
+                Filtre de position
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="pos-card-chevron" style={{ fontSize: '0.7rem', color: '#94a3b8', transition: 'transform 0.2s', transform: posCardOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+                <label className="analysis-switch" style={{ margin: 0 }} onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={posFilterActive} onChange={togglePosFilter} />
+                  <span className="analysis-switch-track" />
+                </label>
+              </div>
+            </div>
+            <div className="pos-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{ pointerEvents: posFilterActive ? 'auto' : 'none' }}>
+                <FenEditor color={params.color} onFenChange={handleFenChange} active={posFilterActive} />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: 1.4 }}>
+                {posFilterActive
+                  ? "Jouez les coups sur l'échiquier. Le rapport ne gardera que les parties qui atteignent cette position."
+                  : "Activez le filtre pour restreindre l'analyse à une position précise."}
+              </p>
+            </div>
+          </div>
+
           {/* ── LANCER ── */}
           <button
             type="button"
@@ -261,48 +303,9 @@ export const ReportForm = React.memo(function ReportForm({ params, onParamsChang
             </div>
           )}
 
-        </div>{/* end left column */}
+        </div>{/* end form-fields */}
 
-        {/* ── POSITION CARD ── */}
-        <div
-          className="rcard"
-          style={{
-            width: 300,
-            flexShrink: 0,
-            ...cardLg,
-            padding: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
-            opacity: posFilterActive ? 1 : 0.55,
-            border: 'none',
-            boxShadow: posFilterActive ? 'inset 0 1px 2px rgba(70,150,255,0.2)' : 'inset 0 0 0 1px rgba(148,163,184,0.12)',
-            transition: 'opacity 0.2s, box-shadow 0.2s',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <div className="report-section-title" style={{ marginBottom: 0, color: posFilterActive ? '#a5b4fc' : '#94a3b8' }}>
-              Filtre de position
-            </div>
-            <label className="analysis-switch" style={{ marginLeft: 12 }}>
-              <input type="checkbox" checked={posFilterActive} onChange={togglePosFilter} />
-              <span className="analysis-switch-track" />
-            </label>
-          </div>
-          <div style={{ pointerEvents: posFilterActive ? 'auto' : 'none' }}>
-            <FenEditor color={params.color} onFenChange={handleFenChange} active={posFilterActive} />
-          </div>
-          <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: 1.4 }}>
-            {posFilterActive
-              ? "Jouez les coups sur l'échiquier. Le rapport ne gardera que les parties qui atteignent cette position."
-              : "Activez le filtre pour restreindre l'analyse à une position précise."}
-          </p>
-        </div>
-
-      </div>{/* end outer flex */}
-
-
+      </div>{/* end report-form-outer */}
     </div>
   );
 });

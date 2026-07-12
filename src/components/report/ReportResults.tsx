@@ -68,7 +68,7 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+        <div className="report-filter-bar" style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
           <div
             style={{
               flex: 1,
@@ -119,12 +119,13 @@ export const ReportResults = React.memo(function ReportResults({ data, params, o
             transition: 'transform 0.18s ease, box-shadow 0.18s ease',
           }}
         >
-          ← Nouvelle analyse
+          <span className="report-btn-arrow">←</span> Nouvelle analyse
         </button>
         </div>
       </div>
 
       <div
+        className="report-stats-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',

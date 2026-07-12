@@ -26,6 +26,7 @@ interface ReportPriorityBadgeProps {
 export const ReportPriorityBadge = React.memo(function ReportPriorityBadge({ badge }: ReportPriorityBadgeProps) {
   return (
     <span
+      className="report-badge"
       style={{
         fontSize: '0.75rem',
         fontWeight: 800,

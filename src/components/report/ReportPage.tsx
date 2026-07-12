@@ -274,7 +274,7 @@ export const ReportPage = React.memo(function ReportPage() {
   }
 
   return (
-    <div className="report-page-root" style={{ padding: '24px 24px 40px' }}>
+    <div className="report-page-root">
 
       <div className="report-page-header">
         <span className="report-page-header-label" style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>

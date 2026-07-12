@@ -75,7 +75,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
         overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '14px 24px 16px' }}>
+      <div className="report-card-padding" style={{ padding: '14px 24px 16px' }}>
         <div className="report-group-content-grid">
           <div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -97,7 +97,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                   FORT
                 </span>
               )}
-              <div style={{ fontSize: '1.0rem', fontWeight: 700, color: '#f8fafc', flex: 1 }}>
+              <div className="report-opening-name" style={{ fontSize: '1.0rem', fontWeight: 700, color: '#f8fafc', flex: 1 }}>
                 {getOpeningNameByPath(fullPath, group.fen ?? undefined, repInfo)}
               </div>
               <div style={{ fontSize: '0.9rem', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>
@@ -131,7 +131,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
 
             <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc' }}>
+                <div className="report-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc' }}>
                   {hPct}%
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -139,7 +139,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: variant === 'weakness' ? '#cbd5e1' : '#67e8f9' }}>
+                <div className="report-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: variant === 'weakness' ? '#cbd5e1' : '#67e8f9' }}>
                   {gapVal >= 0 ? `−${gapDisplay}%` : `+${Math.abs(gapVal).toFixed(0)}%`}
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -147,7 +147,7 @@ export const ReportGroupCard = React.memo(function ReportGroupCard({
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#cbd5e1' }}>
+                <div className="report-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#cbd5e1' }}>
                   {Math.round(Math.abs(group.impactElo))} pts
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>
