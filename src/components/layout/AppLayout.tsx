@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
@@ -7,6 +7,7 @@ import { useTrainingStore } from '@/stores/trainingStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useToastStore } from '@/stores/toastStore';
 import * as repertoireService from '@/services/repertoire';
+import { getVariantPath, nodeMap } from '@/services/repertoire';
 import { scheduleRepertoireSync } from '@/services/authService';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { RightPanel } from '@/components/layout/RightPanel';
@@ -17,7 +18,24 @@ import { EngineArrows } from '@/components/board/EngineArrows';
 import { EvalBarConnected } from '@/components/board/EvalBarConnected';
 import { TrainingBanner } from '@/components/training/TrainingBanner';
 import { BoardControls } from '@/components/board/BoardControls';
+import { Monitor } from '@/components/monitor/Monitor';
+import { RepertoirePanel } from '@/components/repertoire/RepertoirePanel';
+import { TreePanel } from '@/components/repertoire/TreePanel';
+import { AnalysisTabContent } from '@/components/analysis/AnalysisTabContent';
+import { CandidatesTabContent } from '@/components/analysis/CandidatesTabContent';
+import { SurvivalMonitor } from '@/components/training/SurvivalMonitor';
+import type { TrainingMode } from '@/types/training';
+import { SURVIVAL_LIVES } from '@/types/training';
 import { useStatsAutoLoad } from '@/hooks/useStats';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+
+const MODE_LABEL: Record<TrainingMode, string> = {
+  survival: 'Survie',
+  vertical: 'Vertical',
+  horizontal: 'Horizontal',
+  express: 'Express',
+  randomizer: 'Aléatoire',
+};
 
 /**
  * Racine de l'application React — shell complet.
@@ -149,6 +167,13 @@ export function AppLayout() {
   const isEnabled     = useAnalysisStore((s) => s.isEnabled);
   const evaluateFen   = useAnalysisStore((s) => s.evaluateFen);
   const trainingPhase = useTrainingStore((s) => s.phase);
+  const trainingMode   = useTrainingStore((s) => s.mode);
+  const lives          = useTrainingStore((s) => s.lives);
+  const maxLives       = useTrainingStore((s) => s.maxLives);
+  const goldenHeart    = useTrainingStore((s) => s.goldenHeart);
+  const endTraining    = useTrainingStore((s) => s.endTraining);
+  const isTraining     = trainingPhase !== 'idle';
+  const isSurvival     = isTraining && trainingMode === 'survival';
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -176,50 +201,165 @@ export function AppLayout() {
   const results     = useAnalysisStore((s) => s.results);
   const settings    = useAnalysisStore((s) => s.settings);
 
+  /* ── Mobile detection ──────────────────────────────────── */
+  const isMobile = useMediaQuery('(max-width: 1024px)');
+  const [activeTab, setActiveTab] = useState<'repertoire' | 'arbre' | 'analyse' | 'candidats'>('analyse');
+
+  /* ── Monitor info (mobile header) ─────────────────────── */
+  const activeRepIndex = useRepertoireStore((s) => s.activeRepIndex);
+  const repertoires    = useRepertoireStore((s) => s.repertoires);
+  const currentNodeId  = useRepertoireStore((s) => s.currentNodeId);
+  const trainingRoot   = useTrainingStore((s) => s.root);
+
+  const monitorInfo = useMemo(() => {
+    if (activeRepIndex < 0 || !repertoires[activeRepIndex]) {
+      return { repName: 'Jeu Libre', varPath: [] as string[] };
+    }
+    if (isTraining && trainingRoot) {
+      return getVariantPath(trainingRoot);
+    }
+    if (currentNodeId) {
+      const node = nodeMap.get(currentNodeId);
+      if (node) return getVariantPath(node);
+    }
+    return { repName: repertoires[activeRepIndex]?.name ?? 'Répertoire', varPath: [] as string[] };
+  }, [activeRepIndex, repertoires, isTraining, trainingRoot, currentNodeId]);
+
   if (status === 'loading') return null;
+
+  const boardContent = (
+    <div className="board-shell">
+      <div style={{ position: 'relative', gridColumn: 1, gridRow: 1 }}>
+        <Board />
+        {trainingPhase === 'idle' && (
+        <EngineArrows
+          results={results}
+          boardFlipped={boardFlipped}
+          arrowCount={settings.arrowCount}
+          boardTheme={boardTheme}
+          showArrows={settings.showArrows && isEnabled}
+        />
+        )}
+      </div>
+      <EvalBarConnected />
+    </div>
+  );
 
   return (
     <div id="view-app">
       {showSplash && <SplashScreen />}
       <ToastContainer />
 
-      <div className="main-layout">
-        {/* ── Colonne gauche : répertoires + arbre ─── */}
-        <aside className="left-panel">
-          <Sidebar />
-        </aside>
-
-        {/* ── Zone centrale : échiquier ──────────────── */}
-        <section className="board-area">
-          <TrainingBanner />
-
-          {/* board-panel : flex-column, aligne et centre board-shell + board-controls */}
-          <div className="board-panel">
-            <div className="board-shell">
-              <div style={{ position: 'relative', gridColumn: 1, gridRow: 1 }}>
-                <Board />
-                {trainingPhase === 'idle' && (
-                <EngineArrows
-                  results={results}
-                  boardFlipped={boardFlipped}
-                  arrowCount={settings.arrowCount}
-                  boardTheme={boardTheme}
-                  showArrows={settings.showArrows && isEnabled}
-                />
+      {isMobile ? (
+        <div className="main-layout">
+          <section className="board-area">
+            {/* Mobile monitor compact (above board) */}
+            <div className="mobile-monitor">
+              <div className="monitor-header">
+                <div>
+                  <div className="monitor-title">
+                    <span className="monitor-title-name">{monitorInfo.repName}</span>
+                    {monitorInfo.varPath.length > 0 && (
+                      <div className="monitor-title-vars">
+                        {monitorInfo.varPath.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {isTraining ? (
+                  isSurvival ? (
+                    <div className="monitor-header-hearts">
+                      {Array.from({ length: maxLives }, (_, i) => (
+                        <span key={i} className={`survival-heart ${i < lives ? (goldenHeart && i === lives - 1 ? 'is-golden' : '') : 'is-empty'}`}>
+                          {i < lives ? '\u2665' : '\u2661'}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <button className="btn-switch-freeplay" onClick={endTraining}>Terminer</button>
+                  )
+                ) : (
+                  activeRepIndex >= 0 ? (
+                    <button className="btn-switch-freeplay" onClick={() => repertoireService.switchToFreePlay()}>Jeu libre</button>
+                  ) : (
+                    <button className="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
+                  )
                 )}
               </div>
-              <EvalBarConnected />
+              <div className="mobile-monitor-scroll">
+                {isSurvival ? (
+                  <SurvivalMonitor hideHearts />
+                ) : isTraining ? (
+                  <div className="training-status-card">
+                    Mode {MODE_LABEL[trainingMode]} — entraînement en cours
+                  </div>
+                ) : (
+                  <Monitor />
+                )}
+              </div>
             </div>
 
-            <BoardControls />
-          </div>
-        </section>
+            {/* Board + eval bar */}
+            <div className="board-panel">
+              {boardContent}
+              <BoardControls />
+            </div>
 
-        {/* ── Colonne droite : monitor / analyse / stats ─── */}
-        <aside className="right-panel">
-          <RightPanel />
-        </aside>
-      </div>
+            {/* Tab bar */}
+            <div className="mobile-tab-bar">
+              {(['repertoire', 'arbre', 'analyse', 'candidats'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  className={`mobile-tab-btn${activeTab === tab ? ' active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab === 'repertoire' ? 'RÉPERTOIRE' :
+                   tab === 'arbre' ? 'ARBRE' :
+                   tab === 'analyse' ? 'ANALYSE' : 'CANDIDATS'}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            <div className="mobile-tab-content">
+              {activeTab === 'repertoire' && (isTraining ? (
+                <div className="training-disabled-msg">Répertoire indisponible pendant l&rsquo;entraînement</div>
+              ) : (
+                <RepertoirePanel />
+              ))}
+              {activeTab === 'arbre' && (isTraining ? (
+                <div className="training-disabled-msg">Arbre désactivé pendant l&rsquo;entraînement</div>
+              ) : (
+                <TreePanel />
+              ))}
+              {activeTab === 'analyse' && <AnalysisTabContent />}
+              {activeTab === 'candidats' && <CandidatesTabContent />}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="main-layout">
+          {/* ── Colonne gauche : répertoires + arbre ─── */}
+          <aside className="left-panel">
+            <Sidebar />
+          </aside>
+
+          {/* ── Zone centrale : échiquier ──────────────── */}
+          <section className="board-area">
+            <TrainingBanner />
+
+            <div className="board-panel">
+              {boardContent}
+              <BoardControls />
+            </div>
+          </section>
+
+          {/* ── Colonne droite : monitor / analyse / stats ─── */}
+          <aside className="right-panel">
+            <RightPanel />
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

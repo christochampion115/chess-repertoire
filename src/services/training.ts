@@ -721,6 +721,7 @@ export function stopTraining(): void {
   }
 
   const fen = useChessStore.getState().chess.fen();
+  useAnalysisStore.getState().clearAnnotations();
   useAnalysisStore.getState().evaluateFen(fen);
 }
 
