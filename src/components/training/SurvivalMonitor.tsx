@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { SURVIVAL_LIVES, SURVIVAL_LIFE_BONUS_INTERVAL } from '@/types/training';
 
-export const SurvivalMonitor = React.memo(function SurvivalMonitor() {
+export const SurvivalMonitor = React.memo(function SurvivalMonitor({ hideHearts }: { hideHearts?: boolean }) {
   const phase = useTrainingStore((s) => s.phase);
   const mode = useTrainingStore((s) => s.mode);
   const lives = useTrainingStore((s) => s.lives);
@@ -64,6 +64,7 @@ export const SurvivalMonitor = React.memo(function SurvivalMonitor() {
 
   return (
     <div className="survival-monitor-card">
+      {!hideHearts && (
       <div className="survival-monitor-lives">
         Vies:{' '}
         <span className="survival-monitor-hearts">
@@ -77,6 +78,7 @@ export const SurvivalMonitor = React.memo(function SurvivalMonitor() {
           ))}
         </span>
       </div>
+      )}
       {bonusHint !== null && (
         <div className="survival-monitor-row survival-monitor-hint">
           Prochain ♥ dans <b>{bonusHint}</b> coup{bonusHint > 1 ? 's' : ''}
