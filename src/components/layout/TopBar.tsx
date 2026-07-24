@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -24,6 +25,9 @@ export const TopBar = React.memo(function TopBar() {
   const navigate = useNavigate();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
+
+  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -104,8 +108,36 @@ export const TopBar = React.memo(function TopBar() {
     item.onClick();
   }, []);
 
+  const handleMobileTabClick = useCallback((tab: NavTab) => {
+    if (tab.disabled) return;
+    if (tab.dropdownItems) {
+      setExpandedSections((prev) => {
+        const next = new Set(prev);
+        if (next.has(tab.label)) next.delete(tab.label);
+        else next.add(tab.label);
+        return next;
+      });
+    } else if (tab.onClick) {
+      tab.onClick();
+      setMobileMenuOpen(false);
+    }
+  }, []);
+
+  const handleMobileSubItemClick = useCallback((item: DropdownItem) => {
+    setMobileMenuOpen(false);
+    item.onClick();
+  }, []);
+
   return (
     <header className="top-bar">
+      <button
+        className="top-menu-btn"
+        onClick={() => setMobileMenuOpen(true)}
+        aria-label="Menu"
+      >
+        ☰
+      </button>
+
       <div className="brand-group" role="button" tabIndex={0} onClick={goHome} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goHome(); }}>
         <div className="brand-logo">A</div>
         <div className="brand-label">
@@ -161,16 +193,84 @@ export const TopBar = React.memo(function TopBar() {
               <div className="account-avatar">
                 {user.username.slice(0, 2).toUpperCase()}
               </div>
-              <div className="account-name" style={{ fontSize: '0.78rem' }}>{user.username}</div>
+              <div className="account-name">{user.username}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => openModal({ type: 'auth' })}>
-              <span style={{ fontSize: '1rem' }}>👤</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Connexion</span>
+              <span>👤</span>
+              <span style={{ fontWeight: 800 }}>Connexion</span>
             </div>
           )}
         </div>
       </div>
+
+      {isMobileMenuOpen && createPortal(
+        <div className="top-menu-overlay open" onClick={() => setMobileMenuOpen(false)}>
+          <div className="top-menu-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="top-menu-header">
+              <div className="brand-title">Blundertale</div>
+              <button className="top-menu-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
+            </div>
+
+            {NAV_TABS.map((tab) => (
+              <div key={tab.label}>
+                <button
+                  className={'top-menu-item' + (tab.disabled ? ' disabled' : '')}
+                  onClick={() => handleMobileTabClick(tab)}
+                >
+                  <span>{tab.label}</span>
+                  {tab.dropdownItems && (
+                    <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                      {expandedSections.has(tab.label) ? '▾' : '▸'}
+                    </span>
+                  )}
+                </button>
+                {tab.dropdownItems && expandedSections.has(tab.label) && (
+                  <div className="top-menu-sub">
+                    {tab.dropdownItems.map((item) => (
+                      <button
+                        key={item.label}
+                        className="top-menu-sub-item"
+                        onClick={() => handleMobileSubItemClick(item)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div className="top-menu-separator" />
+
+            <button className="top-menu-item" onClick={() => { openModal({ type: 'medals' }); setMobileMenuOpen(false); }}>
+              Médailles
+            </button>
+            <button className="top-menu-item" onClick={() => { openModal({ type: 'patch-notes' }); setMobileMenuOpen(false); }}>
+              Notes de mise à jour
+            </button>
+
+            {user ? (
+              <button className="top-menu-item" onClick={() => { openModal({ type: 'profile' }); setMobileMenuOpen(false); }}>
+                Profil — {user.username}
+              </button>
+            ) : (
+              <button className="top-menu-item" onClick={() => { openModal({ type: 'auth' }); setMobileMenuOpen(false); }}>
+                Se connecter
+              </button>
+            )}
+
+            <div className="top-menu-separator" />
+            <button className="top-menu-item" onClick={() => { navigate('/mentions-legales'); setMobileMenuOpen(false); }}>
+              Mentions légales
+            </button>
+            <button className="top-menu-item" onClick={() => { navigate('/confidentialite'); setMobileMenuOpen(false); }}>
+              Politique de confidentialité
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
     </header>
   );
 });
