@@ -108,7 +108,7 @@ export const RightPanel = React.memo(function RightPanel() {
         {!isTraining && (activeRepIndex >= 0 ? (
           <button className="btn-switch-freeplay" id="btn-switch-free-play" onClick={() => repertoireService.switchToFreePlay()}>Jeu libre</button>
         ) : (
-          <button className="btn-open-new-rep" id="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
+          <button className="btn-open-new-rep" id="btn-open-new-rep" data-tutorial="create-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
         ))}
 
         {/* ── PGN + commentaire (Monitor) ────────────────────── */}
@@ -121,13 +121,13 @@ export const RightPanel = React.memo(function RightPanel() {
 
         {/* ── Section Analyse (masquée pendant l'entraînement) ─── */}
         {!isTraining && (
-        <div className={`monitor-analysis-section${isEnabled ? ' is-active' : ''}`} id="monitor-analysis-section">
+        <div className={`monitor-analysis-section${isEnabled ? ' is-active' : ''}`} id="monitor-analysis-section" data-tutorial="analysis-section">
           <div className="monitor-analysis-header">
 
             {/* Titre + toggle switch */}
             <div className="monitor-analysis-title-row">
               <span className="monitor-analysis-title">Analyse</span>
-              <label className="analysis-switch" htmlFor="analysis-toggle-switch">
+              <label className="analysis-switch" htmlFor="analysis-toggle-switch" data-tutorial="analysis-toggle">
                 <input
                   type="checkbox"
                   id="analysis-toggle-switch"
@@ -188,11 +188,12 @@ export const RightPanel = React.memo(function RightPanel() {
 
     {/* COUPS CANDIDATS (masqué pendant l'entraînement) */}
     {!isTraining && (
-    <div className="cands-section" id="cands-section">
+    <div className="cands-section" id="cands-section" data-tutorial="candidates-list">
       <button
         type="button"
         className="cands-toggle-btn"
         id="cands-toggle-btn"
+        data-tutorial="candidates-toggle"
         aria-expanded={candidatesOpen ? 'true' : 'false'}
         aria-controls="cands-body"
         onClick={() => setFilter('candidatesOpen', !candidatesOpen)}

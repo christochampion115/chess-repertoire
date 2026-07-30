@@ -41,7 +41,7 @@ export const TreePanel = React.memo(function TreePanel() {
   }
 
   return (
-    <div className="tree-panel" id="arbre-panel">
+    <div className="tree-panel" id="arbre-panel" data-tutorial="tree-panel">
       <ul className="tree-root">
         {root.children.map((child) => (
           <TreeNode

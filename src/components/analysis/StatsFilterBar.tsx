@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStatsStore } from '@/stores/statsStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useTutorialStore } from '@/stores/tutorialStore';
 import { scheduleStatsReload } from '@/services/stats';
 import type { StatsSortBy } from '@/types/stats';
 import { useAuthStore } from '@/stores/authStore';
@@ -53,6 +54,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
   const savedPlayerStats = useStatsStore((s) => s.savedPlayerStats);
   const token            = useAuthStore((s) => s.token);
   const isAuthenticated  = !!token;
+  const tutorialActive   = useTutorialStore((s) => s.isActive);
 
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [playerDropdownOpen, setPlayerDropdownOpen] = useState(false);
@@ -143,6 +145,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
             id="stats-filter-lichess-btn"
             className={`stats-filter-btn stats-filter-btn--split${isLichess ? ' active' : ''}${eloLoading && isLichess ? ' is-loading' : ''}`}
             onClick={switchToLichess}
+            disabled={tutorialActive}
             title="Base Lichess"
           >
             <span className="stats-filter-btn-label">Lichess</span>
@@ -166,6 +169,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
           id="stats-filter-masters-btn"
           className={`stats-filter-btn${isMasters ? ' active' : ''}`}
           onClick={switchToMasters}
+          disabled={tutorialActive}
           title="Base Masters (parties de haut niveau)"
         >
           Masters
@@ -179,6 +183,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
               type="button"
               className="stats-filter-btn"
               onClick={() => openModal({ type: 'auth' })}
+              disabled={tutorialActive}
               title="Connectez-vous pour utiliser les stats joueur"
             >
               Joueur
@@ -191,6 +196,7 @@ export const StatsFilterBar = React.memo(function StatsFilterBar() {
                 id="stats-filter-player-btn"
                 className={`stats-filter-btn stats-filter-btn--split${isPlayer ? ' active' : ''}`}
                 onClick={savedPlayerStats ? switchToSavedPlayer : () => openModal({ type: 'player-stats' })}
+                disabled={tutorialActive}
                 title={savedPlayerStats ? `Stats de @${savedPlayerStats.filters.playerUsername}` : 'Analyser les parties d\'un joueur Chess.com'}
               >
                 <span className="stats-filter-btn-label">Joueur</span>

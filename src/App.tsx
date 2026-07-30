@@ -6,6 +6,7 @@ import { LegalPage } from '@/components/layout/LegalPage';
 import { TopBar } from '@/components/layout/TopBar';
 import { ModalPortal } from '@/components/modals/ModalPortal';
 import { ContextMenu } from '@/components/common/ContextMenu';
+import { TutorialOverlay } from '@/components/common/TutorialOverlay';
 import { TooltipProvider } from '@/contexts/TooltipContext';
 import { ReportPage } from '@/components/report/ReportPage';
 import { bootstrapSession } from '@/services/authService';
@@ -29,6 +30,7 @@ export function App() {
           </Routes>
           <ModalPortal />
           <ContextMenu />
+          <TutorialOverlay />
         </div>
       </TooltipProvider>
     </BrowserRouter>

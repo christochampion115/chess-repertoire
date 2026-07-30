@@ -225,6 +225,8 @@ export async function bootstrapSession(): Promise<void> {
     } else {
       auth.setSyncStatus('error', 'Connexion perdue, veuillez vous reconnecter');
       // Garder les données locales (Zustand persist) plutôt que vider
+      auth.setStatus('logged');
+      initializeService();
     }
   }
 }

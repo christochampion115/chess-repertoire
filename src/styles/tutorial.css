@@ -1,0 +1,248 @@
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+}
+
+.tutorial-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 99999;
+  pointer-events: all;
+}
+
+.tutorial-mask-segment {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 99999;
+  pointer-events: all;
+}
+
+.tutorial-highlight-ring {
+  position: fixed;
+  z-index: 100000;
+  pointer-events: none;
+  background: transparent;
+  border: 2px solid var(--accent-blue-bright, #3B82F6);
+  border-radius: 8px;
+  animation: tutorial-glow 1.8s ease-in-out infinite;
+}
+
+.tutorial-highlight-ring::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  animation: tutorial-ring-expand 1.8s ease-out infinite;
+}
+
+@keyframes tutorial-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 6px rgba(59, 130, 246, 0.35),
+      inset 0 0 8px rgba(59, 130, 246, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(59, 130, 246, 0.55),
+      inset 0 0 14px rgba(59, 130, 246, 0.08);
+  }
+}
+
+@keyframes tutorial-ring-expand {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.tutorial-bubble {
+  position: fixed;
+  z-index: 100001;
+  pointer-events: all;
+  background: linear-gradient(160deg, #1a2744 0%, #0f1a30 100%);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 12px;
+  padding: 18px 22px;
+  max-width: 340px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(59, 130, 246, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: opacity 0.25s ease-out;
+}
+
+.tutorial-bubble-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #1a2744;
+  border-left: 1px solid rgba(59, 130, 246, 0.35);
+  border-top: 1px solid rgba(59, 130, 246, 0.35);
+  transform: rotate(45deg);
+}
+
+.tutorial-bubble-arrow--top {
+  bottom: -7px;
+  left: 50%;
+  margin-left: -6px;
+  border-left: none;
+  border-top: none;
+  border-right: 1px solid rgba(59, 130, 246, 0.35);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.tutorial-bubble-arrow--bottom {
+  top: -7px;
+  left: 50%;
+  margin-left: -6px;
+}
+
+.tutorial-bubble-arrow--left {
+  right: -7px;
+  top: 50%;
+  margin-top: -6px;
+  border-left: none;
+  border-bottom: none;
+  border-top: 1px solid rgba(59, 130, 246, 0.35);
+  border-right: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.tutorial-bubble-arrow--right {
+  left: -7px;
+  top: 50%;
+  margin-top: -6px;
+  border-right: none;
+  border-bottom: none;
+  border-left: 1px solid rgba(59, 130, 246, 0.35);
+  border-top: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.tutorial-bubble-text {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+  margin: 0 0 14px 0;
+}
+
+.tutorial-bubble-text strong {
+  color: var(--accent-blue-bright, #3B82F6);
+  font-weight: 600;
+}
+
+.tutorial-bubble-text kbd {
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.7rem;
+  background: rgba(255,255,255,0.05);
+}
+
+.tutorial-bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tutorial-btn {
+  background: var(--accent-blue-bright, #3B82F6);
+  border: none;
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.tutorial-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.tutorial-btn:active {
+  transform: translateY(0);
+}
+
+.tutorial-skip-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  padding: 4px 6px;
+}
+
+.tutorial-skip-btn:hover {
+  opacity: 1;
+  color: var(--text-main);
+}
+
+@keyframes tutorial-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tutorial-arrow-anim {
+  position: fixed;
+  z-index: 100002;
+  pointer-events: none;
+  font-size: 2rem;
+  color: var(--accent-blue-bright, #3B82F6);
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+  line-height: 1;
+}
+
+/* Arrow above target (default) */
+.tutorial-arrow-anim--top {
+  animation: tutorial-arrow-bounce-top 1.2s ease-in-out infinite;
+}
+
+/* Arrow to the left, pointing right */
+.tutorial-arrow-anim--left {
+  animation: tutorial-arrow-bounce-left 1.2s ease-in-out infinite;
+}
+
+@keyframes tutorial-arrow-bounce-top {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(8px); opacity: 0.7; }
+}
+
+@keyframes tutorial-arrow-bounce-left {
+  0%, 100% { transform: rotate(90deg) translateY(0); opacity: 1; }
+  50% { transform: rotate(90deg) translateY(-8px); opacity: 0.7; }
+}
+
+/* ─── Step 13 modal lock ───────────────────────────────────── */
+body.tutorial-lock-modal #modal-overlay input,
+body.tutorial-lock-modal #modal-overlay select,
+body.tutorial-lock-modal #modal-overlay button,
+body.tutorial-lock-modal #modal-overlay .modal-actions {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+body.tutorial-lock-modal #modal-overlay input[type="text"][placeholder="Nom de la variante"] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+body.tutorial-lock-modal #modal-overlay .ctrl-btn--primary {
+  pointer-events: auto;
+  opacity: 1;
+  filter: brightness(1.4);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+}
+
+

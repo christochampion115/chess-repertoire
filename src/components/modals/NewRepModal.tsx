@@ -4,6 +4,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useTrainingStore } from '@/stores/trainingStore';
+import { useTutorialStore } from '@/stores/tutorialStore';
 import { ModalBox } from './ModalBox';
 import * as repertoireService from '@/services/repertoire';
 import * as pgnService from '@/services/pgn';
@@ -38,8 +39,9 @@ export function NewRepModal() {
   const closeModal  = useUiStore((s) => s.closeModal);
   const openModal   = useUiStore((s) => s.openModal);
 
-  const repFolders  = useRepertoireStore((s) => s.repFolders);
-  const repertoires = useRepertoireStore((s) => s.repertoires);
+  const repFolders    = useRepertoireStore((s) => s.repFolders);
+  const repertoires   = useRepertoireStore((s) => s.repertoires);
+  const tutorialActive = useTutorialStore((s) => s.isActive);
 
   const isOpen      = modal?.type === 'new-repertoire' || modal?.type === 'rename';
   const isRename    = modal?.type === 'rename';
@@ -167,9 +169,10 @@ export function NewRepModal() {
       {!isRename && (
         <div className="rep-create-mode-selector">
           {MODES.map((m) => (
-            <button
+              <button
               key={m.id}
               className={`rep-create-mode-btn${mode === m.id ? ' active' : ''}`}
+              data-tutorial={m.id === 'start' ? 'rep-mode-start' : undefined}
               onClick={() => { setMode(m.id); setError(''); }}
             >
               {m.label}
@@ -180,9 +183,10 @@ export function NewRepModal() {
 
       {/* Color selector — hidden in rename mode */}
       {!isRename && (
-        <div className="color-selector" id="color-sel-container">
+          <div className="color-selector" id="color-sel-container">
           <div
             className={`color-opt${selectedColor === 'w' ? ' active' : ''}`}
+            data-tutorial="rep-color-white"
             role="button"
             tabIndex={0}
             onClick={() => { setSelectedColor('w'); setFolderValue(''); }}
@@ -283,7 +287,7 @@ export function NewRepModal() {
       {error && <p className="rep-create-error" style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</p>}
 
       <div className="modal-actions">
-        <button className="ctrl-btn" onClick={closeModal} disabled={pgnLoading}>
+        <button className="ctrl-btn" onClick={closeModal} disabled={pgnLoading || tutorialActive}>
           Annuler
         </button>
         <button

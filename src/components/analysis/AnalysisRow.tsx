@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import type { AnalysisLine } from '@/types/analysis';
 import { formatCp, formatMate } from '@/utils/format';
 import { buildContextMenu } from '@/services/contextMenu';
+import { playUciMove } from '@/services/repertoire';
 import { useTooltipContext } from '@/contexts/TooltipContext';
 import { AnalysisMiniBoardTooltip } from '@/services/tooltipContent';
 import { useChessStore } from '@/stores/chessStore';
@@ -42,11 +43,16 @@ export const AnalysisRow = React.memo(function AnalysisRow({
     hideTooltip(0);
   }, [hideTooltip]);
 
+  const handleClick = useCallback(() => {
+    playUciMove(line.uci);
+  }, [line.uci]);
+
   return (
     <div
       className="analysis-row"
       data-move-uci={line.uci}
       data-move-san={bestMoveSan}
+      onClick={handleClick}
       onContextMenu={(e) => buildContextMenu(e, 'analysis_move', { uci: line.uci, san: bestMoveSan, pv: line.pv })}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
