@@ -163,7 +163,12 @@ export function AppLayout() {
       openModal({ type: 'select-repertoire', repChoices: matches });
     }
   }, [openModal]);
-
+  useEffect(() => {
+    const flag = sessionStorage.getItem('alphaChess.openNewRepAfterTutorial');
+    if (!flag) return;
+    sessionStorage.removeItem('alphaChess.openNewRepAfterTutorial');
+    openModal({ type: 'new-repertoire' });
+  }, [openModal]);
   /* ── Analyse (désactivée pendant l'entraînement) ────────── */
   const chess         = useChessStore((s) => s.chess);
   const isEnabled     = useAnalysisStore((s) => s.isEnabled);

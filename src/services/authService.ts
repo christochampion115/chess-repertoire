@@ -547,6 +547,7 @@ export function scheduleRepertoireSync(): void {
 }
 
 export async function registerCreatedRepertoire(rep: RepertoireNode): Promise<void> {
+  if (useRepertoireStore.getState().suppressSync) return;
   const token = useAuthStore.getState().token;
   if (!token) return;
   const data = serializeRepertoire(rep);
@@ -626,6 +627,7 @@ export async function resolveConflict(
 }
 
 export function syncUserSettings(): void {
+  if (useRepertoireStore.getState().suppressSync) return;
   const { token } = useAuthStore.getState();
   if (!token) return;
 

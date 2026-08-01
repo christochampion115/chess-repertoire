@@ -737,6 +737,7 @@ export function resetPosition(): void {
 
 export function initExampleData(): void {
   const store = useRepertoireStore.getState();
+  const prevSuppressSync = store.suppressSync;
   store.setSuppressSync(true);
 
   try {
@@ -894,8 +895,8 @@ export function initExampleData(): void {
     const bB_e5f = addMove(bB_f4.id, 'e5')!;
     addMove(bB_e5f.id, 'Nf3');
   } finally {
-    store.setSuppressSync(false);
-    scheduleRepertoireSync();
+    store.setSuppressSync(prevSuppressSync);
+    if (!prevSuppressSync) scheduleRepertoireSync();
   }
 
   // Reset sur le jeu libre

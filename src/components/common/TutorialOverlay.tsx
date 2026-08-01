@@ -17,7 +17,7 @@ interface StepConfig {
   center?: boolean;
   showArrow?: boolean;
   arrowPos?: 'top' | 'bottom' | 'left' | 'right';
-  arrowOffset?: { x?: number; y?: number };
+  arrowOffset?: { x?: number; y?: number; xFrac?: number; yFrac?: number };
   /** Optional callback to track state changes and auto-advance. Returns an unsubscribe function. */
   subscribe?: (nextStep: () => void) => () => void;
   /** When true, skip rendering mask segments and highlight ring (page stays fully interactive). */
@@ -87,7 +87,7 @@ const STEPS: StepConfig[] = [
   // ─── 3: Nom + bouton Créer ───────────────────────────────────
   {
     target: '#rep-name-input, #btn-rep-confirm',
-    text: <>Ecrivez le nom de votre répertoire (par exemple : <strong>"Gambit Dame"</strong>).<br /><br />Cliquez ensuite sur <strong>"Créer"</strong>.</>,
+    text: <>Écrivez le nom de votre répertoire (par exemple : <strong>"Gambit Dame"</strong>).<br /><br />Cliquez ensuite sur <strong>"Créer"</strong>.</>,
     bubblePos: 'top',
     subscribe: (next) => {
       const unsub = useUiStore.subscribe((state, prev) => {
@@ -120,7 +120,7 @@ const STEPS: StepConfig[] = [
     text: <>Ajoutez le premier coup de votre répertoire.<br /><br />Jouez le coup <strong>e4</strong> pour commencer.</>,
     bubblePos: 'right',
     showArrow: true,
-    arrowOffset: { x: 20, y: 385 },
+    arrowOffset: { xFrac: 0.0625, yFrac: 0.9375, y: -60 }, // between e1 and e2: col e = 4.5/8, row 1 = 7.5/8
     subscribe: (next) => {
       let initialId: string | null = null;
       const unsub = useRepertoireStore.subscribe((state) => {
@@ -171,7 +171,7 @@ const STEPS: StepConfig[] = [
     text: <>Ici, vous trouverez les réponses les plus populaires au coup que vous venez de jouer.<br /><br />Vous pourrez naviguer entre plusieurs bases de données une fois sorti du tutoriel.<br /><br />Choisissez un coup pour l'intégrer à votre répertoire.</>,
     bubblePos: 'top',
     showArrow: true,
-    arrowOffset: { y: 100 },
+    arrowOffset: { y: 110 },
     subscribe: (next) => {
       let initialUci = useStatsStore.getState().selectedUci;
       const unsub = useStatsStore.subscribe((state) => {
@@ -207,7 +207,7 @@ const STEPS: StepConfig[] = [
     text: <>Voici la liste des coups favoris de l'ordinateur, choisissez en un pour l'intégrer à votre répertoire.</>,
     bubblePos: 'top',
     showArrow: true,
-    arrowOffset: { y: 40 },
+    arrowOffset: { y: 45 },
     subscribe: (next) => {
       let refId: string | null = null;
       const unsub = useRepertoireStore.subscribe((state) => {
@@ -275,7 +275,7 @@ const STEPS: StepConfig[] = [
         Vous pouvez naviguer de l'une à l'autre en cliquant dessus, ce qui vous permet de préparer vos réponses à l'avance.<br /><br />
         <span style={{ fontSize: '0.82rem', display: 'block', lineHeight: 1.8 }}>
           Exemple de hiérarchie :<br />
-          <span style={{ display: 'block', marginLeft: 0 }}>└─ <strong>Sicilienne</strong></span>
+          <span style={{ display: 'block', marginLeft: 0 }}><strong>Sicilienne</strong></span>
           <span style={{ display: 'block', marginLeft: 20 }}>└─ <strong>Sicilienne fermée</strong></span>
           <span style={{ display: 'block', marginLeft: 40 }}>└─ <strong>Sicilienne ouverte</strong></span>
           <span style={{ display: 'block', marginLeft: 60 }}>└─ <strong>Vieille sicilienne</strong> …</span>
@@ -295,7 +295,7 @@ const STEPS: StepConfig[] = [
         Cliquez <strong>deux fois</strong> sur la flèche retour ← pour revenir en arrière et explorer d'autres réponses adverses.
       </>
     ),
-    bubblePos: 'bottom',
+    bubblePos: 'top',
     showArrow: true,
     arrowPos: 'left',
     arrowOffset: { x: 20, y: 10 },
@@ -317,7 +317,7 @@ const STEPS: StepConfig[] = [
 
   // ─── 15: Autre coup candidat ────────────────────────────────
   {
-    target: '#stats-panel',
+    target: '[data-tutorial="candidates-list"]',
     text: (
       <>
         Maintenant, ajoutez un <strong>coup différent</strong> de celui déjà choisi pour voir comment l'arbre gère les <strong>bifurcations</strong>.<br /><br />
@@ -326,16 +326,59 @@ const STEPS: StepConfig[] = [
     ),
     bubblePos: 'top',
     showArrow: true,
-    arrowOffset: { y: 10 },
-    subscribe: (next) => {
+    arrowOffset: { y: 155 },
+    subscribe: (_next) => {
       const { filters, setFilter } = useStatsStore.getState();
       if (!filters.candidatesOpen) setFilter('candidatesOpen', true);
+
+      // Snapshot children of current node to detect if the user replays the same move
+      const startNodeId = useRepertoireStore.getState().currentNodeId;
+      const knownChildIds = new Set<string>();
+      const stack = [...useRepertoireStore.getState().repertoires];
+      while (stack.length) {
+        const n = stack.pop()!;
+        if (n.id === startNodeId) { n.children.forEach(c => knownChildIds.add(c.id)); break; }
+        stack.push(...n.children);
+      }
 
       let refUci = useStatsStore.getState().selectedUci;
       const unsub = useStatsStore.subscribe((state) => {
         if (state.selectedUci && state.selectedUci !== refUci) {
           refUci = state.selectedUci;
-          setTimeout(() => next(), 500);
+          setTimeout(() => {
+            const newNodeId = useRepertoireStore.getState().currentNodeId;
+            if (newNodeId && knownChildIds.has(newNodeId)) {
+              useTutorialStore.getState().goToStep(16); // same move → error recovery (step 15b)
+            } else {
+              useTutorialStore.getState().goToStep(17); // different move → proceed
+            }
+          }, 500);
+        }
+      });
+      return unsub;
+    },
+  },
+
+  // ─── 15b: Même coup rejoué — erreur ─────────────────────────
+  {
+    target: '#btn-nav-back',
+    text: (
+      <>
+        Mince, vous avez rejoué le même coup !<br /><br />
+        Le but est de voir ce qu'il se passe quand l'adversaire joue un coup <strong>différent</strong>.<br /><br />
+        Revenez au coup précédent.
+      </>
+    ),
+    bubblePos: 'top',
+    showArrow: true,
+    arrowPos: 'left',
+    arrowOffset: { x: 20, y: 10 },
+    noMask: false,
+    subscribe: (_next) => {
+      const refId = useRepertoireStore.getState().currentNodeId;
+      const unsub = useRepertoireStore.subscribe((state) => {
+        if (state.currentNodeId !== refId) {
+          setTimeout(() => useTutorialStore.getState().goToStep(15), 300);
         }
       });
       return unsub;
@@ -454,11 +497,15 @@ const STEPS: StepConfig[] = [
 
 ];
 
-/** Returns a union bounding rect of ALL elements matching `selector` (comma-separated). */
+/** Returns visible elements matching `selector` (comma-separated). Filters hidden/invisible elements. */
 function resolveTargets(selector: string): Element[] {
   const els: Element[] = [];
   for (const sel of selector.split(',').map(s => s.trim())) {
-    document.querySelectorAll(sel).forEach(el => els.push(el));
+    for (const el of document.querySelectorAll(sel)) {
+      if (el.checkVisibility?.() ?? (el as HTMLElement).offsetParent !== null) {
+        els.push(el);
+      }
+    }
   }
   return els;
 }
@@ -494,7 +541,9 @@ function useTargetRect(selector?: string, step?: TutorialStep) {
     if (els.length === 0) { setRect(null); return; }
 
     const update = (force = false) => {
-      const u = unionRect(els);
+      const elsNow = resolveTargets(selector);
+      if (elsNow.length === 0) { setRect(null); return; }
+      const u = unionRect(elsNow);
       if (!u) { setRect(null); return; }
       if (force || !rectRef.current ||
         u.left !== rectRef.current.left ||
@@ -507,14 +556,23 @@ function useTargetRect(selector?: string, step?: TutorialStep) {
     };
 
     update();
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', () => update(true), { passive: true });
-    const observer = new ResizeObserver(update);
+
+    const onScroll = () => update();
+    const onResize = () => update(true);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+
+    const observer = new ResizeObserver(() => update(true));
     for (const el of els) observer.observe(el);
+    observer.observe(document.body);
+
+    // rAF loop catches position shifts not detected by ResizeObserver (e.g. analysis panel opening above target)
+    let rafId = requestAnimationFrame(function loop() { update(); rafId = requestAnimationFrame(loop); });
 
     return () => {
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
       observer.disconnect();
     };
   }, [selector, step]);
@@ -578,6 +636,7 @@ export function TutorialOverlay() {
   const currentStep = useTutorialStore((s) => s.currentStep);
   const nextStep = useTutorialStore((s) => s.nextStep);
   const endTutorial = useTutorialStore((s) => s.endTutorial);
+  const cleanupTutorial = useTutorialStore((s) => s.cleanupTutorial);
 
   const step = STEPS[currentStep];
   const targetRect = useTargetRect(step?.target, currentStep);
@@ -600,24 +659,37 @@ export function TutorialOverlay() {
   }, [isActive]);
 
   useEffect(() => {
-    document.body.classList.remove('tutorial-lock-modal');
+    document.body.classList.remove('tutorial-lock-modal', 'tutorial-lock-step3');
     if (!isActive) return;
     if (currentStep === 12) {
       document.body.classList.add('tutorial-lock-modal');
+    } else if (currentStep === 3) {
+      document.body.classList.add('tutorial-lock-step3');
     }
     return () => {
-      document.body.classList.remove('tutorial-lock-modal');
+      document.body.classList.remove('tutorial-lock-modal', 'tutorial-lock-step3');
     };
   }, [isActive, currentStep]);
 
   useEffect(() => {
     if (!isActive) return;
+    const cleanup = () => useTutorialStore.getState().cleanupTutorial();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') endTutorial();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('popstate', cleanup);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('popstate', cleanup);
+    };
   }, [isActive, endTutorial]);
+
+  const handleCreateRep = useCallback(() => {
+    try { sessionStorage.setItem('alphaChess.openNewRepAfterTutorial', '1'); } catch {}
+    cleanupTutorial();
+    window.location.href = '/app';
+  }, [cleanupTutorial]);
 
   if (!isActive || !step) return null;
 
@@ -629,6 +701,7 @@ export function TutorialOverlay() {
       targetRect={targetRect}
       onNext={handleNext}
       onQuit={endTutorial}
+      onCreateRep={handleCreateRep}
     />,
     document.body,
   );
@@ -640,12 +713,14 @@ function TutorialCenterStep({
   totalSteps,
   onNext,
   onQuit,
+  onCreateRep,
 }: {
   step: StepConfig;
   stepIndex: number;
   totalSteps: number;
   onNext: () => void;
   onQuit: () => void;
+  onCreateRep: () => void;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -674,7 +749,7 @@ function TutorialCenterStep({
           <p className="tutorial-bubble-text">{step.text}</p>
           <div className="tutorial-bubble-actions" style={{ justifyContent: 'center' }}>
             <button className="tutorial-btn" onClick={onQuit}>Revenir à l'accueil</button>
-            <button className="tutorial-btn" onClick={onQuit}>Créer un répertoire</button>
+            <button className="tutorial-btn" onClick={onCreateRep}>Créer un répertoire</button>
           </div>
         </div>
       </div>
@@ -730,6 +805,8 @@ function TutorialTargetedStep({
 }) {
   const [bubbleStyle, setBubbleStyle] = useState<React.CSSProperties>({ opacity: 0, pointerEvents: 'none' });
   const [arrowDir, setArrowDir] = useState('');
+  const [bubbleTriStyle, setBubbleTriStyle] = useState<React.CSSProperties>({});
+  const [arrowEmojiStyle, setArrowEmojiStyle] = useState<React.CSSProperties>({});
   const bubbleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -766,12 +843,45 @@ function TutorialTargetedStep({
         dir = 'top';
     }
 
-    left = Math.max(12, Math.min(left, window.innerWidth - b.width - 12));
-    top = Math.max(12, Math.min(top, window.innerHeight - b.height - 12));
+    const clampedLeft = Math.max(12, Math.min(left, window.innerWidth - b.width - 12));
+    const clampedTop = Math.max(12, Math.min(top, window.innerHeight - b.height - 12));
 
-    setBubbleStyle({ left, top, opacity: 1, pointerEvents: 'auto' });
+    setBubbleStyle({ left: clampedLeft, top: clampedTop, opacity: 1, pointerEvents: 'auto' });
     setArrowDir(dir);
-  }, [targetRect, step.bubblePos]);
+
+    // Adjust arrow triangle to stay aligned with the target after clamping
+    const tri: React.CSSProperties = {};
+    if (dir === 'top' || dir === 'bottom') {
+      const idealCx = targetRect.left + targetRect.width / 2;
+      const bubbleCx = clampedLeft + b.width / 2;
+      tri.marginLeft = '-6px';
+      tri.left = `calc(50% + ${idealCx - bubbleCx}px)`;
+      tri.right = 'auto';
+    } else {
+      const idealCy = targetRect.top + targetRect.height / 2;
+      const bubbleCy = clampedTop + b.height / 2;
+      tri.marginTop = '-6px';
+      tri.top = `calc(50% + ${idealCy - bubbleCy}px)`;
+      tri.bottom = 'auto';
+    }
+    setBubbleTriStyle(tri);
+
+    // Arrow emoji position
+    const arrPos = step.arrowPos || 'top';
+    const ox = (step.arrowOffset?.x ?? 0) + (step.arrowOffset?.xFrac ?? 0) * targetRect.width;
+    const oy = (step.arrowOffset?.y ?? 0) + (step.arrowOffset?.yFrac ?? 0) * targetRect.height;
+    if (arrPos === 'left') {
+      setArrowEmojiStyle({
+        left: targetRect.left - 39 + ox,
+        top: targetRect.top + targetRect.height / 2 - 12 + oy,
+      });
+    } else {
+      setArrowEmojiStyle({
+        left: targetRect.left + targetRect.width / 2 - 12 + ox,
+        top: targetRect.top - 12 + oy,
+      });
+    }
+  }, [targetRect, step.bubblePos, step.arrowPos, step.arrowOffset?.x, step.arrowOffset?.y, step.arrowOffset?.xFrac, step.arrowOffset?.yFrac]);
 
   const bu = 4;
   const segments = targetRect && !step.noMask ? maskSegments(targetRect, bu) : null;
@@ -795,24 +905,14 @@ function TutorialTargetedStep({
       {step.showArrow && targetRect && (
         <div
           className={`tutorial-arrow-anim tutorial-arrow-anim--${step.arrowPos || 'top'}`}
-          style={
-            step.arrowPos === 'left'
-              ? {
-                  left: targetRect.left - 39 + (step.arrowOffset?.x || 0),
-                  top: targetRect.top + targetRect.height / 2 - 12 + (step.arrowOffset?.y || 0),
-                }
-              : {
-                  left: targetRect.left + targetRect.width / 2 - 12 + (step.arrowOffset?.x || 0),
-                  top: targetRect.top - 12 + (step.arrowOffset?.y || 0),
-                }
-          }
+          style={arrowEmojiStyle}
         >
           👆
         </div>
       )}
 
       <div ref={bubbleRef} className="tutorial-bubble" style={bubbleStyle}>
-        <div className={`tutorial-bubble-arrow tutorial-bubble-arrow--${arrowDir}`} />
+        <div className={`tutorial-bubble-arrow tutorial-bubble-arrow--${arrowDir}`} style={bubbleTriStyle} />
         <p className="tutorial-bubble-text">{step.text}</p>
         <BubbleActions
           hasSubscribe={!!step.subscribe}
@@ -835,6 +935,7 @@ function TutorialOverlayInner({
   targetRect,
   onNext,
   onQuit,
+  onCreateRep,
 }: {
   step: StepConfig;
   stepIndex: number;
@@ -842,6 +943,7 @@ function TutorialOverlayInner({
   targetRect: DOMRect | null;
   onNext: () => void;
   onQuit: () => void;
+  onCreateRep: () => void;
 }) {
   if (step.center) {
     return (
@@ -851,6 +953,7 @@ function TutorialOverlayInner({
         totalSteps={totalSteps}
         onNext={onNext}
         onQuit={onQuit}
+        onCreateRep={onCreateRep}
       />
     );
   }

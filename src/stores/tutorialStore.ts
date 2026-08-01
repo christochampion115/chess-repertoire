@@ -3,6 +3,7 @@ import { useRepertoireStore } from './repertoireStore';
 import { useChessStore } from './chessStore';
 import { useStatsStore } from './statsStore';
 import { useAnalysisStore } from './analysisStore';
+import { useAuthStore } from './authStore';
 import { Chess } from 'chess.js';
 
 export type TutorialStep = number;
@@ -21,11 +22,14 @@ interface TutorialState {
   currentStep: TutorialStep;
   snapshot: TutorialSnapshot | null;
   navProgress: number;
+  /** auth token saved before tutorial starts — cleared on the store to block all API calls */
+  savedToken: string;
 }
 
 interface TutorialActions {
   startTutorial: () => void;
   endTutorial: () => void;
+  cleanupTutorial: () => void;
   nextStep: () => void;
   goToStep: (step: TutorialStep) => void;
   setNavProgress: (val: number) => void;
@@ -36,6 +40,7 @@ const LS_CHESS = 'alphaChess-chess';
 const LS_ANALYSIS = 'alphaChess-analysis';
 const LS_STATS = 'alphaChess.statsFilters';
 const LS_REP_FOLDERS = 'alphaChess.repFolders';
+const SS_SNAPSHOT_KEY = 'alphaChess.tutorialSnapshot';
 
 function takeSnapshot(): TutorialSnapshot {
   return {
@@ -46,6 +51,22 @@ function takeSnapshot(): TutorialSnapshot {
     repFolders: localStorage.getItem(LS_REP_FOLDERS),
     previousPath: window.location.pathname,
   };
+}
+
+function persistSnapshot(snap: TutorialSnapshot) {
+  try { sessionStorage.setItem(SS_SNAPSHOT_KEY, JSON.stringify(snap)); } catch {}
+}
+
+function loadPersistedSnapshot(): TutorialSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(SS_SNAPSHOT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as TutorialSnapshot;
+  } catch { return null; }
+}
+
+function clearPersistedSnapshot() {
+  try { sessionStorage.removeItem(SS_SNAPSHOT_KEY); } catch {}
 }
 
 function restoreSnapshot(snap: TutorialSnapshot) {
@@ -91,34 +112,50 @@ export const useTutorialStore = create<TutorialState & TutorialActions>()(
     currentStep: 0,
     snapshot: null,
     navProgress: 0,
+    savedToken: '',
 
     startTutorial: () => {
       const snap = takeSnapshot();
+      persistSnapshot(snap);
+      // Disable localStorage BEFORE clearing the token so the empty token is never persisted
       disableLocalStorage();
+      const savedToken = useAuthStore.getState().token;
+      useAuthStore.getState().setToken('');
 
-      useRepertoireStore.getState().setSuppressSync(true);
-      useRepertoireStore.getState().setSuppressSnapshot(true);
-
+      // reset() must run before suppress flags — it hardcodes suppressSync:false in its payload
       useRepertoireStore.getState().reset();
       useChessStore.setState({ chess: new Chess(), selectedSq: null });
       useStatsStore.getState().reset();
       useStatsStore.getState().setFilter('candidatesOpen', false);
       useAnalysisStore.setState({ isEnabled: false, results: [], error: null });
-      set({ isActive: true, currentStep: 0, snapshot: snap, navProgress: 0 });
+
+      useRepertoireStore.getState().setSuppressSync(true);
+      useRepertoireStore.getState().setSuppressSnapshot(true);
+
+      set({ isActive: true, currentStep: 0, snapshot: snap, navProgress: 0, savedToken });
     },
 
-    endTutorial: () => {
-      const snap = useTutorialStore.getState().snapshot;
+    cleanupTutorial: () => {
+      const snap = useTutorialStore.getState().snapshot ?? loadPersistedSnapshot();
+      const savedToken = useTutorialStore.getState().savedToken;
 
-      set({ isActive: false, currentStep: 0, snapshot: null });
+      set({ isActive: false, currentStep: 0, snapshot: null, savedToken: '' });
 
       useRepertoireStore.getState().setSuppressSync(false);
       useRepertoireStore.getState().setSuppressSnapshot(false);
 
+      // Restore token BEFORE re-enabling localStorage so the empty token is never written to disk
+      if (savedToken) useAuthStore.getState().setToken(savedToken);
+
       enableLocalStorage();
 
       if (snap) restoreSnapshot(snap);
+      clearPersistedSnapshot();
+    },
 
+    endTutorial: () => {
+      const snap = useTutorialStore.getState().snapshot ?? loadPersistedSnapshot();
+      useTutorialStore.getState().cleanupTutorial();
       window.location.href = snap?.previousPath || '/';
     },
 

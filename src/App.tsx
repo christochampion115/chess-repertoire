@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ViewHome } from '@/components/layout/ViewHome';
 import { LegalPage } from '@/components/layout/LegalPage';
@@ -10,6 +10,24 @@ import { TutorialOverlay } from '@/components/common/TutorialOverlay';
 import { TooltipProvider } from '@/contexts/TooltipContext';
 import { ReportPage } from '@/components/report/ReportPage';
 import { bootstrapSession } from '@/services/authService';
+import { useTutorialStore } from '@/stores/tutorialStore';
+
+// Only cleans up when leaving /app — not when arriving (which would kill the tutorial on start)
+function TutorialGuard() {
+  const location = useLocation();
+  const prevRef = useRef(location.pathname);
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    prevRef.current = location.pathname;
+    if (prev !== '/app') return;
+    if (location.pathname !== '/app' && useTutorialStore.getState().isActive) {
+      useTutorialStore.getState().cleanupTutorial();
+    }
+  }, [location]);
+
+  return null;
+}
 
 export function App() {
   useEffect(() => {
@@ -20,6 +38,7 @@ export function App() {
     <BrowserRouter>
       <TooltipProvider>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', position: 'relative' }}>
+          <TutorialGuard />
           <TopBar />
           <Routes>
             <Route path="/" element={<ViewHome />} />

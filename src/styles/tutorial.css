@@ -224,11 +224,20 @@
   50% { transform: rotate(90deg) translateY(-8px); opacity: 0.7; }
 }
 
+/* ─── Step 3 lock: disable distracting modal elements ──────── */
+body.tutorial-lock-step3 #modal-overlay .rep-create-mode-selector,
+body.tutorial-lock-step3 #modal-overlay .color-selector,
+body.tutorial-lock-step3 #modal-overlay .rep-folder-container,
+body.tutorial-lock-step3 #modal-overlay .pgn-import-section,
+body.tutorial-lock-step3 #modal-overlay .rep-current-info {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
 /* ─── Step 13 modal lock ───────────────────────────────────── */
 body.tutorial-lock-modal #modal-overlay input,
 body.tutorial-lock-modal #modal-overlay select,
-body.tutorial-lock-modal #modal-overlay button,
-body.tutorial-lock-modal #modal-overlay .modal-actions {
+body.tutorial-lock-modal #modal-overlay button {
   pointer-events: none;
   opacity: 0.5;
 }
