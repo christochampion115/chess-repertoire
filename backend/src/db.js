@@ -35,9 +35,13 @@ const PG_DDLS = [
   `CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE,
+    phone TEXT UNIQUE,
+    "emailVerified" BOOLEAN DEFAULT FALSE,
+    "phoneVerified" BOOLEAN DEFAULT FALSE,
     "passwordHash" TEXT NOT NULL,
-    "createdAt" TEXT NOT NULL
+    "createdAt" TEXT NOT NULL,
+    CONSTRAINT check_contact_required CHECK (email IS NOT NULL OR phone IS NOT NULL)
   )`,
   `CREATE TABLE IF NOT EXISTS repertoires (
     id SERIAL PRIMARY KEY,
@@ -119,9 +123,13 @@ const SQLITE_DDLS = [
   `CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE,
+    phone TEXT UNIQUE,
+    "emailVerified" INTEGER DEFAULT 0,
+    "phoneVerified" INTEGER DEFAULT 0,
     "passwordHash" TEXT NOT NULL,
-    "createdAt" TEXT NOT NULL
+    "createdAt" TEXT NOT NULL,
+    CHECK (email IS NOT NULL OR phone IS NOT NULL)
   )`,
   `CREATE TABLE IF NOT EXISTS repertoires (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

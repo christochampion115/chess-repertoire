@@ -3,6 +3,7 @@ import type { RepertoireNode } from '@/types/repertoire';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useTutorialStore } from '@/stores/tutorialStore';
 import type { CtxMenuItem } from '@/stores/uiStore';
 import {
   getNode,
@@ -270,6 +271,15 @@ export function buildContextMenu(
         uiStore.openModal({ type: 'new-repertoire' });
       },
     });
+  }
+
+  if (useTutorialStore.getState().isActive && (type === 'arbre' || type === 'repertoire_subitem' || type === 'repertoire_item' || type === 'monitor')) {
+    for (const item of items) {
+      const lower = item.label.toLowerCase();
+      if (!lower.includes('nommer la variante') && !lower.includes('renommer la variante')) {
+        item.disabled = true;
+      }
+    }
   }
 
   if (items.length === 0) return;

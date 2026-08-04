@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '@/stores/uiStore';
+import { useTutorialStore } from '@/stores/tutorialStore';
 
 const PARTICLES = Array.from({ length: 48 }, (_, i) => ({
   id: i,
@@ -70,9 +71,12 @@ export const ViewHome = React.memo(function ViewHome() {
             de drill, et progressez avec des données réelles.
           </p>
           <div className="home-hero-cta">
-            <button className="home-cta-btn home-cta-btn--primary" disabled>
+            <button className="home-cta-btn home-cta-btn--primary" onClick={() => {
+              useTutorialStore.getState().startTutorial();
+              navigate('/app');
+            }}>
               <span aria-hidden="true">🎓</span>
-              Tutoriel — bientôt disponible
+              Tutoriel
             </button>
           </div>
         </div>

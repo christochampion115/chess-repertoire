@@ -13,8 +13,10 @@ export const SplashScreen = React.memo(function SplashScreen() {
   const error        = useAuthStore((s) => s.error);
   const isSubmitting = useAuthStore((s) => s.isSubmitting);
   const [step, setStep] = useState<SplashStep>('welcome');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
 
   const handleGuest = useCallback(() => {
@@ -27,12 +29,12 @@ export const SplashScreen = React.memo(function SplashScreen() {
   }, [setGuestMode, setStatus]);
 
   const handleLogin = useCallback(async () => {
-    await loginWithCredentials({ email, password });
-  }, [email, password]);
+    await loginWithCredentials({ identifier, password });
+  }, [identifier, password]);
 
   const handleSignup = useCallback(async () => {
-    await signupWithCredentials({ username, password });
-  }, [username, password]);
+    await signupWithCredentials({ username, email: email || undefined, phone: phone || undefined, password });
+  }, [username, email, phone, password]);
 
   return (
     <div id="splash-screen">
@@ -66,14 +68,15 @@ export const SplashScreen = React.memo(function SplashScreen() {
           </div>
           <div className="splash-actions" style={{ marginTop: 24 }}>
             <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Email, téléphone ou pseudo"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
               className="splash-input"
               style={{ marginBottom: 12 }}
               autoFocus
+              autoComplete="username"
             />
             <input
               type="password"
@@ -89,7 +92,7 @@ export const SplashScreen = React.memo(function SplashScreen() {
               className="splash-btn primary"
               id="splash-submit-btn"
               style={{ width: '100%', marginBottom: 12 }}
-              disabled={isSubmitting || !email || !password}
+              disabled={isSubmitting || !identifier || !password}
               onClick={handleLogin}
             >
               {isSubmitting ? 'Connexion...' : 'Se connecter'}
@@ -118,24 +121,52 @@ export const SplashScreen = React.memo(function SplashScreen() {
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
               className="splash-input"
-              style={{ marginBottom: 12 }}
+              style={{ marginBottom: 16 }}
               autoFocus
+              autoComplete="username"
+            />
+            {/* ── Séparateur ── */}
+            <div style={{ height: 1, background: 'var(--border-subtle, #333)', margin: '4px 0 12px' }} />
+            <input
+              type="email"
+              placeholder="votre@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
+              className="splash-input"
+              style={{ marginBottom: 8 }}
+              autoComplete="email"
             />
             <input
+              type="tel"
+              placeholder="Numéro de téléphone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
+              className="splash-input"
+              style={{ marginBottom: 6 }}
+              autoComplete="tel"
+            />
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+              Choisir au moins un des deux moyens d'identification
+            </div>
+            <div style={{ height: 1, background: 'var(--border-subtle, #333)', marginBottom: 12 }} />
+            <input
               type="password"
-              placeholder="Mot de passe"
+              placeholder="Mot de passe (min. 8 caractères)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
               className="splash-input"
               style={{ marginBottom: 12 }}
+              autoComplete="new-password"
             />
             {error && <div style={{ color: '#fb7185', fontSize: '0.85rem', marginBottom: 8 }}>{error}</div>}
             <button
               className="splash-btn primary"
               id="splash-submit-btn"
               style={{ width: '100%', marginBottom: 12 }}
-              disabled={isSubmitting || !username || !password}
+              disabled={isSubmitting || !username || !password || (!email && !phone)}
               onClick={handleSignup}
             >
               {isSubmitting ? 'Création...' : 'Créer un compte'}

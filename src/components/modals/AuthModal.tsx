@@ -4,22 +4,25 @@ import { useAuthStore } from '@/stores/authStore';
 import { ModalBox } from './ModalBox';
 import { loginWithCredentials, signupWithCredentials } from '@/services/authService';
 
+const INPUT_STYLE = { width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box' as const };
+
 export function AuthModal() {
   const closeModal = useUiStore((s) => s.closeModal);
   const error        = useAuthStore((s) => s.error);
   const isSubmitting = useAuthStore((s) => s.isSubmitting);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = async () => {
     if (mode === 'login') {
-      await loginWithCredentials({ email, password });
+      await loginWithCredentials({ identifier, password });
     } else {
-      await signupWithCredentials({ username, password });
+      await signupWithCredentials({ username, email: email || undefined, phone: phone || undefined, password });
     }
-    // Close modal on success (user will be set in store)
     if (useAuthStore.getState().user) {
       closeModal();
     }
@@ -35,13 +38,14 @@ export function AuthModal() {
         {mode === 'login' ? (
           <>
             <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Email, téléphone ou pseudo"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box' }}
+              style={INPUT_STYLE}
               autoFocus
+              autoComplete="username"
             />
             <input
               type="password"
@@ -49,7 +53,8 @@ export function AuthModal() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box' }}
+              style={INPUT_STYLE}
+              autoComplete="current-password"
             />
           </>
         ) : (
@@ -60,16 +65,42 @@ export function AuthModal() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box' }}
+              style={{ ...INPUT_STYLE, marginBottom: 4 }}
               autoFocus
+              autoComplete="username"
             />
+            {/* ── Séparateur ── */}
+            <div style={{ height: 1, background: '#333', margin: '4px 0 8px' }} />
+            <input
+              type="email"
+              placeholder="votre@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+              style={INPUT_STYLE}
+              autoComplete="email"
+            />
+            <input
+              type="tel"
+              placeholder="Numéro de téléphone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+              style={INPUT_STYLE}
+              autoComplete="tel"
+            />
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: -4 }}>
+              Choisir au moins un des deux moyens d'identification
+            </div>
+            <div style={{ height: 1, background: '#333' }} />
             <input
               type="password"
               placeholder="Mot de passe (8 caractères min.)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-              style={{ width: '100%', padding: 12, background: '#111', color: 'white', border: '1px solid #333', borderRadius: 5, fontSize: '0.95rem', boxSizing: 'border-box' }}
+              style={INPUT_STYLE}
+              autoComplete="new-password"
             />
           </>
         )}
@@ -78,7 +109,7 @@ export function AuthModal() {
       <div className="modal-actions">
         <button
           className="ctrl-btn ctrl-btn--primary"
-          disabled={isSubmitting}
+          disabled={isSubmitting || (mode === 'login' ? (!identifier || !password) : (!username || !password || (!email && !phone)))}
           onClick={handleSubmit}
           style={mode === 'login' ? { marginLeft: 'auto' } : undefined}
         >

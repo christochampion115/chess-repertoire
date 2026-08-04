@@ -225,6 +225,8 @@ export async function bootstrapSession(): Promise<void> {
     } else {
       auth.setSyncStatus('error', 'Connexion perdue, veuillez vous reconnecter');
       // Garder les données locales (Zustand persist) plutôt que vider
+      auth.setStatus('logged');
+      initializeService();
     }
   }
 }
@@ -289,7 +291,7 @@ async function _applyServerRepertoires(remoteReps: any[]): Promise<void> {
 
 // ─── Login ────────────────────────────────────────────────────────────────
 
-export async function loginWithCredentials({ email, password }: { email: string; password: string }): Promise<void> {
+export async function loginWithCredentials({ identifier, password }: { identifier: string; password: string }): Promise<void> {
   const auth = useAuthStore.getState();
   auth.setSubmitting(true);
   auth.setError('');
@@ -297,7 +299,7 @@ export async function loginWithCredentials({ email, password }: { email: string;
   try {
     const response = await apiRequest('/auth/login', {
       method: 'POST',
-      body: { email, password },
+      body: { identifier, password },
     });
     await finalizeAuthenticatedSession(response, false);
   } catch (error: any) {
@@ -318,7 +320,7 @@ export async function loginWithCredentials({ email, password }: { email: string;
 
 // ─── Signup ───────────────────────────────────────────────────────────────
 
-export async function signupWithCredentials({ username, password }: { username: string; password: string }): Promise<void> {
+export async function signupWithCredentials({ username, email, phone, password }: { username: string; email?: string; phone?: string; password: string }): Promise<void> {
   const auth = useAuthStore.getState();
   auth.setSubmitting(true);
   auth.setError('');
@@ -326,13 +328,17 @@ export async function signupWithCredentials({ username, password }: { username: 
   try {
     const response = await apiRequest('/auth/signup', {
       method: 'POST',
-      body: { username, password },
+      body: { username, email: email || undefined, phone: phone || undefined, password },
     });
     await finalizeAuthenticatedSession(response, true);
   } catch (error: any) {
     const msg = error?.message || '';
     if (error?.status === 409 || msg.toLowerCase().includes('username already')) {
       auth.setError('Ce nom d\'utilisateur est déjà pris.');
+    } else if (msg.toLowerCase().includes('email already')) {
+      auth.setError('Cette adresse email est déjà utilisée.');
+    } else if (msg.toLowerCase().includes('phone already')) {
+      auth.setError('Ce numéro de téléphone est déjà utilisé.');
     } else if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('mot de passe')) {
       auth.setError('Le mot de passe doit contenir au moins 8 caractères.');
     } else {
@@ -541,6 +547,7 @@ export function scheduleRepertoireSync(): void {
 }
 
 export async function registerCreatedRepertoire(rep: RepertoireNode): Promise<void> {
+  if (useRepertoireStore.getState().suppressSync) return;
   const token = useAuthStore.getState().token;
   if (!token) return;
   const data = serializeRepertoire(rep);
@@ -620,6 +627,7 @@ export async function resolveConflict(
 }
 
 export function syncUserSettings(): void {
+  if (useRepertoireStore.getState().suppressSync) return;
   const { token } = useAuthStore.getState();
   if (!token) return;
 

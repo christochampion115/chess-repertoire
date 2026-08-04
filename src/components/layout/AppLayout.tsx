@@ -4,6 +4,7 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useChessStore } from '@/stores/chessStore';
 import { useRepertoireStore } from '@/stores/repertoireStore';
 import { useTrainingStore } from '@/stores/trainingStore';
+import { useTutorialStore } from '@/stores/tutorialStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useToastStore } from '@/stores/toastStore';
 import * as repertoireService from '@/services/repertoire';
@@ -52,7 +53,8 @@ export function AppLayout() {
   const isGuestMode = useAuthStore((s) => s.isGuestMode);
   const activeModal = useUiStore((s) => s.activeModal);
 
-  const showSplash  = status === 'guest' && !isGuestMode && activeModal?.type !== 'session-expired';
+  const tutorialActive = useTutorialStore((s) => s.isActive);
+  const showSplash  = !tutorialActive && status === 'guest' && !isGuestMode && activeModal?.type !== 'session-expired';
 
   /* ── Stats auto-load ─────────────────────────── */
   useStatsAutoLoad();
@@ -161,7 +163,12 @@ export function AppLayout() {
       openModal({ type: 'select-repertoire', repChoices: matches });
     }
   }, [openModal]);
-
+  useEffect(() => {
+    const flag = sessionStorage.getItem('alphaChess.openNewRepAfterTutorial');
+    if (!flag) return;
+    sessionStorage.removeItem('alphaChess.openNewRepAfterTutorial');
+    openModal({ type: 'new-repertoire' });
+  }, [openModal]);
   /* ── Analyse (désactivée pendant l'entraînement) ────────── */
   const chess         = useChessStore((s) => s.chess);
   const isEnabled     = useAnalysisStore((s) => s.isEnabled);
@@ -282,7 +289,7 @@ export function AppLayout() {
                   activeRepIndex >= 0 ? (
                     <button className="btn-switch-freeplay" onClick={() => repertoireService.switchToFreePlay()}>Jeu libre</button>
                   ) : (
-                    <button className="btn-open-new-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
+                    <button className="btn-open-new-rep" data-tutorial="create-rep" onClick={() => openModal({ type: 'new-repertoire' })}>Créer un répertoire</button>
                   )
                 )}
               </div>

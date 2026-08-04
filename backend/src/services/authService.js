@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
+// findByPhone est utilisé dans login() via userModel.findByPhone()
 const repertoireModel = require('../models/repertoireModel');
 const { jwtSecret, tokenTTL } = require('../config');
 const { getDb, run, get } = require('../db');
@@ -43,14 +44,11 @@ function buildAuthResponse(user) {
   };
 }
 
-function buildInternalEmail(username) {
-  const encodedUsername = Buffer.from(String(username || '').trim(), 'utf8').toString('hex') || 'user';
-  return `user_${encodedUsername}@blundertale.local`;
-}
+// Hash factice utilisé pour maintenir un temps de réponse constant
+// même quand l'identifiant n'existe pas (protection timing attack — OWASP)
+const DUMMY_HASH = '$2b$12$invalidhashfortimingprotectionXXXXXXXXXXXXXXX';
 
-async function signup({ username, email, password }) {
-  const resolvedEmail = email || buildInternalEmail(username);
-
+async function signup({ username, email, phone, password }) {
   const existingUsername = await userModel.findByUsername(username);
   if (existingUsername) {
     const error = new Error('Username already in use');
@@ -58,28 +56,47 @@ async function signup({ username, email, password }) {
     throw error;
   }
 
-  const existingEmail = await userModel.findByEmail(resolvedEmail);
-  if (existingEmail) {
-    const error = new Error('Username already in use');
-    error.statusCode = 409;
-    throw error;
+  if (email) {
+    const existingEmail = await userModel.findByEmail(email);
+    if (existingEmail) {
+      const error = new Error('Email already in use');
+      error.statusCode = 409;
+      throw error;
+    }
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user = await userModel.createUser({ username, email: resolvedEmail, passwordHash });
+  if (phone) {
+    const existingPhone = await userModel.findByPhone(phone);
+    if (existingPhone) {
+      const error = new Error('Phone already in use');
+      error.statusCode = 409;
+      throw error;
+    }
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await userModel.createUser({ username, email: email || null, phone: phone || null, passwordHash });
   return buildAuthResponse(user);
 }
 
-async function login({ email, password }) {
-  const user = await userModel.findByEmail(email) || await userModel.findByUsername(email);
+async function login({ identifier, password }) {
+  let user = null;
+
+  // Détection du type d'identifiant
+  if (identifier.includes('@')) {
+    user = await userModel.findByEmail(identifier);
+  } else if (/^\+?\d{7,15}$/.test(identifier)) {
+    user = await userModel.findByPhone(identifier);
+  }
+  // Toujours essayer par username en dernier recours
   if (!user) {
-    const error = new Error('Invalid credentials');
-    error.statusCode = 401;
-    throw error;
+    user = await userModel.findByUsername(identifier);
   }
 
-  const passwordMatch = await bcrypt.compare(password, user.passwordHash);
-  if (!passwordMatch) {
+  // Toujours exécuter bcrypt même si user introuvable (protection timing attack — OWASP)
+  const passwordMatch = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
+
+  if (!user || !passwordMatch) {
     const error = new Error('Invalid credentials');
     error.statusCode = 401;
     throw error;

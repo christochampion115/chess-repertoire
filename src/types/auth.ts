@@ -1,7 +1,8 @@
 export interface User {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
 }
 
 export type AuthStatus = 'guest' | 'logged' | 'loading';

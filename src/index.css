@@ -4209,6 +4209,11 @@ body::after {
   background: rgba(148, 163, 184, 0.04);
   border-radius: 5px;
   align-items: center;
+  cursor: pointer;
+}
+
+.analysis-row:hover {
+  background: rgba(148, 163, 184, 0.10);
 }
 
 .analysis-row:last-child {
@@ -4517,7 +4522,7 @@ body::after {
 /* ─── Context Menu React ─────────────────────────────────────────────────── */
 .ctx-menu {
   position: absolute;
-  z-index: 10000;
+  z-index: 100010;
   background: linear-gradient(160deg, rgba(20,35,60,0.97) 0%, rgba(12,22,40,0.97) 100%);
   border: none;
   border-radius: 10px;

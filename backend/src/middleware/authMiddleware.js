@@ -21,7 +21,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    req.user = { id: user.id, username: user.username, email: user.email };
+    req.user = { id: user.id, username: user.username, email: user.email ?? null, phone: user.phone ?? null };
     req.token = token;
     next();
   } catch (error) {
@@ -41,7 +41,7 @@ async function optionalAuthMiddleware(req, res, next) {
     if (await authService.isTokenRevoked(token)) return next();
     const payload = jwt.verify(token, jwtSecret);
     const user = await userModel.findById(payload.sub);
-    if (user) req.user = { id: user.id, username: user.username, email: user.email };
+    if (user) req.user = { id: user.id, username: user.username, email: user.email ?? null, phone: user.phone ?? null };
   } catch (_) { /* invalid token — proceed without user */ }
   next();
 }

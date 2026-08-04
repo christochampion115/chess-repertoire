@@ -1,4 +1,5 @@
 node_modules/
 db/*.db
-.env
+.env*
+!.env.example
 *.db
