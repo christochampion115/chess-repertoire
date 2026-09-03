@@ -36,12 +36,9 @@ const PG_DDLS = [
     id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE,
-    phone TEXT UNIQUE,
     "emailVerified" BOOLEAN DEFAULT FALSE,
-    "phoneVerified" BOOLEAN DEFAULT FALSE,
     "passwordHash" TEXT NOT NULL,
-    "createdAt" TEXT NOT NULL,
-    CONSTRAINT check_contact_required CHECK (email IS NOT NULL OR phone IS NOT NULL)
+    "createdAt" TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS repertoires (
     id SERIAL PRIMARY KEY,
@@ -59,6 +56,17 @@ const PG_DDLS = [
     token TEXT PRIMARY KEY NOT NULL,
     "expiresAt" TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS auth_tokens (
+    id SERIAL PRIMARY KEY,
+    "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    "tokenHash" TEXT NOT NULL UNIQUE,
+    purpose TEXT NOT NULL CHECK (purpose IN ('verify-email','reset-password','change-email')),
+    "newEmail" TEXT,
+    "expiresAt" TIMESTAMPTZ NOT NULL,
+    "usedAt" TIMESTAMPTZ,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens("userId")`,
   `CREATE TABLE IF NOT EXISTS training_stats (
     id SERIAL PRIMARY KEY,
     "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -124,12 +132,9 @@ const SQLITE_DDLS = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE,
-    phone TEXT UNIQUE,
     "emailVerified" INTEGER DEFAULT 0,
-    "phoneVerified" INTEGER DEFAULT 0,
     "passwordHash" TEXT NOT NULL,
-    "createdAt" TEXT NOT NULL,
-    CHECK (email IS NOT NULL OR phone IS NOT NULL)
+    "createdAt" TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS repertoires (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,6 +152,17 @@ const SQLITE_DDLS = [
     token TEXT PRIMARY KEY NOT NULL,
     "expiresAt" TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS auth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    "tokenHash" TEXT NOT NULL UNIQUE,
+    purpose TEXT NOT NULL CHECK (purpose IN ('verify-email','reset-password','change-email')),
+    "newEmail" TEXT,
+    "expiresAt" TEXT NOT NULL,
+    "usedAt" TEXT,
+    "createdAt" TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens("userId")`,
   `CREATE TABLE IF NOT EXISTS training_stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

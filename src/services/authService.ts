@@ -320,7 +320,7 @@ export async function loginWithCredentials({ identifier, password }: { identifie
 
 // ─── Signup ───────────────────────────────────────────────────────────────
 
-export async function signupWithCredentials({ username, email, phone, password }: { username: string; email?: string; phone?: string; password: string }): Promise<void> {
+export async function signupWithCredentials({ username, email, password }: { username: string; email: string; password: string }): Promise<void> {
   const auth = useAuthStore.getState();
   auth.setSubmitting(true);
   auth.setError('');
@@ -328,7 +328,7 @@ export async function signupWithCredentials({ username, email, phone, password }
   try {
     const response = await apiRequest('/auth/signup', {
       method: 'POST',
-      body: { username, email: email || undefined, phone: phone || undefined, password },
+      body: { username, email, password },
     });
     await finalizeAuthenticatedSession(response, true);
   } catch (error: any) {
@@ -337,8 +337,6 @@ export async function signupWithCredentials({ username, email, phone, password }
       auth.setError('Ce nom d\'utilisateur est déjà pris.');
     } else if (msg.toLowerCase().includes('email already')) {
       auth.setError('Cette adresse email est déjà utilisée.');
-    } else if (msg.toLowerCase().includes('phone already')) {
-      auth.setError('Ce numéro de téléphone est déjà utilisé.');
     } else if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('mot de passe')) {
       auth.setError('Le mot de passe doit contenir au moins 8 caractères.');
     } else {

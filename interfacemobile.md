@@ -1,5 +1,7 @@
 # Plan Responsive — Blundertale
 
+> ⚠️ **DOCUMENT HISTORIQUE — PLAN DÉJÀ APPLIQUÉ** (vérifié dans le code le 31/08/2026 : `min-width:900px` supprimé, hamburger TopBar implémenté, Pointer Events, breakpoints 480/768 en place). Ne pas re-dérouler ce plan. État à jour et points restants : [docs/04-mobile-capacitor.md](docs/04-mobile-capacitor.md) §2.
+
 Adaptation pour interfaces mobiles et tablettes.
 
 ---

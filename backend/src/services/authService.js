@@ -1,7 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
-// findByPhone est utilisé dans login() via userModel.findByPhone()
 const repertoireModel = require('../models/repertoireModel');
 const { jwtSecret, tokenTTL } = require('../config');
 const { getDb, run, get } = require('../db');
@@ -48,7 +47,7 @@ function buildAuthResponse(user) {
 // même quand l'identifiant n'existe pas (protection timing attack — OWASP)
 const DUMMY_HASH = '$2b$12$invalidhashfortimingprotectionXXXXXXXXXXXXXXX';
 
-async function signup({ username, email, phone, password }) {
+async function signup({ username, email, password }) {
   const existingUsername = await userModel.findByUsername(username);
   if (existingUsername) {
     const error = new Error('Username already in use');
@@ -56,37 +55,23 @@ async function signup({ username, email, phone, password }) {
     throw error;
   }
 
-  if (email) {
-    const existingEmail = await userModel.findByEmail(email);
-    if (existingEmail) {
-      const error = new Error('Email already in use');
-      error.statusCode = 409;
-      throw error;
-    }
-  }
-
-  if (phone) {
-    const existingPhone = await userModel.findByPhone(phone);
-    if (existingPhone) {
-      const error = new Error('Phone already in use');
-      error.statusCode = 409;
-      throw error;
-    }
+  const existingEmail = await userModel.findByEmail(email);
+  if (existingEmail) {
+    const error = new Error('Email already in use');
+    error.statusCode = 409;
+    throw error;
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await userModel.createUser({ username, email: email || null, phone: phone || null, passwordHash });
+  const user = await userModel.createUser({ username, email, passwordHash });
   return buildAuthResponse(user);
 }
 
 async function login({ identifier, password }) {
   let user = null;
 
-  // Détection du type d'identifiant
   if (identifier.includes('@')) {
-    user = await userModel.findByEmail(identifier);
-  } else if (/^\+?\d{7,15}$/.test(identifier)) {
-    user = await userModel.findByPhone(identifier);
+    user = await userModel.findByEmail(identifier.trim().toLowerCase());
   }
   // Toujours essayer par username en dernier recours
   if (!user) {

@@ -1,4 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════
+-- OBSOLÈTE — ne pas exécuter. Remplacé par migrate-v2-email-only.sql
+-- (retour à un système email-only, le téléphone a été abandonné)
+-- ═══════════════════════════════════════════════════════════════
 -- Migration : système d'identité étendu (email OU téléphone)
 -- À exécuter UNE SEULE FOIS sur la base PostgreSQL Render
 -- AVANT de déployer la nouvelle version du backend
