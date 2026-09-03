@@ -14,14 +14,13 @@ export function AuthModal() {
   const [identifier, setIdentifier] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = async () => {
     if (mode === 'login') {
       await loginWithCredentials({ identifier, password });
     } else {
-      await signupWithCredentials({ username, email: email || undefined, phone: phone || undefined, password });
+      await signupWithCredentials({ username, email, password });
     }
     if (useAuthStore.getState().user) {
       closeModal();
@@ -39,7 +38,7 @@ export function AuthModal() {
           <>
             <input
               type="text"
-              placeholder="Email, téléphone ou pseudo"
+              placeholder="Email ou pseudo"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
@@ -81,19 +80,6 @@ export function AuthModal() {
               autoComplete="email"
             />
             <input
-              type="tel"
-              placeholder="Numéro de téléphone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-              style={INPUT_STYLE}
-              autoComplete="tel"
-            />
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: -4 }}>
-              Choisir au moins un des deux moyens d'identification
-            </div>
-            <div style={{ height: 1, background: '#333' }} />
-            <input
               type="password"
               placeholder="Mot de passe (8 caractères min.)"
               value={password}
@@ -109,7 +95,7 @@ export function AuthModal() {
       <div className="modal-actions">
         <button
           className="ctrl-btn ctrl-btn--primary"
-          disabled={isSubmitting || (mode === 'login' ? (!identifier || !password) : (!username || !password || (!email && !phone)))}
+          disabled={isSubmitting || (mode === 'login' ? (!identifier || !password) : (!username || !email || !password))}
           onClick={handleSubmit}
           style={mode === 'login' ? { marginLeft: 'auto' } : undefined}
         >

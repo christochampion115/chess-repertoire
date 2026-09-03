@@ -16,7 +16,6 @@ export const SplashScreen = React.memo(function SplashScreen() {
   const [identifier, setIdentifier] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
 
   const handleGuest = useCallback(() => {
@@ -33,8 +32,8 @@ export const SplashScreen = React.memo(function SplashScreen() {
   }, [identifier, password]);
 
   const handleSignup = useCallback(async () => {
-    await signupWithCredentials({ username, email: email || undefined, phone: phone || undefined, password });
-  }, [username, email, phone, password]);
+    await signupWithCredentials({ username, email, password });
+  }, [username, email, password]);
 
   return (
     <div id="splash-screen">
@@ -69,7 +68,7 @@ export const SplashScreen = React.memo(function SplashScreen() {
           <div className="splash-actions" style={{ marginTop: 24 }}>
             <input
               type="text"
-              placeholder="Email, téléphone ou pseudo"
+              placeholder="Email ou pseudo"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
@@ -134,22 +133,9 @@ export const SplashScreen = React.memo(function SplashScreen() {
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
               className="splash-input"
-              style={{ marginBottom: 8 }}
+              style={{ marginBottom: 16 }}
               autoComplete="email"
             />
-            <input
-              type="tel"
-              placeholder="Numéro de téléphone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSignup(); }}
-              className="splash-input"
-              style={{ marginBottom: 6 }}
-              autoComplete="tel"
-            />
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 12 }}>
-              Choisir au moins un des deux moyens d'identification
-            </div>
             <div style={{ height: 1, background: 'var(--border-subtle, #333)', marginBottom: 12 }} />
             <input
               type="password"
@@ -166,7 +152,7 @@ export const SplashScreen = React.memo(function SplashScreen() {
               className="splash-btn primary"
               id="splash-submit-btn"
               style={{ width: '100%', marginBottom: 12 }}
-              disabled={isSubmitting || !username || !password || (!email && !phone)}
+              disabled={isSubmitting || !username || !email || !password}
               onClick={handleSignup}
             >
               {isSubmitting ? 'Création...' : 'Créer un compte'}
