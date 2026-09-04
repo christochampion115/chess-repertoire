@@ -8,16 +8,16 @@ export function ConflictModal() {
   const closeModal = useUiStore((s) => s.closeModal);
 
   if (modal?.type !== 'conflict') return null;
-  const { localRepId, serverId, serverRep } = modal;
+  const { localRepId, serverId, serverRep, serverUpdatedAt } = modal;
 
   const handleOverwrite = async () => {
     closeModal();
-    await resolveConflict(localRepId, serverId, 'overwrite', serverRep);
+    await resolveConflict(localRepId, serverId, 'overwrite', serverRep, serverUpdatedAt);
   };
 
   const handleKeepServer = async () => {
     closeModal();
-    await resolveConflict(localRepId, serverId, 'keep-server', serverRep);
+    await resolveConflict(localRepId, serverId, 'keep-server', serverRep, serverUpdatedAt);
   };
 
   return (

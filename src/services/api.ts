@@ -30,14 +30,14 @@ function buildUrl(baseUrl: string, path: string): string {
   return `${baseUrl}${normalizedPath}`;
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
+async function readErrorBody(response: Response): Promise<{ message: string; data: any }> {
   const text = await response.text().catch(() => '');
-  if (!text) return `Erreur HTTP ${response.status}`;
+  if (!text) return { message: `Erreur HTTP ${response.status}`, data: null };
   try {
     const data = JSON.parse(text);
-    return data.error || data.message || text;
+    return { message: data.error || data.message || text, data };
   } catch {
-    return text;
+    return { message: text, data: null };
   }
 }
 
@@ -71,8 +71,10 @@ export async function apiRequest(
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 409 || response.status === 429) {
-          const error = new Error(await readErrorMessage(response)) as any;
+          const { message, data } = await readErrorBody(response);
+          const error = new Error(message) as any;
           error.status = response.status;
+          error.body = data;
           throw error;
         }
         networkErrors.push(`${url}: HTTP ${response.status}`);

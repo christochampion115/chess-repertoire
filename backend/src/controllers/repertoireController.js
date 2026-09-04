@@ -42,6 +42,7 @@ async function updateRepertoire(req, res, next) {
         error: 'Conflict',
         message: 'Le répertoire a été modifié ailleurs.',
         serverData: error.serverData,
+        serverUpdatedAt: error.serverUpdatedAt,
       });
     }
     next(error);
