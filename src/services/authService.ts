@@ -478,11 +478,17 @@ async function _putWithRetry(
   return {};
 }
 
+let _isFlushing = false;
+
 async function _flushDirtyRepertoires(): Promise<void> {
+  // Empêche deux flushes concurrents de relire un serverUpdatedAtMap pas encore à jour (cause de faux conflits 409)
+  if (_isFlushing) return;
   const store = useRepertoireStore.getState();
   const { token } = useAuthStore.getState();
   if (!token || store.dirtyIds.size === 0) return;
 
+  _isFlushing = true;
+  try {
   useAuthStore.getState().setSyncStatus('syncing');
   let hadError = false;
   const ids = [...store.dirtyIds];
@@ -508,9 +514,36 @@ async function _flushDirtyRepertoires(): Promise<void> {
         store.clearDirty(localId);
         continue;
       } else if (err?.status === 409) {
-        // P1-B : conflit — déléguer à la modale
+        // Faux conflit fréquent : notre propre écriture précédente a abouti côté serveur sans que
+        // la réponse nous parvienne (retry réseau) — un seul re-essai silencieux avec le timestamp
+        // serveur frais règle ce cas sans déranger l'utilisateur. Si ça échoue encore, vrai conflit.
+        const freshUpdatedAt = err?.body?.serverUpdatedAt;
+        if (freshUpdatedAt && freshUpdatedAt !== clientUpdatedAt) {
+          try {
+            const retryResult = await _putWithRetry(serverId, data, freshUpdatedAt, token);
+            if (retryResult.updatedAt) store.setServerUpdatedAt(localId, retryResult.updatedAt);
+            useAuthStore.getState().setSyncStatus('idle');
+            continue;
+          } catch (retryErr: any) {
+            if (retryErr?.status !== 409) {
+              hadError = true;
+              store.markDirty(localId);
+              console.warn('[sync] PUT retry failed:', retryErr?.message);
+              useAuthStore.getState().setSyncStatus('error', 'Sauvegarde échouée — sera retentée');
+              continue;
+            }
+            err = retryErr;
+          }
+        }
+        // P1-B : vrai conflit — déléguer à la modale
         const { openModal } = await import('@/stores/uiStore').then((m) => m.useUiStore.getState());
-        openModal({ type: 'conflict', localRepId: localId, serverId, serverRep: err?.serverData ?? null });
+        openModal({
+          type: 'conflict',
+          localRepId: localId,
+          serverId,
+          serverRep: err?.body?.serverData ?? null,
+          serverUpdatedAt: err?.body?.serverUpdatedAt,
+        });
       } else {
         // Remettre en dirty pour la prochaine tentative (sauf 401/404)
         if (err?.status !== 401 && err?.status !== 404) {
@@ -524,6 +557,9 @@ async function _flushDirtyRepertoires(): Promise<void> {
   }
 
   useAuthStore.getState().setSyncStatus(hadError ? 'error' : 'idle');
+  } finally {
+    _isFlushing = false;
+  }
 }
 
 export function scheduleRepertoireSync(): void {
@@ -590,6 +626,7 @@ export async function resolveConflict(
   serverId: number,
   action: 'overwrite' | 'keep-server',
   serverRep: any,
+  serverUpdatedAt?: string,
 ): Promise<void> {
   const { token } = useAuthStore.getState();
   const store = useRepertoireStore.getState();
@@ -600,6 +637,8 @@ export async function resolveConflict(
       const reps = store.repertoires.map((r) => (r.id === localRepId ? node : r));
       store.setRepertoires(reps);
     }
+    // Sans ça, le prochain PUT réutilise l'ancien timestamp et rouvre un conflit à coup sûr
+    if (serverUpdatedAt) store.setServerUpdatedAt(localRepId, serverUpdatedAt);
     store.clearDirty(localRepId);
     return;
   }

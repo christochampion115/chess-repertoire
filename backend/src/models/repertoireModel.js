@@ -122,6 +122,7 @@ async function updateRepertoire(id, userId, updates) {
       const conflict = new Error('Conflict: server has a newer version');
       conflict.statusCode = 409;
       conflict.serverData = parsePayload(existing);
+      conflict.serverUpdatedAt = existing.updatedAt;
       throw conflict;
     }
   }
