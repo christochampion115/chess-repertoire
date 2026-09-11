@@ -19,8 +19,13 @@ export const SplashScreen = React.memo(function SplashScreen() {
   const [password, setPassword] = useState('');
 
   const handleGuest = useCallback(() => {
-    resetAllUserStores();              // vide répertoires, stats, training
+    // Session expirée non reconnectée : ne pas écraser les données locales du compte
+    const expiredId = useAuthStore.getState().expiredUserId;
+    if (!expiredId) {
+      resetAllUserStores();           // vide répertoires, stats, training
+    }
     useAuthStore.getState().logout();  // vide auth + status='guest'
+    if (expiredId) useAuthStore.getState().setExpiredUserId(expiredId); // logout() efface le marqueur
     setGuestMode(true);                // flag invité
     setStatus('guest');
     initializeService();

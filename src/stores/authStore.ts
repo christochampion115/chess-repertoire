@@ -11,6 +11,7 @@ interface AuthActions {
   setSyncStatus: (status: SyncStatus, message?: string) => void;
   setFormMode: (mode: AuthFormMode) => void;
   setGuestMode: (val: boolean) => void;
+  setExpiredUserId: (id: string | null) => void;
   logout: () => void;
 }
 
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
   syncMessage: '',
   formMode: 'login',
   isGuestMode: false,
+  expiredUserId: null,
 
   setUser: (user) => set({ user }),
   setToken: (token) => set({ token }),
@@ -36,6 +38,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     set({ syncStatus: status, syncMessage: message }),
   setFormMode: (mode) => set({ formMode: mode }),
   setGuestMode: (val) => set({ isGuestMode: val }),
+  setExpiredUserId: (id) => set({ expiredUserId: id }),
   logout: () =>
     set({
       user: null,
@@ -45,6 +48,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       syncStatus: 'idle',
       syncMessage: '',
       isGuestMode: false,
+      expiredUserId: null,
     }),
     }),
     {
@@ -54,6 +58,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         token: s.token,
         status: s.status,
         isGuestMode: s.isGuestMode,
+        expiredUserId: s.expiredUserId,
       }),
     },
   ),
