@@ -191,7 +191,10 @@ export async function bootstrapSession(): Promise<void> {
   }
 
   if (!token) {
-    resetAllUserStores();
+    // Ne pas vider si une session a expiré sans re-login : les données locales attendent le retour du même compte
+    if (!auth.expiredUserId) {
+      resetAllUserStores();
+    }
     initializeService();
     auth.setStatus('guest');
     return;
@@ -201,6 +204,8 @@ export async function bootstrapSession(): Promise<void> {
     const session = await apiRequest('/auth/me', { token });
     auth.setUser(session.user);
     auth.setStatus('logged');
+    auth.setExpiredUserId(null);
+    _authExpired = false;
 
     const repResponse = await apiRequest('/repertoires', { token });
     await _applyServerRepertoires(repResponse?.repertoires || []);
@@ -211,16 +216,17 @@ export async function bootstrapSession(): Promise<void> {
     initializeService();
   } catch (error: any) {
     if (error?.status === 401) {
-      const store = useRepertoireStore.getState();
-      if (store.dirtyIds.size > 0) {
-        _flushDirtyRepertoires().catch(() => {});
-      }
+      // Session expirée : PAS de flush (token mort) ni de reset — les données locales sont
+      // conservées et fusionnées au prochain login du même compte (shouldPreferLocal)
+      const expiredId = auth.user?.id != null ? String(auth.user.id) : null;
+      auth.setExpiredUserId(expiredId);
+      _authExpired = true;
       auth.setToken('');
       auth.setUser(null);
       auth.setStatus('guest');
       clearState('alphaChess.authToken');
       clearState('alphaChess.authUser');
-      resetAllUserStores();
+      initializeService();
       useUiStore.getState().openModal({ type: 'session-expired' });
     } else {
       auth.setSyncStatus('error', 'Connexion perdue, veuillez vous reconnecter');
@@ -357,18 +363,25 @@ async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): 
     throw new Error('Réponse de connexion invalide');
   }
 
-  // Capturer les répertoires invités AVANT resetAllUserStores (P1-C)
-  const guestReps = isNewUser
+  // P1-C : capturer les répertoires invités AVANT reset — mode invité réel uniquement,
+  // jamais les données d'une session expirée (elles migreraient vers un AUTRE compte)
+  const guestReps = isNewUser && useAuthStore.getState().isGuestMode
     ? useRepertoireStore.getState().repertoires.slice()
     : [];
 
   const auth = useAuthStore.getState();
+  const sameUser = auth.expiredUserId != null && String(user.id) === auth.expiredUserId;
   auth.setToken(token);
   auth.setUser(user);
   auth.setStatus('logged');
   auth.setGuestMode(false);
+  auth.setExpiredUserId(null);
+  _authExpired = false;
 
-  resetAllUserStores();
+  // Même compte après expiration : conserver le local intact, _applyServerRepertoires fusionne
+  if (!sameUser) {
+    resetAllUserStores();
+  }
 
   try {
     const repResponse = await apiRequest('/repertoires', { token });
@@ -379,6 +392,19 @@ async function finalizeAuthenticatedSession(response: any, isNewUser: boolean): 
     }
     initializeService();
     retryStats();
+
+    // Re-pousser les modifications locales préservées pendant l'expiration (audit M4)
+    if (useRepertoireStore.getState().dirtyIds.size > 0) {
+      _flushDirtyRepertoires().catch(() => {});
+    }
+
+    // Re-créer côté serveur les répertoires locaux jamais synchronisés (créés pendant l'expiration)
+    const repStore = useRepertoireStore.getState();
+    for (const rep of repStore.repertoires) {
+      if (!rep.isExample && !repStore.serverIdMap[rep.id]) {
+        registerCreatedRepertoire(rep).catch(() => {});
+      }
+    }
 
     // P1-C : migration des répertoires invités après signup
     if (isNewUser && guestReps.length > 0) {
@@ -441,6 +467,7 @@ export async function logoutSession(): Promise<void> {
       clearState('alphaChess.authUser');
       resetAllUserStores();
       useAuthStore.getState().logout();
+      _authExpired = false;
       initializeService();
       retryStats();
     }
@@ -465,6 +492,7 @@ async function _putWithRetry(
         method: 'PUT',
         token,
         body: clientUpdatedAt ? { data, clientUpdatedAt } : { data },
+        timeoutMs: 15000, // borne la tentative — sans elle un fetch suspendu gèle _isFlushing indéfiniment
       });
       return response?.repertoire ?? {};
     } catch (err: any) {
@@ -479,10 +507,13 @@ async function _putWithRetry(
 }
 
 let _isFlushing = false;
+// true entre un 401 détecté et le prochain login réussi — suspend la sync sans perdre les dirty
+let _authExpired = false;
 
 async function _flushDirtyRepertoires(): Promise<void> {
   // Empêche deux flushes concurrents de relire un serverUpdatedAtMap pas encore à jour (cause de faux conflits 409)
   if (_isFlushing) return;
+  if (_authExpired) return;
   const store = useRepertoireStore.getState();
   const { token } = useAuthStore.getState();
   if (!token || store.dirtyIds.size === 0) return;
@@ -509,9 +540,17 @@ async function _flushDirtyRepertoires(): Promise<void> {
       useAuthStore.getState().setSyncStatus('idle');
     } catch (err: any) {
       if (err?.status === 401) {
-        // Session expirée en cours de sync — informer l'utilisateur, ne pas remettre en dirty
+        // Token expiré : conserver le coup en file (dirty), suspendre la sync et proposer la reconnexion.
+        // Surtout ne PAS clearDirty : les données seraient silencieusement abandonnées.
+        store.markDirty(localId);
+        hadError = true;
         useAuthStore.getState().setError('Connexion perdue, veuillez vous reconnecter');
-        store.clearDirty(localId);
+        if (!_authExpired) {
+          _authExpired = true;
+          const auth = useAuthStore.getState();
+          auth.setExpiredUserId(auth.user?.id != null ? String(auth.user.id) : null);
+          useUiStore.getState().openModal({ type: 'session-expired' });
+        }
         continue;
       } else if (err?.status === 409) {
         // Faux conflit fréquent : notre propre écriture précédente a abouti côté serveur sans que

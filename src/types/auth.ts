@@ -18,4 +18,6 @@ export interface AuthState {
   syncMessage: string;
   formMode: AuthFormMode;
   isGuestMode: boolean;
+  /** id du compte dont la session a expiré — permet de préserver les données locales jusqu'à re-login du même compte */
+  expiredUserId: string | null;
 }

@@ -45,17 +45,21 @@ interface ApiRequestOptions {
   method?: string;
   token?: string;
   body?: unknown;
+  /** délai max par tentative — opt-in, sans effet sur les appels existants */
+  timeoutMs?: number;
 }
 
 export async function apiRequest(
   path: string,
-  { method = 'GET', token = '', body }: ApiRequestOptions = {},
+  { method = 'GET', token = '', body, timeoutMs }: ApiRequestOptions = {},
 ): Promise<any> {
   const apiCandidates = buildApiCandidates();
   const networkErrors: string[] = [];
 
   for (const baseUrl of apiCandidates) {
     const url = buildUrl(baseUrl, path);
+    const controller = timeoutMs ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
     try {
       const response = await fetch(url, {
@@ -67,6 +71,7 @@ export async function apiRequest(
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
+        ...(controller ? { signal: controller.signal } : {}),
       });
 
       if (!response.ok) {
@@ -91,7 +96,9 @@ export async function apiRequest(
       return contentType.includes('application/json') ? response.json() : null;
     } catch (error: any) {
       if (error?.status === 401 || error?.status === 409) throw error;
-      networkErrors.push(`${url}: ${error?.message || 'Network error'}`);
+      networkErrors.push(`${url}: ${error?.name === 'AbortError' ? `Timeout (${timeoutMs}ms)` : error?.message || 'Network error'}`);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
